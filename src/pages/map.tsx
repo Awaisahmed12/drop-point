@@ -44,6 +44,11 @@ export default function MapPage() {
 
   const lastFetchedCenter = useRef<{ lat: number; lng: number } | null>(null);
 
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [savedProperty, setSavedProperty] = useState<any>(null);
+
   // Auth guard
   useEffect(() => {
     const getUser = async () => {
@@ -99,6 +104,11 @@ export default function MapPage() {
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+      return;
+    }
     if (!showDropdown || predictions.length === 0) return;
     if (e.key === 'ArrowDown') {
       setSelectedIndex((prev) => (prev + 1) % predictions.length);
@@ -106,9 +116,6 @@ export default function MapPage() {
     } else if (e.key === 'ArrowUp') {
       setSelectedIndex((prev) => (prev - 1 + predictions.length) % predictions.length);
       e.preventDefault();
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      selectPrediction(selectedIndex);
     }
   };
 
@@ -148,24 +155,7 @@ export default function MapPage() {
   // Select a prediction
   const selectPrediction = async (index: number) => {
     const prediction = predictions[index];
-    if (!prediction) return;
-    justSelectedRef.current = true;
-    setInputValue(prediction.description);
-    setShowDropdown(false);
-    setPredictions([]);
-    setSelectedIndex(0);
-    const loc = await geocodePlaceId(prediction.place_id);
-    if (loc) {
-      setMapCenter(loc);
-      setZoom(SEARCH_ZOOM);
-      setHasInteracted(true);
-      lastFetchedCenter.current = loc;
-      fetchAddress(loc.lat, loc.lng);
-      if (map) {
-        map.panTo(loc);
-        map.setZoom(SEARCH_ZOOM);
-      }
-    }
+    await selectPredictionByPrediction(prediction);
   };
 
   // Click outside to close dropdown
@@ -241,6 +231,95 @@ export default function MapPage() {
     return null;
   }
 
+  const handleSearch = async () => {
+    if (!inputValue.trim()) return;
+    // Always trigger a search for the current input value
+    setShowDropdown(false);
+    setPredictions([]);
+    setSelectedIndex(0);
+    if (inputRef.current) inputRef.current.blur();
+    // Find the first prediction that matches the input, or fetch new predictions if needed
+    let prediction = predictions.find(p => p.description === inputValue.trim());
+    if (!prediction) {
+      // Fetch predictions for the current input
+      const newPreds = await fetchPredictions(inputValue.trim());
+      prediction = newPreds[0];
+    }
+    if (prediction) {
+      await selectPredictionByPrediction(prediction);
+    }
+  };
+
+  // Helper to select a prediction object
+  const selectPredictionByPrediction = async (prediction: any) => {
+    if (!prediction) return;
+    justSelectedRef.current = true;
+    setInputValue(prediction.description);
+    setShowDropdown(false);
+    setPredictions([]);
+    setSelectedIndex(0);
+    const loc = await geocodePlaceId(prediction.place_id);
+    if (loc) {
+      setMapCenter(loc);
+      setZoom(SEARCH_ZOOM);
+      setHasInteracted(true);
+      lastFetchedCenter.current = loc;
+      fetchAddress(loc.lat, loc.lng);
+      if (map) {
+        map.panTo(loc);
+        map.setZoom(SEARCH_ZOOM);
+      }
+    }
+  };
+
+  // Save property to Supabase
+  const handleSaveProperty = async () => {
+    if (!user || !address || !map) return;
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      const center = map.getCenter();
+      if (!center) throw new Error('No map center');
+      // Check for duplicate property by address for this user
+      const { data: existing, error: selectError } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('address', address)
+        .maybeSingle();
+      if (selectError) throw selectError;
+      if (existing) {
+        setSaveMessage('You have already saved this property!');
+        setSaving(false);
+        setSavedProperty(existing);
+        setShowDetailsModal(true);
+        return;
+      }
+      // Insert new property
+      const { data, error } = await supabase.from('properties').insert([
+        {
+          user_id: user.id,
+          address,
+          lat: center.lat(),
+          lng: center.lng(),
+          label: null,
+          notes: null,
+          thumbnail_url: null,
+        },
+      ]).select();
+      if (error) {
+        console.error('Supabase insert error:', error);
+        throw error;
+      }
+      setSaveMessage('Property saved!');
+      setSavedProperty(data && data[0] ? data[0] : null);
+      setShowDetailsModal(true);
+    } catch (err: any) {
+      setSaveMessage('Error saving property.');
+    }
+    setSaving(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -301,6 +380,22 @@ export default function MapPage() {
               autoComplete="off"
               style={{ boxShadow: '0 4px 24px 0 rgba(0,0,0,0.10)' }}
             />
+            {inputValue && (
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none"
+                onClick={() => {
+                  setInputValue('');
+                  setShowDropdown(false);
+                  setPredictions([]);
+                  setSelectedIndex(0);
+                  if (inputRef.current) inputRef.current.focus();
+                }}
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
             {showDropdown && predictions.length > 0 && (
               <div
                 ref={dropdownRef}
@@ -324,13 +419,13 @@ export default function MapPage() {
         <div className="absolute top-6 left-6 z-30">
           <div className="flex gap-2 bg-white rounded-lg shadow-lg p-2">
             <button
-              className={`px-3 py-1 rounded font-semibold text-sm ${mapType === 'roadmap' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800 border border-gray-300'}`}
+              className={`px-3 py-1 rounded font-semibold text-sm ${mapType === 'roadmap' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800 border border-gray-300'} cursor-pointer`}
               onClick={() => setMapType('roadmap')}
             >
               Map
             </button>
             <button
-              className={`px-3 py-1 rounded font-semibold text-sm ${mapType === 'satellite' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800 border border-gray-300'}`}
+              className={`px-3 py-1 rounded font-semibold text-sm ${mapType === 'satellite' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800 border border-gray-300'} cursor-pointer`}
               onClick={() => setMapType('satellite')}
             >
               Satellite
@@ -340,14 +435,75 @@ export default function MapPage() {
         {/* Property info card at bottom */}
         {hasInteracted && address && (
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 w-full max-w-md px-4">
-            <div className="bg-white rounded-xl shadow-lg p-4 flex flex-col items-center gap-2 border border-gray-200">
-              <div className="text-gray-800 text-base font-semibold">{addressLoading ? 'Loading address...' : address}</div>
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-4 border border-blue-100 animate-fade-in">
+              <div className="text-gray-900 text-lg font-semibold text-center">
+                {addressLoading ? (
+                  <div className="flex items-center gap-2">
+                    <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading address...
+                  </div>
+                ) : address}
+              </div>
               <button
-                className="mt-2 px-5 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
-                disabled={addressLoading || !address || address === 'No address found' || address === 'Error fetching address'}
+                className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer"
+                disabled={addressLoading || !address || address === 'No address found' || address === 'Error fetching address' || saving}
+                onClick={handleSaveProperty}
               >
-                Select Property
+                {saving ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </div>
+                ) : 'Select Property'}
               </button>
+              {saveMessage && (
+                <div className={`text-sm font-medium ${saveMessage.includes('Error') ? 'text-red-600' : 'text-green-600'} animate-fade-in`}>
+                  {saveMessage}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {/* Property details modal */}
+        {showDetailsModal && savedProperty && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in">
+            <div className="bg-white/80 rounded-3xl shadow-2xl p-8 w-full max-w-md relative flex flex-col gap-6 border border-blue-100">
+              <button
+                className="absolute top-4 right-4 text-gray-400 hover:text-blue-600 text-2xl font-bold focus:outline-none transition-colors cursor-pointer"
+                onClick={() => setShowDetailsModal(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+              <div className="flex flex-col items-center gap-2">
+                <div className="text-2xl font-extrabold text-blue-700 mb-1">Property Details</div>
+                <div className="text-lg font-semibold text-gray-900 text-center">{savedProperty.label || savedProperty.address}</div>
+                {savedProperty.label && (
+                  <div className="text-blue-500 text-sm">Label: {savedProperty.label}</div>
+                )}
+                {savedProperty.notes && (
+                  <div className="text-gray-500 text-sm">Notes: {savedProperty.notes}</div>
+                )}
+              </div>
+              <div className="mt-2 w-full">
+                <div className="font-semibold mb-2 text-blue-700">Files</div>
+                <div className="bg-blue-50 rounded-xl p-4 text-blue-400 text-base text-center flex flex-col items-center gap-2">
+                  {/* Icon for empty state */}
+                  <svg width="32" height="32" fill="none" viewBox="0 0 32 32"><rect x="6" y="8" width="20" height="16" rx="3" fill="#2563eb" fillOpacity="0.08"/><rect x="10" y="12" width="12" height="8" rx="2" fill="#2563eb" fillOpacity="0.18"/><rect x="14" y="16" width="4" height="2" rx="1" fill="#2563eb" fillOpacity="0.4"/></svg>
+                  No files uploaded yet.
+                </div>
+                <button
+                  className="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all cursor-pointer"
+                >
+                  Upload File
+                </button>
+              </div>
             </div>
           </div>
         )}

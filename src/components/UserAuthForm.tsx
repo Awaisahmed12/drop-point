@@ -60,19 +60,20 @@ export default function UserAuthForm() {
   };
 
   return (
-    <div className="w-full max-w-md bg-white rounded-xl shadow-md p-8 flex flex-col gap-6">
-      <div className="flex flex-col items-center gap-2">
+    <div className="w-full max-w-md bg-white/80 rounded-3xl shadow-2xl p-8 flex flex-col gap-8 border border-blue-100 animate-fade-in backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-3">
         {/* Logo placeholder */}
-        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-2">
-          <span className="text-3xl font-bold text-blue-600">DP</span>
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-2 shadow-lg">
+          <span className="text-3xl font-extrabold text-blue-600">DP</span>
         </div>
-        <h1 className="text-2xl font-semibold text-gray-900">{isSignUp ? 'Sign Up' : 'Log In'} to DropPoint</h1>
+        <h1 className="text-3xl font-extrabold text-blue-700">{isSignUp ? 'Sign Up' : 'Log In'}</h1>
+        <div className="text-base text-gray-500 font-medium">to DropPoint</div>
       </div>
-      <form className="flex flex-col gap-4" onSubmit={handleAuth}>
+      <form className="flex flex-col gap-5" onSubmit={handleAuth}>
         <input
           type="email"
           placeholder="Email"
-          className="input input-bordered w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900"
+          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow"
           value={email}
           onChange={e => setEmail(e.target.value)}
           autoComplete="email"
@@ -82,7 +83,7 @@ export default function UserAuthForm() {
           <input
             type={showPassword ? 'text' : 'password'}
             placeholder="Password"
-            className="input input-bordered w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 pr-10"
+            className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow pr-10"
             value={password}
             onChange={e => setPassword(e.target.value)}
             autoComplete={isSignUp ? 'new-password' : 'current-password'}
@@ -90,9 +91,10 @@ export default function UserAuthForm() {
           />
           <button
             type="button"
-            className="absolute right-3 top-1/2 -translate-y-1/2"
-            tabIndex={-1}
-            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none cursor-pointer"
+            onClick={() => {
+              setShowPassword((v) => !v);
+            }}
             aria-label={showPassword ? 'Hide password' : 'Show password'}
           >
             <EyeIcon open={showPassword} />
@@ -103,7 +105,7 @@ export default function UserAuthForm() {
             <input
               type={showConfirmPassword ? 'text' : 'password'}
               placeholder="Confirm Password"
-              className="input input-bordered w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 pr-10"
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow pr-10"
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
               autoComplete="new-password"
@@ -111,9 +113,10 @@ export default function UserAuthForm() {
             />
             <button
               type="button"
-              className="absolute right-3 top-1/2 -translate-y-1/2"
-              tabIndex={-1}
-              onClick={() => setShowConfirmPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none cursor-pointer"
+              onClick={() => {
+                setShowConfirmPassword((v) => !v);
+              }}
               aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
             >
               <EyeIcon open={showConfirmPassword} />
@@ -125,15 +128,15 @@ export default function UserAuthForm() {
         )}
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60"
+          className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer"
           disabled={loading}
         >
           {loading ? (isSignUp ? 'Signing Up...' : 'Logging In...') : (isSignUp ? 'Sign Up' : 'Log In')}
         </button>
       </form>
-      <div className="flex flex-col gap-2 items-center">
+      <div className="flex flex-col gap-2 items-center mt-2">
         <button
-          className="text-blue-600 hover:underline text-sm"
+          className="text-blue-600 hover:underline text-base font-medium cursor-pointer"
           onClick={() => {
             setIsSignUp(!isSignUp);
             setError(null);
@@ -144,9 +147,13 @@ export default function UserAuthForm() {
         >
           {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
         </button>
-        {error && <div className="text-red-600 text-sm text-center">{error}</div>}
-        {message && <div className="text-green-600 text-sm text-center">{message}</div>}
+        {error && <div className="text-red-600 text-base text-center font-semibold animate-fade-in">{error}</div>}
+        {message && <div className="text-green-600 text-base text-center font-semibold animate-fade-in">{message}</div>}
       </div>
     </div>
   );
-} 
+}
+
+// Add fade-in animation to Tailwind (if not already in your config):
+// .animate-fade-in { animation: fadeIn 0.3s ease; }
+// @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } } 
