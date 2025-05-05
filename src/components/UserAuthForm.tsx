@@ -62,10 +62,8 @@ export default function UserAuthForm() {
   return (
     <div className="w-full max-w-md bg-white/80 rounded-3xl shadow-2xl p-8 flex flex-col gap-8 border border-blue-100 animate-fade-in backdrop-blur-sm">
       <div className="flex flex-col items-center gap-3">
-        {/* Logo placeholder */}
-        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-2 shadow-lg">
-          <span className="text-3xl font-extrabold text-blue-600">DP</span>
-        </div>
+        {/* Logo image, no circle, no shadow, larger */}
+        <img src="/logo.png" alt="DropPoint Logo" className="w-20 h-20 object-contain mb-2" />
         <h1 className="text-3xl font-extrabold text-blue-700">{isSignUp ? 'Sign Up' : 'Log In'}</h1>
         <div className="text-base text-gray-500 font-medium">to DropPoint</div>
       </div>
