@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
 import { GoogleMap, LoadScript } from '@react-google-maps/api';
+import { v4 as uuidv4 } from 'uuid';
 
 const containerStyle = {
   width: '100vw',
@@ -14,6 +15,7 @@ const US_CENTER = {
 };
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
+const GOOGLE_MAP_LIBRARIES = ["places"] as const;
 
 const DEFAULT_ZOOM = 12;
 const SEARCH_ZOOM = 19;
@@ -48,6 +50,13 @@ export default function MapPage() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [savedProperty, setSavedProperty] = useState<any>(null);
+
+  // Add state for selected files at the top of MapPage
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<{ name: string; status: 'uploading' | 'success' | 'error'; error?: string }[]>([]);
+  const [rejectedFiles, setRejectedFiles] = useState<{ name: string; size: number }[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [propertyFiles, setPropertyFiles] = useState<any[]>([]);
 
   // Auth guard
   useEffect(() => {
@@ -320,6 +329,80 @@ export default function MapPage() {
     setSaving(false);
   };
 
+  // Fetch files for the selected property
+  useEffect(() => {
+    async function fetchFiles() {
+      if (!savedProperty) return;
+      const { data, error } = await supabase
+        .from('property_files')
+        .select('*')
+        .eq('property_id', savedProperty.id)
+        .order('uploaded_at', { ascending: false });
+      if (!error) setPropertyFiles(data || []);
+    }
+    if (showDetailsModal && savedProperty) {
+      fetchFiles();
+    }
+  }, [showDetailsModal, savedProperty]);
+
+  // Multi-file upload handler
+  async function handleFilesSelected(files: FileList | null) {
+    if (!files || !savedProperty || !user) return;
+    setUploadError(null);
+    const validFiles: File[] = [];
+    const rejected: { name: string; size: number }[] = [];
+    Array.from(files).forEach(file => {
+      if (file.size > 20 * 1024 * 1024) {
+        rejected.push({ name: file.name, size: file.size });
+      } else {
+        validFiles.push(file);
+      }
+    });
+    setRejectedFiles(rejected);
+    if (validFiles.length === 0) return;
+    // Start uploading
+    setUploadingFiles(validFiles.map(f => ({ name: f.name, status: 'uploading' })));
+    for (const file of validFiles) {
+      try {
+        const ext = file.name.split('.').pop();
+        const uniqueName = `${uuidv4()}.${ext}`;
+        const filePath = `${savedProperty.id}/${uniqueName}`;
+        // Upload to Supabase Storage
+        const { error: storageError } = await supabase.storage
+          .from('property-files')
+          .upload(filePath, file, { upsert: false });
+        if (storageError) throw storageError;
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('property-files')
+          .getPublicUrl(filePath);
+        const fileUrl = urlData?.publicUrl;
+        // Insert metadata into property_files
+        const { error: dbError } = await supabase.from('property_files').insert([
+          {
+            property_id: savedProperty.id,
+            user_id: user.id,
+            file_name: uniqueName,
+            file_url: fileUrl,
+            file_type: file.type,
+            file_size: file.size,
+          },
+        ]);
+        if (dbError) throw dbError;
+        setUploadingFiles(prev => prev.map(f => f.name === file.name ? { ...f, status: 'success' } : f));
+      } catch (err: any) {
+        setUploadingFiles(prev => prev.map(f => f.name === file.name ? { ...f, status: 'error', error: err.message || 'Upload failed.' } : f));
+      }
+    }
+    // Refresh file list
+    const { data, error } = await supabase
+      .from('property_files')
+      .select('*')
+      .eq('property_id', savedProperty.id)
+      .order('uploaded_at', { ascending: false });
+    if (!error) setPropertyFiles(data || []);
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -332,7 +415,7 @@ export default function MapPage() {
     <div className="relative w-screen h-screen overflow-hidden">
       <LoadScript
         googleMapsApiKey={GOOGLE_MAPS_API_KEY}
-        libraries={["places"]}
+        libraries={GOOGLE_MAP_LIBRARIES as any}
       >
         <GoogleMap
           mapContainerStyle={containerStyle}
@@ -476,11 +559,20 @@ export default function MapPage() {
             <div className="bg-white/80 rounded-3xl shadow-2xl p-8 w-full max-w-md relative flex flex-col gap-6 border border-blue-100">
               <button
                 className="absolute top-4 right-4 text-gray-400 hover:text-blue-600 text-2xl font-bold focus:outline-none transition-colors cursor-pointer"
-                onClick={() => setShowDetailsModal(false)}
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setUploadingFiles([]);
+                  setRejectedFiles([]);
+                  setUploadError(null);
+                }}
                 aria-label="Close"
               >
                 ×
               </button>
+              {/* Property image area: Static Map only (no Street View) */}
+              <div className="w-full h-40 rounded-2xl bg-gray-200 flex items-center justify-center overflow-hidden border border-blue-100 mb-2">
+                <StaticMapImage lat={savedProperty.lat} lng={savedProperty.lng} address={savedProperty.address} />
+              </div>
               <div className="flex flex-col items-center gap-2">
                 <div className="text-2xl font-extrabold text-blue-700 mb-1">Property Details</div>
                 <div className="text-lg font-semibold text-gray-900 text-center">{savedProperty.label || savedProperty.address}</div>
@@ -491,18 +583,61 @@ export default function MapPage() {
                   <div className="text-gray-500 text-sm">Notes: {savedProperty.notes}</div>
                 )}
               </div>
-              <div className="mt-2 w-full">
-                <div className="font-semibold mb-2 text-blue-700">Files</div>
-                <div className="bg-blue-50 rounded-xl p-4 text-blue-400 text-base text-center flex flex-col items-center gap-2">
-                  {/* Icon for empty state */}
-                  <svg width="32" height="32" fill="none" viewBox="0 0 32 32"><rect x="6" y="8" width="20" height="16" rx="3" fill="#2563eb" fillOpacity="0.08"/><rect x="10" y="12" width="12" height="8" rx="2" fill="#2563eb" fillOpacity="0.18"/><rect x="14" y="16" width="4" height="2" rx="1" fill="#2563eb" fillOpacity="0.4"/></svg>
-                  No files uploaded yet.
+              {/* Uploaded files section: only show if files exist */}
+              {propertyFiles.length > 0 && (
+                <div className="mt-2 w-full">
+                  <div className="font-semibold mb-2 text-blue-700">Uploaded Files</div>
+                  <div className="flex flex-wrap gap-3 mb-4 min-h-[48px] items-center justify-center">
+                    {propertyFiles.map((file) => (
+                      <FileIcon key={file.id} type={file.file_type?.split('/')[1] || 'file'} label={file.file_name} />
+                    ))}
+                  </div>
                 </div>
-                <button
-                  className="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all cursor-pointer"
-                >
-                  Upload File
-                </button>
+              )}
+              {/* Upload file section */}
+              <div className="border-t border-blue-100 pt-4 mt-2">
+                <form className="flex flex-col gap-3" onSubmit={e => e.preventDefault()}>
+                  <input
+                    id="file-upload-input"
+                    type="file"
+                    className="sr-only"
+                    multiple
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.heic,.webp,.gif,.bmp,.tiff,.txt,.csv,.xls,.xlsx,.ppt,.pptx,.mp4,.mov,.avi,.mkv,.zip,.rar,.7z,.json,.xml,.rtf,.pages,.numbers,.key,.rcf"
+                    onChange={e => handleFilesSelected(e.target.files)}
+                  />
+                  <button
+                    className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all cursor-pointer"
+                    type="button"
+                    onClick={() => document.getElementById('file-upload-input')?.click()}
+                  >
+                    Upload File
+                  </button>
+                  {/* Upload progress and results */}
+                  {uploadingFiles.length > 0 && (
+                    <div className="flex flex-col gap-1 mt-2">
+                      {uploadingFiles.map(f => (
+                        <div key={f.name} className="flex items-center gap-2 text-sm">
+                          <span className="truncate max-w-[120px]">{f.name}</span>
+                          {f.status === 'uploading' && <span className="text-blue-500">Uploading...</span>}
+                          {f.status === 'success' && <span className="text-green-600 font-bold">✓ Uploaded</span>}
+                          {f.status === 'error' && <span className="text-red-600 font-bold">✗ Failed</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Rejected files */}
+                  {rejectedFiles.length > 0 && (
+                    <div className="text-xs text-red-600 text-center font-semibold animate-fade-in mt-2">
+                      {rejectedFiles.length === 1
+                        ? `"${rejectedFiles[0].name}" was too large (max 20MB). Try zipping or splitting large files.`
+                        : `${rejectedFiles.length} files were too large (max 20MB). Try zipping or splitting large files.`}
+                    </div>
+                  )}
+                  {uploadError && (
+                    <div className="text-xs text-red-600 text-center font-semibold animate-fade-in">{uploadError}</div>
+                  )}
+                  <div className="text-xs text-gray-500 text-center">Max file size: 20MB. You can select multiple files.</div>
+                </form>
               </div>
             </div>
           </div>
@@ -511,3 +646,44 @@ export default function MapPage() {
     </div>
   );
 }
+
+// --- Helper components ---
+
+function FileIcon({ type, label }: { type: string; label: string }) {
+  // Simple icon based on type
+  let icon;
+  if (type === 'pdf') {
+    icon = (
+      <svg width="36" height="36" fill="none" viewBox="0 0 36 36"><rect x="4" y="6" width="28" height="24" rx="4" fill="#2563eb" fillOpacity="0.08"/><rect x="8" y="10" width="20" height="16" rx="2" fill="#2563eb" fillOpacity="0.18"/><rect x="14" y="18" width="8" height="4" rx="1" fill="#2563eb" fillOpacity="0.4"/></svg>
+    );
+  } else if (type === 'doc') {
+    icon = (
+      <svg width="36" height="36" fill="none" viewBox="0 0 36 36"><rect x="4" y="6" width="28" height="24" rx="4" fill="#2563eb" fillOpacity="0.08"/><rect x="8" y="10" width="20" height="16" rx="2" fill="#2563eb" fillOpacity="0.18"/><rect x="12" y="16" width="12" height="2" rx="1" fill="#2563eb" fillOpacity="0.4"/></svg>
+    );
+  } else {
+    // img or other
+    icon = (
+      <svg width="36" height="36" fill="none" viewBox="0 0 36 36"><rect x="4" y="6" width="28" height="24" rx="4" fill="#2563eb" fillOpacity="0.08"/><rect x="8" y="10" width="20" height="16" rx="2" fill="#2563eb" fillOpacity="0.18"/><circle cx="18" cy="18" r="4" fill="#2563eb" fillOpacity="0.4"/></svg>
+    );
+  }
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {icon}
+      <div className="text-xs font-semibold text-gray-700">{label}</div>
+    </div>
+  );
+}
+
+function StaticMapImage({ lat, lng, address }: { lat: number; lng: number; address: string }) {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=17&size=400x200&maptype=satellite&markers=color:blue%7C${lat},${lng}&key=${apiKey}`;
+  return (
+    <img
+      src={staticMapUrl}
+      alt={address}
+      className="object-cover w-full h-full"
+      style={{ minHeight: 120, minWidth: 200 }}
+    />
+  );
+}
+ 
