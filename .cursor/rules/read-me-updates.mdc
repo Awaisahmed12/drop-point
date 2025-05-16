@@ -1,0 +1,17 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+After every code update, bug fix, feature addition, or problem resolution, please update the @README.md file tohe current state of the project. This file should always serve as a clear, living guide to:
+
+What we’re building
+
+Why we’re building it
+
+How each part of the codebase contributes to the whole
+
+The current architecture, decisions made, and any tradeoffs
+
+
+The goal is to make the README a reliable source of truth for anyone working on the project—whether it's you (Cursor), another dev, or even future me. As the codebase grows past 2,000+ lines and more people contribute, this documentation will be critical for keeping things understandable and maintainable.
