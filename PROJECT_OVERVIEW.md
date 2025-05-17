@@ -64,4 +64,15 @@ To support more granular property management (e.g., 123 Main Street, Suite #220 
 - Treat properties with the same base address but different units as distinct records
 - Optionally, relate or group these sub-properties for better organization
 
-This ensures users can manage documents for specific units within a building, reflecting real-world real estate needs. 
+This ensures users can manage documents for specific units within a building, reflecting real-world real estate needs.
+
+## 2024 Update: Property Saving, Location Accuracy, and Modal UX
+
+- Properties now store both the user's original map center (`user_selected_lat`, `user_selected_lng`) and the snapped address coordinates (`lat`, `lng`) from Google Maps.
+- The property modal features a hoverable + button for saving, with floating feedback messages for success/failure.
+- The modal is closed by clicking outside of it, and properties are only saved on explicit user action.
+- The property table schema now includes:
+  - `address`: Formatted address
+  - `lat`, `lng`: Snapped address coordinates
+  - `user_selected_lat`, `user_selected_lng`: User's original selection
+- This approach ensures consistency, accuracy, and future extensibility (e.g., supporting custom boundaries or polygons). 

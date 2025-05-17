@@ -101,3 +101,28 @@ To support users who want to save more specific property locations (e.g., 123 Ma
 - Optionally, group or relate these sub-properties for easier management in the UI
 
 This ensures users can organize documents for specific units within the same building, supporting real-world real estate workflows.
+
+---
+
+## Property Saving & Location Accuracy (2024 Update)
+
+- When a user saves a property, we now store both:
+  - The original map center coordinates the user selected (`user_selected_lat`, `user_selected_lng`)
+  - The snapped address coordinates returned by Google Maps (`lat`, `lng`)
+- The app uses the snapped address coordinates for the property pin, static map, and as the canonical property location in the database.
+- This approach ensures consistency between the address and the map location, while preserving the user's original intent for future features (like custom boundaries).
+
+## Property Modal UX Improvements
+- The property details modal now features a hoverable + button in the top right for saving a property.
+- When clicked, a floating message appears (green for success, red for error) to provide immediate feedback.
+- The modal can be closed by clicking outside of it.
+- The property is only saved when the user explicitly clicks the + button, not automatically.
+
+## Property Table Schema (Key Fields)
+- `address`: The formatted address string
+- `lat`, `lng`: Snapped address coordinates (from Google Maps)
+- `user_selected_lat`, `user_selected_lng`: The user's original map center
+- (other fields: label, notes, etc.)
+
+## Rationale
+- This design balances user experience, data accuracy, and future extensibility (e.g., supporting custom-drawn property boundaries or polygons).
