@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
 import { GoogleMap, LoadScript } from '@react-google-maps/api';
 import { v4 as uuidv4 } from 'uuid';
+import { CheckIcon, PlusIcon } from '@heroicons/react/24/solid';
 
 const containerStyle = {
   width: '100vw',
@@ -57,6 +58,15 @@ export default function MapPage() {
   const [rejectedFiles, setRejectedFiles] = useState<{ name: string; size: number }[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [propertyFiles, setPropertyFiles] = useState<any[]>([]);
+
+  // Add state to track if the current property is saved
+  const [isPropertySaved, setIsPropertySaved] = useState(false);
+
+  // Add state for snapped address coordinates
+  const [snappedLatLng, setSnappedLatLng] = useState<{lat: number, lng: number} | null>(null);
+
+  // Add state for floating message
+  const [floatMessage, setFloatMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -212,11 +222,16 @@ export default function MapPage() {
       const data = await res.json();
       if (data.results && data.results[0]) {
         setAddress(data.results[0].formatted_address);
+        // Save snapped address coordinates
+        const snapped = data.results[0].geometry.location;
+        setSnappedLatLng({ lat: snapped.lat, lng: snapped.lng });
       } else {
         setAddress('No address found');
+        setSnappedLatLng(null);
       }
     } catch {
       setAddress('Error fetching address');
+      setSnappedLatLng(null);
     }
     setAddressLoading(false);
   };
@@ -283,7 +298,7 @@ export default function MapPage() {
 
   // Save property to Supabase
   const handleSaveProperty = async () => {
-    if (!user || !address || !map) return;
+    if (!user || !address || !map || !snappedLatLng) return;
     setSaving(true);
     setSaveMessage(null);
     try {
@@ -304,13 +319,15 @@ export default function MapPage() {
         setShowDetailsModal(true);
         return;
       }
-      // Insert new property
+      // Insert new property with both sets of coordinates
       const { data, error } = await supabase.from('properties').insert([
         {
           user_id: user.id,
           address,
-          lat: center.lat(),
-          lng: center.lng(),
+          lat: snappedLatLng.lat,
+          lng: snappedLatLng.lng,
+          user_selected_lat: center.lat(),
+          user_selected_lng: center.lng(),
           label: null,
           notes: null,
           thumbnail_url: null,
@@ -402,6 +419,24 @@ export default function MapPage() {
       .order('uploaded_at', { ascending: false });
     if (!error) setPropertyFiles(data || []);
   }
+
+  // Add effect to check if the property is already saved whenever address or user changes
+  useEffect(() => {
+    async function checkIfSaved() {
+      if (!user || !address || addressLoading) {
+        setIsPropertySaved(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('properties')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('address', address)
+        .maybeSingle();
+      setIsPropertySaved(!!data);
+    }
+    checkIfSaved();
+  }, [user, address, addressLoading]);
 
   if (loading) {
     return (
@@ -533,41 +568,68 @@ export default function MapPage() {
               <button
                 className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer"
                 disabled={addressLoading || !address || address === 'No address found' || address === 'Error fetching address' || saving}
-                onClick={handleSaveProperty}
+                onClick={() => {
+                  if (map) {
+                    const center = map.getCenter();
+                    setSavedProperty({
+                      address,
+                      lat: center?.lat(),
+                      lng: center?.lng(),
+                      label: null,
+                      notes: null,
+                      id: null, // Not saved yet
+                    });
+                    setShowDetailsModal(true);
+                  }
+                }}
               >
-                {saving ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Saving...
-                  </div>
-                ) : 'Select Property'}
+                Select
               </button>
-              {saveMessage && (
-                <div className={`text-sm font-medium ${saveMessage.includes('Error') ? 'text-red-600' : 'text-green-600'} animate-fade-in`}>
-                  {saveMessage}
-                </div>
-              )}
             </div>
           </div>
         )}
         {/* Property details modal */}
         {showDetailsModal && savedProperty && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in">
-            <div className="bg-white/80 rounded-3xl shadow-2xl p-8 w-full max-w-md relative flex flex-col gap-6 border border-blue-100">
+          <div
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in"
+            onClick={e => {
+              // Only close if clicking the backdrop, not the modal itself
+              if (e.target === e.currentTarget) {
+                setShowDetailsModal(false);
+                setUploadingFiles([]);
+                setRejectedFiles([]);
+                setUploadError(null);
+              }
+            }}
+          >
+            <div className="bg-white/80 rounded-3xl shadow-2xl p-8 w-full max-w-md relative flex flex-col gap-6 border border-blue-100" onClick={e => e.stopPropagation()}>
+              {/* Tiny save button in modal top right */}
               <button
-                className="absolute top-4 right-4 text-gray-400 hover:text-blue-600 text-2xl font-bold focus:outline-none transition-colors cursor-pointer"
-                onClick={() => {
-                  setShowDetailsModal(false);
-                  setUploadingFiles([]);
-                  setRejectedFiles([]);
-                  setUploadError(null);
+                className={`absolute top-2 right-2 rounded-full w-7 h-7 flex items-center justify-center shadow transition-colors border-2 z-10
+                  ${isPropertySaved ? 'bg-green-500 border-green-600' : 'bg-white border-blue-200 hover:bg-blue-100 hover:border-blue-400 cursor-pointer'}
+                  ${!isPropertySaved ? 'hover:scale-110 active:scale-95 transition-transform' : ''}
+                `}
+                style={{ fontSize: '0.9rem' }}
+                disabled={isPropertySaved}
+                onClick={async () => {
+                  if (!isPropertySaved) {
+                    try {
+                      await handleSaveProperty();
+                      setIsPropertySaved(true);
+                      setFloatMessage({ text: 'Property saved!', type: 'success' });
+                    } catch {
+                      setFloatMessage({ text: 'Failed to save property. Try again.', type: 'error' });
+                    }
+                    setTimeout(() => setFloatMessage(null), 2500);
+                  }
                 }}
-                aria-label="Close"
+                aria-label={isPropertySaved ? 'Property saved' : 'Add property'}
               >
-                ×
+                {isPropertySaved ? (
+                  <CheckIcon className="w-4 h-4 text-white" />
+                ) : (
+                  <PlusIcon className="w-4 h-4 text-blue-600" />
+                )}
               </button>
               {/* Property image area: Static Map only (no Street View) */}
               <div className="w-full h-40 rounded-2xl bg-gray-200 flex items-center justify-center overflow-hidden border border-blue-100 mb-2">
@@ -640,6 +702,15 @@ export default function MapPage() {
                 </form>
               </div>
             </div>
+          </div>
+        )}
+        {/* Floating message in the modal (top center) */}
+        {floatMessage && (
+          <div className={`fixed top-8 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 rounded-xl shadow-lg font-semibold text-sm animate-fade-in
+            ${floatMessage.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
+            style={{ pointerEvents: 'none' }}
+          >
+            {floatMessage.text}
           </div>
         )}
       </LoadScript>

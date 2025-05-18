@@ -107,4 +107,34 @@ DropPoint is a secure, map-based document storage web app for real estate profes
 - **Storage:** Supabase Storage
 
 ## How to Use This File
-This file is designed to be easily understood by AI assistants and humans. It outlines the project vision, goals, completed steps, next steps, design principles, and tech stack. It will be updated as the project evolves to ensure that new goals, accomplishments, and design preferences are always up to date. 
+This file is designed to be easily understood by AI assistants and humans. It outlines the project vision, goals, completed steps, next steps, design principles, and tech stack. It will be updated as the project evolves to ensure that new goals, accomplishments, and design preferences are always up to date.
+
+## Future Collaboration & Property Sharing (Vision)
+
+As DropPoint grows, we plan to support collaborative workflows where multiple users or teams can share access to the same property. This will involve:
+- Global property records (unique by address/lat/lng)
+- A join table (e.g., `property_users`) to manage user access and roles
+- Shared file storage per property, with permissions enforced via RLS
+- Detecting when a user tries to save a property already saved by another user, and offering to join/share instead of duplicating
+
+This approach will enable true team collaboration, shared file management, and more advanced permission models. It is a complex scenario and will require careful planning of data models and security policies.
+
+## Property Specificity (Suites, Units, etc.)
+
+To support more granular property management (e.g., 123 Main Street, Suite #220 vs. Suite #345), DropPoint will:
+- Allow users to specify unit/suite numbers or sub-address details
+- Treat properties with the same base address but different units as distinct records
+- Optionally, relate or group these sub-properties for better organization
+
+This ensures users can manage documents for specific units within a building, reflecting real-world real estate needs.
+
+## 2024 Update: Property Saving, Location Accuracy, and Modal UX
+
+- Properties now store both the user's original map center (`user_selected_lat`, `user_selected_lng`) and the snapped address coordinates (`lat`, `lng`) from Google Maps.
+- The property modal features a hoverable + button for saving, with floating feedback messages for success/failure.
+- The modal is closed by clicking outside of it, and properties are only saved on explicit user action.
+- The property table schema now includes:
+  - `address`: Formatted address
+  - `lat`, `lng`: Snapped address coordinates
+  - `user_selected_lat`, `user_selected_lng`: User's original selection
+- This approach ensures consistency, accuracy, and future extensibility (e.g., supporting custom boundaries or polygons). 
