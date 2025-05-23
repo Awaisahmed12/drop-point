@@ -12,7 +12,7 @@ DropPoint is a map-based document storage web app for real estate professionals.
   - Select a property by map center or search
   - Reverse geocode to get property address
   - Save properties (with duplicate prevention)
-  - Upload and manage files per property (Supabase Storage)
+  - Upload and manage files per property (Supabase Storage; files can only be uploaded for saved properties with a valid ID)
   - Property details modal with file management
   - Modern, mobile-first UI (TailwindCSS, glassmorphism, smooth animations)
   - Limited to 5 properties or 5GB storage per user (enforced in backend, not yet visible in UI)
@@ -49,7 +49,7 @@ For a detailed vision, completed steps, and roadmap, see [`PROJECT_OVERVIEW.md`]
 ## Main Files & Structure
 - `src/pages/index.tsx`: Landing page, shows login/signup form
 - `src/components/UserAuthForm.tsx`: Handles authentication UI and logic
-- `src/pages/map.tsx`: Main app page, map, property selection, file upload, property modal
+- `src/pages/map.tsx`: Main app page, map, property selection, file upload (only for saved properties), property modal
 - `src/pages/api/autocomplete.ts` and `reverse-geocode.ts`: Google Maps API proxies
 - `src/utils/supabaseClient.ts`: Supabase client setup
 - `src/styles/globals.css`: Tailwind and custom styles
@@ -126,3 +126,37 @@ This ensures users can organize documents for specific units within the same bui
 
 ## Rationale
 - This design balances user experience, data accuracy, and future extensibility (e.g., supporting custom-drawn property boundaries or polygons).
+
+## Unit Testing Setup (2024)
+
+DropPoint now uses [Vitest](https://vitest.dev/) and [Testing Library](https://testing-library.com/) for unit and integration testing.
+
+### How to Run Tests
+
+- Run all tests:
+  ```bash
+  npm test
+  # or
+  npm run test
+  ```
+- Tests are automatically picked up from files matching `src/**/*.test.ts` or `src/**/*.test.tsx`.
+
+### Configuration
+- `vitest.config.ts`: Main Vitest configuration (jsdom, globals, setup file, test file pattern)
+- `vitest.setup.ts`: Loads Testing Library matchers (e.g., `toBeInTheDocument`)
+
+### Example Test
+- See `src/utils/supabaseClient.test.ts` for a sample test that mocks Supabase and checks client creation.
+
+### Where to Add Tests
+- Place new test files next to the code they test, using the `.test.ts` or `.test.tsx` suffix.
+- Use Testing Library for React components, and Vitest for utilities and logic.
+
+### Why Vitest?
+- Fast, modern, and compatible with Vite/Next.js projects
+- Simple configuration and great TypeScript support
+- Works seamlessly with Testing Library for React
+
+## File Upload Guard
+
+Files can only be uploaded for properties that have been saved to the database and have a valid ID. The UI and backend logic prevent file uploads for unsaved properties, avoiding errors and invalid storage paths.

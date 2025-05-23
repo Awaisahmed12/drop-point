@@ -1,9 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
 import { GoogleMap, LoadScript } from '@react-google-maps/api';
 import { v4 as uuidv4 } from 'uuid';
 import { CheckIcon, PlusIcon } from '@heroicons/react/24/solid';
+import type { User } from '@supabase/supabase-js';
+import Image from 'next/image';
 
 const containerStyle = {
   width: '100vw',
@@ -23,10 +25,39 @@ const SEARCH_ZOOM = 19;
 const MAP_TYPE_KEY = 'drop-point-map-type';
 const DEFAULT_MAP_TYPE = 'satellite';
 
+// Prediction type for Google Places API
+export type Prediction = { description: string; place_id: string; matched_substrings?: unknown; structured_formatting?: unknown; terms?: unknown; types?: string[] };
+
+// Property type matching the properties table
+export type Property = {
+  id: string | null;
+  user_id?: string;
+  address: string;
+  lat: number;
+  lng: number;
+  user_selected_lat?: number;
+  user_selected_lng?: number;
+  label?: string | null;
+  notes?: string | null;
+  thumbnail_url?: string | null;
+};
+
+// PropertyFile type matching the property_files table
+export type PropertyFile = {
+  id: string;
+  property_id: string;
+  file_name: string;
+  file_url: string;
+  uploaded_at: string;
+  user_id: string;
+  file_type: string;
+  file_size: number;
+};
+
 export default function MapPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [mapCenter, setMapCenter] = useState(US_CENTER);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
@@ -34,13 +65,6 @@ export default function MapPage() {
   const [address, setAddress] = useState<string>('');
   const [addressLoading, setAddressLoading] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // Custom autocomplete state
-  const [inputValue, setInputValue] = useState('');
-  const [predictions, setPredictions] = useState<any[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const justSelectedRef = useRef(false);
@@ -48,16 +72,14 @@ export default function MapPage() {
   const lastFetchedCenter = useRef<{ lat: number; lng: number } | null>(null);
 
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [savedProperty, setSavedProperty] = useState<any>(null);
+  const [savedProperty, setSavedProperty] = useState<Property | null>(null);
 
-  // Add state for selected files at the top of MapPage
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  // Add state for uploaded files
   const [uploadingFiles, setUploadingFiles] = useState<{ name: string; status: 'uploading' | 'success' | 'error'; error?: string }[]>([]);
   const [rejectedFiles, setRejectedFiles] = useState<{ name: string; size: number }[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [propertyFiles, setPropertyFiles] = useState<any[]>([]);
+  const [propertyFiles, setPropertyFiles] = useState<PropertyFile[]>([]);
 
   // Add state to track if the current property is saved
   const [isPropertySaved, setIsPropertySaved] = useState(false);
@@ -67,6 +89,12 @@ export default function MapPage() {
 
   // Add state for floating message
   const [floatMessage, setFloatMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Custom autocomplete state
+  const [inputValue, setInputValue] = useState('');
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Auth guard
   useEffect(() => {
@@ -145,7 +173,7 @@ export default function MapPage() {
   }
 
   // On dragend or zoom_changed, set hasInteracted and fetch address if center changed
-  const handleUserInteraction = () => {
+  const handleUserInteraction = useCallback(() => {
     if (map) {
       const center = map.getCenter();
       if (center) {
@@ -157,7 +185,7 @@ export default function MapPage() {
         }
       }
     }
-  };
+  }, [map]);
 
   // Only listen for dragend and zoom_changed for user interaction
   useEffect(() => {
@@ -169,7 +197,7 @@ export default function MapPage() {
         if (zoomListener) zoomListener.remove();
       };
     }
-  }, [map]);
+  }, [map, handleUserInteraction]);
 
   // Select a prediction
   const selectPrediction = async (index: number) => {
@@ -236,7 +264,7 @@ export default function MapPage() {
     setAddressLoading(false);
   };
 
-  async function fetchPredictions(input: string): Promise<any[]> {
+  async function fetchPredictions(input: string): Promise<Prediction[]> {
     if (!input) return [];
     const url = `/api/autocomplete?query=${encodeURIComponent(input)}`;
     const res = await fetch(url);
@@ -275,7 +303,7 @@ export default function MapPage() {
   };
 
   // Helper to select a prediction object
-  const selectPredictionByPrediction = async (prediction: any) => {
+  const selectPredictionByPrediction = async (prediction: Prediction) => {
     if (!prediction) return;
     justSelectedRef.current = true;
     setInputValue(prediction.description);
@@ -300,7 +328,7 @@ export default function MapPage() {
   const handleSaveProperty = async () => {
     if (!user || !address || !map || !snappedLatLng) return;
     setSaving(true);
-    setSaveMessage(null);
+    setFloatMessage(null);
     try {
       const center = map.getCenter();
       if (!center) throw new Error('No map center');
@@ -313,7 +341,7 @@ export default function MapPage() {
         .maybeSingle();
       if (selectError) throw selectError;
       if (existing) {
-        setSaveMessage('You have already saved this property!');
+        setFloatMessage({ text: 'You have already saved this property!', type: 'error' });
         setSaving(false);
         setSavedProperty(existing);
         setShowDetailsModal(true);
@@ -337,11 +365,11 @@ export default function MapPage() {
         console.error('Supabase insert error:', error);
         throw error;
       }
-      setSaveMessage('Property saved!');
+      setFloatMessage({ text: 'Property saved!', type: 'success' });
       setSavedProperty(data && data[0] ? data[0] : null);
       setShowDetailsModal(true);
-    } catch (err: any) {
-      setSaveMessage('Error saving property.');
+    } catch {
+      setFloatMessage({ text: 'Error saving property.', type: 'error' });
     }
     setSaving(false);
   };
@@ -349,13 +377,13 @@ export default function MapPage() {
   // Fetch files for the selected property
   useEffect(() => {
     async function fetchFiles() {
-      if (!savedProperty) return;
-      const { data, error } = await supabase
+      if (!savedProperty || !savedProperty.id) return;
+      const { data } = await supabase
         .from('property_files')
         .select('*')
         .eq('property_id', savedProperty.id)
         .order('uploaded_at', { ascending: false });
-      if (!error) setPropertyFiles(data || []);
+      if (data) setPropertyFiles(data);
     }
     if (showDetailsModal && savedProperty) {
       fetchFiles();
@@ -364,7 +392,7 @@ export default function MapPage() {
 
   // Multi-file upload handler
   async function handleFilesSelected(files: FileList | null) {
-    if (!files || !savedProperty || !user) return;
+    if (!files || !savedProperty || !savedProperty.id || !user) return;
     setUploadError(null);
     const validFiles: File[] = [];
     const rejected: { name: string; size: number }[] = [];
@@ -407,17 +435,23 @@ export default function MapPage() {
         ]);
         if (dbError) throw dbError;
         setUploadingFiles(prev => prev.map(f => f.name === file.name ? { ...f, status: 'success' } : f));
-      } catch (err: any) {
-        setUploadingFiles(prev => prev.map(f => f.name === file.name ? { ...f, status: 'error', error: err.message || 'Upload failed.' } : f));
+      } catch (err: unknown) {
+        setUploadingFiles(prev => prev.map(f => {
+          let errorMsg = 'Upload failed.';
+          if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
+            errorMsg = (err as { message?: string }).message as string;
+          }
+          return f.name === file.name ? { ...f, status: 'error', error: errorMsg } : f;
+        }));
       }
     }
     // Refresh file list
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('property_files')
       .select('*')
       .eq('property_id', savedProperty.id)
       .order('uploaded_at', { ascending: false });
-    if (!error) setPropertyFiles(data || []);
+    if (data) setPropertyFiles(data);
   }
 
   // Add effect to check if the property is already saved whenever address or user changes
@@ -427,7 +461,7 @@ export default function MapPage() {
         setIsPropertySaved(false);
         return;
       }
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('properties')
         .select('id')
         .eq('user_id', user.id)
@@ -450,7 +484,7 @@ export default function MapPage() {
     <div className="relative w-screen h-screen overflow-hidden">
       <LoadScript
         googleMapsApiKey={GOOGLE_MAPS_API_KEY}
-        libraries={GOOGLE_MAP_LIBRARIES as any}
+        libraries={[...GOOGLE_MAP_LIBRARIES]}
       >
         <GoogleMap
           mapContainerStyle={containerStyle}
@@ -573,8 +607,8 @@ export default function MapPage() {
                     const center = map.getCenter();
                     setSavedProperty({
                       address,
-                      lat: center?.lat(),
-                      lng: center?.lng(),
+                      lat: center?.lat() ?? 0,
+                      lng: center?.lng() ?? 0,
                       label: null,
                       notes: null,
                       id: null, // Not saved yet
@@ -749,11 +783,14 @@ function StaticMapImage({ lat, lng, address }: { lat: number; lng: number; addre
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=17&size=400x200&maptype=satellite&markers=color:blue%7C${lat},${lng}&key=${apiKey}`;
   return (
-    <img
+    <Image
       src={staticMapUrl}
       alt={address}
+      width={400}
+      height={200}
       className="object-cover w-full h-full"
       style={{ minHeight: 120, minWidth: 200 }}
+      priority
     />
   );
 }

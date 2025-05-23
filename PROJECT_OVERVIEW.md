@@ -65,6 +65,8 @@ DropPoint is a secure, map-based document storage web app for real estate profes
 | shared_with   | text[]       | Array of user emails/IDs for sharing              |
 | created_at    | timestamp    | Creation timestamp                                |
 
+> **Note:** Files can only be uploaded for properties that have been saved to the database and have a valid ID. The UI and backend logic prevent file uploads for unsaved properties, avoiding errors and invalid storage paths.
+
 ### **teams**
 | Column         | Type         | Description/Notes                                 |
 |---------------|--------------|---------------------------------------------------|

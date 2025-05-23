@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
+import Image from 'next/image';
 
 function EyeIcon({ open }: { open: boolean }) {
   return open ? (
@@ -52,8 +53,12 @@ export default function UserAuthForm() {
           router.push('/map');
         }, 800);
       }
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong.');
+    } catch (err: unknown) {
+      let errorMsg = 'Something went wrong.';
+      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
+        errorMsg = (err as { message?: string }).message as string;
+      }
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -63,7 +68,7 @@ export default function UserAuthForm() {
     <div className="w-full max-w-md bg-white/80 rounded-3xl shadow-2xl p-8 flex flex-col gap-8 border border-blue-100 animate-fade-in backdrop-blur-sm">
       <div className="flex flex-col items-center gap-3">
         {/* Logo image, no circle, no shadow, larger */}
-        <img src="/logo.png" alt="DropPoint Logo" className="w-20 h-20 object-contain mb-2" />
+        <Image src="/logo.png" alt="DropPoint Logo" width={80} height={80} className="w-20 h-20 object-contain mb-2" priority />
         <h1 className="text-3xl font-extrabold text-blue-700">{isSignUp ? 'Sign Up' : 'Log In'}</h1>
         <div className="text-base text-gray-500 font-medium">to DropPoint</div>
       </div>
