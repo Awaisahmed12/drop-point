@@ -96,6 +96,12 @@ export default function MapPage() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
+  // Tooltip state
+  const [showSaveTooltip, setShowSaveTooltip] = useState(false);
+
+  // Track if a search is active
+  const [searchActive, setSearchActive] = useState(false);
+
   // Auth guard
   useEffect(() => {
     const getUser = async () => {
@@ -181,6 +187,8 @@ export default function MapPage() {
         if (coordsChanged(lastFetchedCenter.current, coords)) {
           lastFetchedCenter.current = coords;
           setHasInteracted(true);
+          setSearchActive(false);
+          setInputValue('');
           fetchAddress(coords.lat, coords.lng);
         }
       }
@@ -409,19 +417,31 @@ export default function MapPage() {
     setUploadingFiles(validFiles.map(f => ({ name: f.name, status: 'uploading' })));
     for (const file of validFiles) {
       try {
+        console.log('Starting upload for file:', file.name);
         const ext = file.name.split('.').pop();
         const uniqueName = `${uuidv4()}.${ext}`;
         const filePath = `${savedProperty.id}/${uniqueName}`;
+        console.log('Uploading to path:', filePath);
+        
         // Upload to Supabase Storage
         const { error: storageError } = await supabase.storage
           .from('property-files')
           .upload(filePath, file, { upsert: false });
-        if (storageError) throw storageError;
+        
+        if (storageError) {
+          console.error('Storage upload error:', storageError);
+          throw storageError;
+        }
+        
+        console.log('File uploaded successfully, getting public URL');
         // Get public URL
         const { data: urlData } = supabase.storage
           .from('property-files')
           .getPublicUrl(filePath);
+        
         const fileUrl = urlData?.publicUrl;
+        console.log('Public URL:', fileUrl);
+        
         // Insert metadata into property_files
         const { error: dbError } = await supabase.from('property_files').insert([
           {
@@ -433,9 +453,16 @@ export default function MapPage() {
             file_size: file.size,
           },
         ]);
-        if (dbError) throw dbError;
+        
+        if (dbError) {
+          console.error('Database insert error:', dbError);
+          throw dbError;
+        }
+        
+        console.log('File metadata saved successfully');
         setUploadingFiles(prev => prev.map(f => f.name === file.name ? { ...f, status: 'success' } : f));
       } catch (err: unknown) {
+        console.error('Upload error:', err);
         setUploadingFiles(prev => prev.map(f => {
           let errorMsg = 'Upload failed.';
           if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
@@ -498,6 +525,7 @@ export default function MapPage() {
             gestureHandling: 'greedy',
             mapTypeControl: false,
             fullscreenControl: false,
+            streetViewControl: false,
           }}
         >
           {/* Central cursor overlay */}
@@ -587,7 +615,81 @@ export default function MapPage() {
         {/* Property info card at bottom */}
         {hasInteracted && address && (
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 w-full max-w-md px-4">
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-4 border border-blue-100 animate-fade-in">
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-4 border border-blue-100 animate-fade-in relative">
+              {/* Save button in top right, properly aligned */}
+              <button
+                className={`absolute top-4 right-4 rounded-full w-5 h-5 flex items-center justify-center shadow transition-colors border-2 z-10
+                  ${isPropertySaved ? 'bg-green-500 border-green-600' : 'bg-white border-blue-200 hover:bg-blue-100 hover:border-blue-400 cursor-pointer'}
+                  ${!isPropertySaved ? 'hover:scale-110 active:scale-95 transition-transform' : ''}
+                `}
+                style={{ fontSize: '0.7rem' }}
+                disabled={isPropertySaved}
+                onClick={async () => {
+                  if (!isPropertySaved) {
+                    // Only save, do not open modal
+                    if (!user || !address || !map || !snappedLatLng) return;
+                    setSaving(true);
+                    setFloatMessage(null);
+                    try {
+                      const center = map.getCenter();
+                      if (!center) throw new Error('No map center');
+                      // Check for duplicate property by address for this user
+                      const { data: existing, error: selectError } = await supabase
+                        .from('properties')
+                        .select('*')
+                        .eq('user_id', user.id)
+                        .eq('address', address)
+                        .maybeSingle();
+                      if (selectError) throw selectError;
+                      if (existing) {
+                        setFloatMessage({ text: 'You have already saved this property!', type: 'error' });
+                        setSaving(false);
+                        setIsPropertySaved(true);
+                        return;
+                      }
+                      // Insert new property with both sets of coordinates
+                      const { data, error } = await supabase.from('properties').insert([
+                        {
+                          user_id: user.id,
+                          address,
+                          lat: snappedLatLng.lat,
+                          lng: snappedLatLng.lng,
+                          user_selected_lat: center.lat(),
+                          user_selected_lng: center.lng(),
+                          label: null,
+                          notes: null,
+                          thumbnail_url: null,
+                        },
+                      ]).select();
+                      if (error) {
+                        console.error('Supabase insert error:', error);
+                        throw error;
+                      }
+                      setFloatMessage({ text: 'Property saved!', type: 'success' });
+                      setIsPropertySaved(true);
+                    } catch {
+                      setFloatMessage({ text: 'Failed to save property. Try again.', type: 'error' });
+                    }
+                    setTimeout(() => setFloatMessage(null), 2500);
+                    setSaving(false);
+                  }
+                }}
+                aria-label={isPropertySaved ? 'Property saved' : 'Add property'}
+                onMouseEnter={() => setShowSaveTooltip(true)}
+                onMouseLeave={() => setShowSaveTooltip(false)}
+              >
+                {isPropertySaved ? (
+                  <CheckIcon className="w-3 h-3 text-white" />
+                ) : (
+                  <PlusIcon className="w-3 h-3 text-blue-600" />
+                )}
+                {/* Tooltip */}
+                {showSaveTooltip && (
+                  <div className="absolute right-0 top-7 bg-gray-900 text-white text-xs rounded px-2 py-1 shadow z-20 whitespace-nowrap">
+                    {isPropertySaved ? 'Saved' : 'Add to list'}
+                  </div>
+                )}
+              </button>
               <div className="text-gray-900 text-lg font-semibold text-center">
                 {addressLoading ? (
                   <div className="flex items-center gap-2">
@@ -637,35 +739,7 @@ export default function MapPage() {
             }}
           >
             <div className="bg-white/80 rounded-3xl shadow-2xl p-8 w-full max-w-md relative flex flex-col gap-6 border border-blue-100" onClick={e => e.stopPropagation()}>
-              {/* Tiny save button in modal top right */}
-              <button
-                className={`absolute top-2 right-2 rounded-full w-7 h-7 flex items-center justify-center shadow transition-colors border-2 z-10
-                  ${isPropertySaved ? 'bg-green-500 border-green-600' : 'bg-white border-blue-200 hover:bg-blue-100 hover:border-blue-400 cursor-pointer'}
-                  ${!isPropertySaved ? 'hover:scale-110 active:scale-95 transition-transform' : ''}
-                `}
-                style={{ fontSize: '0.9rem' }}
-                disabled={isPropertySaved}
-                onClick={async () => {
-                  if (!isPropertySaved) {
-                    try {
-                      await handleSaveProperty();
-                      setIsPropertySaved(true);
-                      setFloatMessage({ text: 'Property saved!', type: 'success' });
-                    } catch {
-                      setFloatMessage({ text: 'Failed to save property. Try again.', type: 'error' });
-                    }
-                    setTimeout(() => setFloatMessage(null), 2500);
-                  }
-                }}
-                aria-label={isPropertySaved ? 'Property saved' : 'Add property'}
-              >
-                {isPropertySaved ? (
-                  <CheckIcon className="w-4 h-4 text-white" />
-                ) : (
-                  <PlusIcon className="w-4 h-4 text-blue-600" />
-                )}
-              </button>
-              {/* Property image area: Static Map only (no Street View) */}
+              {/* Removed save button from modal top right */}
               <div className="w-full h-40 rounded-2xl bg-gray-200 flex items-center justify-center overflow-hidden border border-blue-100 mb-2">
                 <StaticMapImage lat={savedProperty.lat} lng={savedProperty.lng} address={savedProperty.address} />
               </div>
