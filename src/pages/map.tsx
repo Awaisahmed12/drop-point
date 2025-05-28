@@ -102,6 +102,18 @@ export default function MapPage() {
   // Track if a search is active
   const [searchActive, setSearchActive] = useState(false);
 
+  // Add state for selected files before upload
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
+  // Add state for folders and folder selection
+  const [folders, setFolders] = useState<{ id: string; name: string; parentId: string | null }[]>([
+    { id: 'master', name: savedProperty ? `All Files for ${savedProperty.address}` : 'All Files', parentId: null },
+    // Example nested: { id: 'docs', name: 'Documents', parentId: 'master' }
+  ]);
+  const [selectedFolder, setSelectedFolder] = useState('master');
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+
   // Auth guard
   useEffect(() => {
     const getUser = async () => {
@@ -398,51 +410,43 @@ export default function MapPage() {
     }
   }, [showDetailsModal, savedProperty]);
 
-  // Multi-file upload handler
-  async function handleFilesSelected(files: FileList | null) {
-    if (!files || !savedProperty || !savedProperty.id || !user) return;
-    setUploadError(null);
-    const validFiles: File[] = [];
+  // Refactor file input handler to only select files, not upload
+  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files) return;
+    const valid: File[] = [];
     const rejected: { name: string; size: number }[] = [];
     Array.from(files).forEach(file => {
       if (file.size > 20 * 1024 * 1024) {
         rejected.push({ name: file.name, size: file.size });
       } else {
-        validFiles.push(file);
+        valid.push(file);
       }
     });
     setRejectedFiles(rejected);
-    if (validFiles.length === 0) return;
-    // Start uploading
-    setUploadingFiles(validFiles.map(f => ({ name: f.name, status: 'uploading' })));
-    for (const file of validFiles) {
+    setSelectedFiles(prev => [...prev, ...valid]);
+    // Clear the input value so the same file can be selected again if needed
+    e.target.value = '';
+  }
+
+  // New upload function, only called when user clicks Start Upload
+  async function handleStartUpload() {
+    if (!selectedFiles.length || !savedProperty || !savedProperty.id || !user) return;
+    setUploadError(null);
+    setUploadingFiles(selectedFiles.map(f => ({ name: f.name, status: 'uploading' })));
+    for (const file of selectedFiles) {
       try {
-        console.log('Starting upload for file:', file.name);
         const ext = file.name.split('.').pop();
         const uniqueName = `${uuidv4()}.${ext}`;
         const filePath = `${savedProperty.id}/${uniqueName}`;
-        console.log('Uploading to path:', filePath);
-        
-        // Upload to Supabase Storage
         const { error: storageError } = await supabase.storage
           .from('property-files')
           .upload(filePath, file, { upsert: false });
-        
-        if (storageError) {
-          console.error('Storage upload error:', storageError);
-          throw storageError;
-        }
-        
-        console.log('File uploaded successfully, getting public URL');
-        // Get public URL
+        if (storageError) throw storageError;
         const { data: urlData } = supabase.storage
           .from('property-files')
           .getPublicUrl(filePath);
-        
         const fileUrl = urlData?.publicUrl;
-        console.log('Public URL:', fileUrl);
-        
-        // Insert metadata into property_files
         const { error: dbError } = await supabase.from('property_files').insert([
           {
             property_id: savedProperty.id,
@@ -453,16 +457,9 @@ export default function MapPage() {
             file_size: file.size,
           },
         ]);
-        
-        if (dbError) {
-          console.error('Database insert error:', dbError);
-          throw dbError;
-        }
-        
-        console.log('File metadata saved successfully');
+        if (dbError) throw dbError;
         setUploadingFiles(prev => prev.map(f => f.name === file.name ? { ...f, status: 'success' } : f));
       } catch (err: unknown) {
-        console.error('Upload error:', err);
         setUploadingFiles(prev => prev.map(f => {
           let errorMsg = 'Upload failed.';
           if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
@@ -479,6 +476,7 @@ export default function MapPage() {
       .eq('property_id', savedProperty.id)
       .order('uploaded_at', { ascending: false });
     if (data) setPropertyFiles(data);
+    setSelectedFiles([]); // Clear selected files after upload
   }
 
   // Add effect to check if the property is already saved whenever address or user changes
@@ -498,6 +496,34 @@ export default function MapPage() {
     }
     checkIfSaved();
   }, [user, address, addressLoading]);
+
+  // Utility to shorten address for display
+  function shortAddress(address: string, maxLen = 32) {
+    if (address.length <= maxLen) return address;
+    const start = address.slice(0, Math.floor(maxLen / 2) - 2);
+    const end = address.slice(-Math.floor(maxLen / 2) + 2);
+    return `${start}...${end}`;
+  }
+
+  // Helper to render nested folders with indentation
+  function renderFolderOptions(parentId: string | null = null, level = 0): React.ReactNode[] {
+    return folders
+      .filter(f => f.parentId === parentId)
+      .flatMap(f => [
+        <option key={f.id} value={f.id}>{'— '.repeat(level) + f.name}</option>,
+        ...renderFolderOptions(f.id, level + 1)
+      ]);
+  }
+
+  // Handler for creating a new folder
+  function handleCreateFolder() {
+    if (!newFolderName.trim()) return;
+    const newId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setFolders(prev => [...prev, { id: newId, name: newFolderName.trim(), parentId: selectedFolder }]);
+    setSelectedFolder(newId);
+    setCreatingFolder(false);
+    setNewFolderName('');
+  }
 
   if (loading) {
     return (
@@ -738,76 +764,122 @@ export default function MapPage() {
               }
             }}
           >
-            <div className="bg-white/80 rounded-3xl shadow-2xl p-8 w-full max-w-md relative flex flex-col gap-6 border border-blue-100" onClick={e => e.stopPropagation()}>
-              {/* Removed save button from modal top right */}
-              <div className="w-full h-40 rounded-2xl bg-gray-200 flex items-center justify-center overflow-hidden border border-blue-100 mb-2">
-                <StaticMapImage lat={savedProperty.lat} lng={savedProperty.lng} address={savedProperty.address} />
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="text-2xl font-extrabold text-blue-700 mb-1">Property Details</div>
-                <div className="text-lg font-semibold text-gray-900 text-center">{savedProperty.label || savedProperty.address}</div>
-                {savedProperty.label && (
-                  <div className="text-blue-500 text-sm">Label: {savedProperty.label}</div>
-                )}
-                {savedProperty.notes && (
-                  <div className="text-gray-500 text-sm">Notes: {savedProperty.notes}</div>
-                )}
-              </div>
-              {/* Uploaded files section: only show if files exist */}
-              {propertyFiles.length > 0 && (
-                <div className="mt-2 w-full">
-                  <div className="font-semibold mb-2 text-blue-700">Uploaded Files</div>
-                  <div className="flex flex-wrap gap-3 mb-4 min-h-[48px] items-center justify-center">
-                    {propertyFiles.map((file) => (
-                      <FileIcon key={file.id} type={file.file_type?.split('/')[1] || 'file'} label={file.file_name} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* Upload file section */}
-              <div className="border-t border-blue-100 pt-4 mt-2">
-                <form className="flex flex-col gap-3" onSubmit={e => e.preventDefault()}>
-                  <input
-                    id="file-upload-input"
-                    type="file"
-                    className="sr-only"
-                    multiple
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.heic,.webp,.gif,.bmp,.tiff,.txt,.csv,.xls,.xlsx,.ppt,.pptx,.mp4,.mov,.avi,.mkv,.zip,.rar,.7z,.json,.xml,.rtf,.pages,.numbers,.key,.rcf"
-                    onChange={e => handleFilesSelected(e.target.files)}
-                  />
-                  <button
-                    className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all cursor-pointer"
-                    type="button"
-                    onClick={() => document.getElementById('file-upload-input')?.click()}
+            <div className="bg-white/90 rounded-3xl shadow-2xl p-0 w-full max-w-md relative flex flex-col gap-0 border border-blue-100 overflow-hidden" style={{ borderRadius: '1.5rem' }} onClick={e => e.stopPropagation()}>
+              {/* Header with address, dropdown, and close */}
+              <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-blue-100 bg-white/90">
+                <div className="flex-1 flex items-center justify-center gap-2 relative">
+                  <span
+                    className="text-lg sm:text-xl font-extrabold text-gray-900 truncate max-w-[70vw] cursor-pointer"
+                    title={savedProperty.address}
+                    style={{ display: 'inline-block', verticalAlign: 'middle', lineHeight: 1, maxWidth: 'calc(100vw - 120px)' }}
                   >
-                    Upload File
+                    {shortAddress(savedProperty.address)}
+                  </span>
+                  <button className="ml-1 p-1 rounded hover:bg-blue-50 transition-colors" aria-label="More options">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
                   </button>
-                  {/* Upload progress and results */}
-                  {uploadingFiles.length > 0 && (
-                    <div className="flex flex-col gap-1 mt-2">
-                      {uploadingFiles.map(f => (
-                        <div key={f.name} className="flex items-center gap-2 text-sm">
-                          <span className="truncate max-w-[120px]">{f.name}</span>
-                          {f.status === 'uploading' && <span className="text-blue-500">Uploading...</span>}
-                          {f.status === 'success' && <span className="text-green-600 font-bold">✓ Uploaded</span>}
-                          {f.status === 'error' && <span className="text-red-600 font-bold">✗ Failed</span>}
-                        </div>
-                      ))}
+                </div>
+                <button
+                  className="p-2 rounded-full hover:bg-gray-100 transition-colors absolute right-2 top-2"
+                  aria-label="Close"
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    setUploadingFiles([]);
+                    setRejectedFiles([]);
+                    setUploadError(null);
+                  }}
+                >
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              {/* Property image/preview */}
+              <div className="w-full h-40 bg-gray-200 flex items-center justify-center overflow-hidden border-b border-blue-100" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderBottomLeftRadius: '1.5rem', borderBottomRightRadius: '1.5rem' }}>
+                <div className="rounded-2xl overflow-hidden shadow-md w-full h-full flex items-center justify-center">
+                  <StaticMapImage lat={savedProperty.lat} lng={savedProperty.lng} address={savedProperty.address} />
+                </div>
+              </div>
+              {/* Folder selection section */}
+              <div className="px-4 pt-4 pb-2 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="folder-select" className="text-gray-700 font-semibold text-base flex items-center gap-1">
+                    <svg className="w-5 h-5 text-blue-400 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h2a2 2 0 012 2v2h10a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
+                    Save to:
+                  </label>
+                  <select
+                    id="folder-select"
+                    className="rounded-lg border border-blue-200 px-3 py-1 text-base text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={selectedFolder}
+                    onChange={e => {
+                      if (e.target.value === 'create-folder') {
+                        setCreatingFolder(true);
+                      } else {
+                        setSelectedFolder(e.target.value);
+                        setCreatingFolder(false);
+                      }
+                    }}
+                  >
+                    {renderFolderOptions(null)}
+                    <option value="create-folder">+ Create New Folder</option>
+                  </select>
+                </div>
+                {creatingFolder && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="text"
+                      className="rounded-lg border border-blue-200 px-3 py-1 text-base text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 flex-1"
+                      placeholder="New folder name"
+                      value={newFolderName}
+                      onChange={e => setNewFolderName(e.target.value)}
+                      autoFocus
+                    />
+                    <button
+                      className="bg-blue-600 text-white rounded-lg px-3 py-1 font-semibold hover:bg-blue-700 transition-all"
+                      onClick={e => { e.preventDefault(); handleCreateFolder(); }}
+                      type="button"
+                    >Create</button>
+                    <button
+                      className="text-gray-400 hover:text-gray-700 ml-1"
+                      onClick={e => { e.preventDefault(); setCreatingFolder(false); setNewFolderName(''); }}
+                      type="button"
+                    >Cancel</button>
+                  </div>
+                )}
+              </div>
+              {/* Divider */}
+              <div className="px-4"><div className="border-t border-blue-100 my-2" /></div>
+              {/* Uploaded files section - horizontal scroll */}
+              <div className="px-4 pt-2 pb-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-blue-700 font-semibold text-base">Uploaded Files</span>
+                  <div className="flex-1 border-t border-blue-100" />
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2 bg-blue-50/40 rounded-xl px-2 py-2 min-h-[64px]">
+                  {propertyFiles.length === 0 && (
+                    <span className="text-gray-400 italic self-center">No files uploaded yet.</span>
+                  )}
+                  {propertyFiles.map((file) => (
+                    <div key={file.id} className="flex flex-col items-center gap-1 min-w-[56px]">
+                      <FileIcon type={file.file_type?.split('/')[1] || 'file'} label={file.file_type?.split('/')[1]?.toUpperCase() || 'FILE'} />
+                      <span className="text-xs text-gray-700 truncate max-w-[48px]">{file.file_name}</span>
                     </div>
-                  )}
-                  {/* Rejected files */}
-                  {rejectedFiles.length > 0 && (
-                    <div className="text-xs text-red-600 text-center font-semibold animate-fade-in mt-2">
-                      {rejectedFiles.length === 1
-                        ? `"${rejectedFiles[0].name}" was too large (max 20MB). Try zipping or splitting large files.`
-                        : `${rejectedFiles.length} files were too large (max 20MB). Try zipping or splitting large files.`}
-                    </div>
-                  )}
-                  {uploadError && (
-                    <div className="text-xs text-red-600 text-center font-semibold animate-fade-in">{uploadError}</div>
-                  )}
-                  <div className="text-xs text-gray-500 text-center">Max file size: 20MB. You can select multiple files.</div>
-                </form>
+                  ))}
+                </div>
+              </div>
+              {/* Divider */}
+              <div className="px-4"><div className="border-t border-blue-100 my-2" /></div>
+              {/* Upload File section */}
+              <div className="px-4 pt-2 pb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-blue-700 font-semibold text-base">Upload File</span>
+                  <div className="flex-1 border-t border-blue-100" />
+                </div>
+                <button
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 rounded-2xl font-bold text-lg shadow-lg hover:from-blue-600 hover:to-blue-800 transition-all border-2 border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  type="button"
+                  onClick={() => document.getElementById('file-upload-input')?.click()}
+                >
+                  Upload File
+                </button>
               </div>
             </div>
           </div>
