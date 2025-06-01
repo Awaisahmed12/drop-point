@@ -191,4 +191,33 @@ Files can only be uploaded for properties that have been saved to the database a
 
 ---
 
+## Database Schema Updates (2024)
+
+### property_folders Table
+- `id` (uuid, PK)
+- `property_id` (uuid, FK to properties, not null)
+- `user_id` (uuid, FK to auth.users, not null)
+- `name` (text, not null)
+- `parent_id` (uuid, FK to property_folders, nullable)
+- `created_at`, `updated_at`, `deleted_at` (timestamptz)
+- **No duplicate folder names under the same parent for a property/user:**
+  - The app auto-renames folders (e.g., "Folder", "Folder (1)", etc.) if a duplicate exists.
+- RLS: Only the owner (user_id) can insert/select/update/delete their folders.
+
+### properties Table
+- `id` (uuid, PK)
+- `user_id` (uuid, FK to auth.users, not null)
+- `address` (text, not null)
+- `lat`, `lng` (float, not null)
+- `user_selected_lat`, `user_selected_lng` (float, not null)
+- `label`, `notes`, `thumbnail_url` (nullable)
+- **Unique constraint:** (`user_id`, `address`) — a user cannot have two properties with the same address.
+- RLS: Only the owner (user_id) can insert/select/update/delete their properties.
+
+### Folder/File UX Logic
+- Folders are persisted in the backend and always loaded from Supabase.
+- Folder creation auto-renames to avoid duplicates ("Folder", "Folder (1)", etc.).
+- Files can only be uploaded to saved properties.
+- All data is private to the user unless shared (future-proofed for teams/sharing).
+
 For more details, see the code in `

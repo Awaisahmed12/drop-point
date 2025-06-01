@@ -50,6 +50,18 @@ export type PropertyFile = {
   file_size: number;
 };
 
+// Add a type for folders
+export type PropertyFolder = {
+  id: string;
+  property_id: string;
+  user_id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
 export default function MapPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -82,24 +94,17 @@ export default function MapPage() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Add state for folders and folder selection
-  const [folders, setFolders] = useState<{ id: string; name: string; parentId: string | null }[]>([
-    { id: 'master', name: savedProperty ? `All Files for ${savedProperty.address}` : 'All Files', parentId: null },
-    // Example nested: { id: 'docs', name: 'Documents', parentId: 'master' }
-  ]);
-  const [selectedFolder, setSelectedFolder] = useState('master');
-  const [creatingFolder, setCreatingFolder] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
+  // Replace folders state with backend-driven state
+  const [folders, setFolders] = useState<PropertyFolder[]>([]);
 
   // Add state for error popup
   const [folderErrorPopup, setFolderErrorPopup] = useState<string | null>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (folderErrorPopup) {
-      const timeout = setTimeout(() => setFolderErrorPopup(null), 3000);
-      return () => clearTimeout(timeout);
-    }
-  }, [folderErrorPopup]);
+
+  // Add state for folders and folder selection (move above all usages)
+  const [selectedFolder, setSelectedFolder] = useState('master');
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
 
   // Update folder name validation logic
   const forbiddenFolderChars = /[:;\/\\*?"<>|]/; // Forbid only these special characters
@@ -111,7 +116,7 @@ export default function MapPage() {
     if (name.length > maxFolderLength) return `Folder name must be less than ${maxFolderLength} characters.`;
     const trimmed = name.trim();
     if (!trimmed) return '';
-    if (folders.some(f => f.parentId === selectedFolder && f.name.trim().toLowerCase() === trimmed.toLowerCase())) return 'A folder with this name already exists.';
+    if (folders.some(f => f.parent_id === selectedFolder && f.name.trim().toLowerCase() === trimmed.toLowerCase())) return 'A folder with this name already exists.';
     return '';
   };
   const folderNameValidationMsg = folderNameError(newFolderName);
@@ -360,6 +365,29 @@ export default function MapPage() {
     }
   }, [showDetailsModal, savedProperty]);
 
+  // Load folders from Supabase when opening property details modal
+  useEffect(() => {
+    async function fetchFolders() {
+      if (!showDetailsModal || !savedProperty?.id) return;
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) return;
+      const { data, error } = await supabase
+        .from('property_folders')
+        .select('*')
+        .eq('property_id', savedProperty.id)
+        .eq('user_id', user.data.user.id)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true });
+      if (data) setFolders(data);
+    }
+    fetchFolders();
+  }, [showDetailsModal, savedProperty]);
+
+  // Helper to get folder children
+  function getChildFolders(parentId: string | null) {
+    return folders.filter(f => f.parent_id === parentId);
+  }
+
   // Utility to shorten address for display
   function shortAddress(address: string, maxLen = 32) {
     if (address.length <= maxLen) return address;
@@ -368,31 +396,130 @@ export default function MapPage() {
     return `${start}...${end}`;
   }
 
-  // Handler for creating a new folder
+  // Handler for creating a new folder (with auto-rename logic)
   async function handleCreateFolder() {
-    if (!newFolderName || folderNameError(newFolderName)) {
-      // Do not close the dropdown on error
+    if (!newFolderName || folderNameError(newFolderName)) return;
+    if (!savedProperty?.id) return;
+    const user = await supabase.auth.getUser();
+    if (!user.data.user) return;
+    let baseName = newFolderName.replace(/\s+$/, '');
+    let nameToSave = baseName;
+    let suffix = 1;
+    // Check for duplicates and auto-rename
+    while (folders.some(f => f.parent_id === selectedFolder && f.name.trim().toLowerCase() === nameToSave.trim().toLowerCase())) {
+      nameToSave = `${baseName} (${suffix++})`;
+    }
+    const { data, error } = await supabase
+      .from('property_folders')
+      .insert([
+        {
+          property_id: savedProperty.id,
+          user_id: user.data.user.id,
+          name: nameToSave,
+          parent_id: selectedFolder === 'master' ? null : selectedFolder,
+        },
+      ])
+      .select()
+      .single();
+    if (error) {
+      setFolderErrorPopup('Error creating folder.');
       return;
     }
-    // Trim only the last space
-    const nameToSave = newFolderName.replace(/\s+$/, '');
-    if (!nameToSave) return;
-    // Auto-save property if not already saved
-    if (savedProperty && !savedProperty.id) {
-      // Call your property save logic here (e.g., await saveProperty())
-      // You may need to refactor to expose the save logic as a function
-      // For now, just a placeholder:
-      // await saveProperty();
-    }
-    const newId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setFolders(prev => [...prev, { id: newId, name: nameToSave, parentId: selectedFolder }]);
+    // Refresh folders
+    const { data: allFolders } = await supabase
+      .from('property_folders')
+      .select('*')
+      .eq('property_id', savedProperty.id)
+      .eq('user_id', user.data.user.id)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true });
+    if (allFolders) setFolders(allFolders);
     setNewFolderName('');
     setCreatingFolder(false);
   }
 
-  // Add this function if not present
-  function handleFileInputChange() {
-    // TODO: Implement file upload logic
+  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (!savedProperty) return;
+    (async () => {
+      let propertyId = savedProperty.id;
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) return;
+      // If property not saved, check for existing property by user_id and address
+      if (!propertyId) {
+        const { data: existing, error: fetchError } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('user_id', user.data.user.id)
+          .eq('address', savedProperty.address)
+          .single();
+        propertyId = existing?.id;
+        if (!propertyId) {
+          const { lat, lng } = snappedLatLng || { lat: savedProperty.lat, lng: savedProperty.lng };
+          const { data, error } = await supabase
+            .from('properties')
+            .insert([
+              {
+                address: savedProperty.address,
+                lat,
+                lng,
+                user_selected_lat: savedProperty.user_selected_lat ?? lat,
+                user_selected_lng: savedProperty.user_selected_lng ?? lng,
+                label: savedProperty.label,
+                notes: savedProperty.notes,
+                user_id: user.data.user.id,
+              },
+            ])
+            .select()
+            .single();
+          if (error || !data) {
+            alert('Error saving property before upload.');
+            return;
+          }
+          setSavedProperty(data);
+          propertyId = data.id;
+        } else {
+          setSavedProperty(existing);
+        }
+      }
+      // Upload each file
+      for (const file of Array.from(files)) {
+        const filePath = `${propertyId}/${file.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage.from('property-files').upload(filePath, file, { upsert: true });
+        if (uploadError) {
+          alert(`Error uploading file: ${file.name}`);
+          console.error('Upload error:', uploadError);
+          continue;
+        }
+        // Insert file record in DB
+        const userId = user.data.user.id;
+        const { error: dbError } = await supabase.from('property_files').insert([
+          {
+            property_id: propertyId,
+            file_name: file.name,
+            file_url: uploadData?.path || filePath,
+            uploaded_at: new Date().toISOString(),
+            user_id: userId,
+            file_type: file.type,
+            file_size: file.size,
+          },
+        ]);
+        if (dbError) {
+          alert(`Error saving file record for: ${file.name}`);
+          console.error('DB insert error:', dbError);
+        }
+      }
+      // Refresh file list
+      const result = await supabase
+        .from('property_files')
+        .select('*')
+        .eq('property_id', propertyId)
+        .order('uploaded_at', { ascending: false });
+      if (result.data) setPropertyFiles(result.data);
+    })();
+    // Reset file input
+    e.target.value = '';
   }
 
   if (loading) {
@@ -581,7 +708,7 @@ export default function MapPage() {
               {/* Static satellite image with blue pin */}
               <div className="w-full h-40 sm:h-56 relative bg-gray-200 border-b border-blue-100">
                 <img
-                  src={`https://maps.googleapis.com/maps/api/staticmap?center=${savedProperty.lat},${savedProperty.lng}&zoom=19&size=600x220&maptype=satellite&markers=color:blue%7C${savedProperty.lat},${savedProperty.lng}&key=${GOOGLE_MAPS_API_KEY}`}
+                  src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? savedProperty.lat)},${(snappedLatLng?.lng ?? savedProperty.lng)}&zoom=19&size=600x220&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? savedProperty.lat)},${(snappedLatLng?.lng ?? savedProperty.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
                   alt="Property satellite view"
                   className="w-full h-full object-cover"
                 />
@@ -608,7 +735,7 @@ export default function MapPage() {
                       className="mb-2 text-blue-600 hover:underline text-sm font-semibold flex items-center gap-1 cursor-pointer hover:bg-blue-50 rounded transition-colors"
                       style={{ cursor: 'pointer' }}
                       onClick={() => {
-                        const parent = folders.find(f => f.id === selectedFolder)?.parentId || 'master';
+                        const parent = folders.find(f => f.parent_id === selectedFolder)?.parent_id || 'master';
                         setSelectedFolder(parent);
                       }}
                     >
@@ -617,7 +744,7 @@ export default function MapPage() {
                     </button>
                   )}
                   {/* Folders */}
-                  {folders.filter(f => f.parentId === selectedFolder).map(folder => (
+                  {getChildFolders(selectedFolder === 'master' ? null : selectedFolder).map(folder => (
                     <div
                       key={folder.id}
                       className="flex items-center gap-3 p-3 bg-gray-100 rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-all"
@@ -687,7 +814,7 @@ export default function MapPage() {
                           setFolderErrorPopup("Folder names can't include : ; / \\ * ? \" < > | ");
                         } else if (val.length > maxFolderLength) {
                           setFolderErrorPopup(`Folder name must be less than ${maxFolderLength} characters.`);
-                        } else if (val && folders.some(f => f.parentId === selectedFolder && f.name.trim().toLowerCase() === val.trim().toLowerCase())) {
+                        } else if (val && folders.some(f => f.parent_id === selectedFolder && f.name.trim().toLowerCase() === val.trim().toLowerCase())) {
                           setFolderErrorPopup("A folder with this name already exists.");
                         } else {
                           setFolderErrorPopup(null);
