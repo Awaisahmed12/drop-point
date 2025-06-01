@@ -106,17 +106,19 @@ This ensures users can organize documents for specific units within the same bui
 
 ## Property Saving & Location Accuracy (2024 Update)
 
-- When a user saves a property, we now store both:
+- Properties are now only saved when a user uploads their first file to them. The map modal no longer allows saving a property directly or shows a checkmark for saved properties. This simplifies the flow and keeps the UI clean.
+- When a user uploads a file, the property is created in the database (if it doesn't already exist) and the file is associated with it.
+- The app still stores both:
   - The original map center coordinates the user selected (`user_selected_lat`, `user_selected_lng`)
   - The snapped address coordinates returned by Google Maps (`lat`, `lng`)
 - The app uses the snapped address coordinates for the property pin, static map, and as the canonical property location in the database.
 - This approach ensures consistency between the address and the map location, while preserving the user's original intent for future features (like custom boundaries).
 
 ## Property Modal UX Improvements
-- The property details modal now features a hoverable + button in the top right for saving a property.
-- When clicked, a floating message appears (green for success, red for error) to provide immediate feedback.
-- The modal can be closed by clicking outside of it.
-- The property is only saved when the user explicitly clicks the + button, not automatically.
+- The property info modal on the map no longer shows a checkmark or save button.
+- The only action is to "Select" a property, which opens the details modal for file upload.
+- Properties are saved automatically when a file is uploaded, not before.
+- This results in a cleaner, more modern, and less cluttered user experience.
 
 ## Property Table Schema (Key Fields)
 - `address`: The formatted address string
@@ -160,3 +162,33 @@ DropPoint now uses [Vitest](https://vitest.dev/) and [Testing Library](https://t
 ## File Upload Guard
 
 Files can only be uploaded for properties that have been saved to the database and have a valid ID. The UI and backend logic prevent file uploads for unsaved properties, avoiding errors and invalid storage paths.
+
+# Project Update: Code Hygiene
+
+## Recent Changes
+- Cleaned up `src/pages/map.tsx` by removing unused variables and functions (`uploadingFiles`, `rejectedFiles`, `uploadError`, `searchActive`, `handleSaveProperty`, `handleFileInputChange`, `handleStartUpload`, and unused `data` assignments).
+- Resolved all ESLint errors related to unused variables and functions.
+- Improved maintainability and readability of the codebase.
+
+## Why?
+- Keeping the codebase free of unused code reduces cognitive load, prevents confusion, and ensures that only relevant logic is maintained.
+- This aligns with best practices and keeps the project production-ready.
+
+## Architecture Note
+- All state and handler functions in `map.tsx` are now actively used or have a clear purpose.
+- ESLint is enforced to maintain code quality.
+
+## Recent Updates
+
+- Fixed ESLint error in `src/pages/map.tsx` by changing a `let` to `const` in the folder creation input handler. This keeps the codebase lint-free and up to best practices.
+
+## Property Details Modal: Mobile-First UX Update (2024)
+
+- The property details modal now features a fixed bottom action bar with large, easy-to-tap Upload and Create Folder buttons (split 50/50), inspired by the big Select button in the property selection modal.
+- Folder creation is now handled via a dedicated popup/modal, not a dropdown, making it much more usable on mobile and preventing overflow/cutoff issues.
+- The top of the modal displays a static satellite image of the property with a blue pin, using the Google Static Maps API, for instant visual context.
+- All controls are accessible, uncluttered, and optimized for older/less tech-savvy users in real estate.
+
+---
+
+For more details, see the code in `

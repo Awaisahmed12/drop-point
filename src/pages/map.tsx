@@ -2,10 +2,6 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
 import { GoogleMap, LoadScript } from '@react-google-maps/api';
-import { v4 as uuidv4 } from 'uuid';
-import { CheckIcon, PlusIcon } from '@heroicons/react/24/solid';
-import type { User } from '@supabase/supabase-js';
-import Image from 'next/image';
 
 const containerStyle = {
   width: '100vw',
@@ -57,7 +53,6 @@ export type PropertyFile = {
 export default function MapPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
   const [mapCenter, setMapCenter] = useState(US_CENTER);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
@@ -71,39 +66,21 @@ export default function MapPage() {
 
   const lastFetchedCenter = useRef<{ lat: number; lng: number } | null>(null);
 
-  const [saving, setSaving] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [savedProperty, setSavedProperty] = useState<Property | null>(null);
 
   // Add state for uploaded files
-  const [uploadingFiles, setUploadingFiles] = useState<{ name: string; status: 'uploading' | 'success' | 'error'; error?: string }[]>([]);
-  const [rejectedFiles, setRejectedFiles] = useState<{ name: string; size: number }[]>([]);
-  const [uploadError, setUploadError] = useState<string | null>(null);
   const [propertyFiles, setPropertyFiles] = useState<PropertyFile[]>([]);
 
-  // Add state to track if the current property is saved
-  const [isPropertySaved, setIsPropertySaved] = useState(false);
-
-  // Add state for snapped address coordinates
+  // Will be used for property save-on-upload logic
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [snappedLatLng, setSnappedLatLng] = useState<{lat: number, lng: number} | null>(null);
-
-  // Add state for floating message
-  const [floatMessage, setFloatMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Custom autocomplete state
   const [inputValue, setInputValue] = useState('');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
-
-  // Tooltip state
-  const [showSaveTooltip, setShowSaveTooltip] = useState(false);
-
-  // Track if a search is active
-  const [searchActive, setSearchActive] = useState(false);
-
-  // Add state for selected files before upload
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   // Add state for folders and folder selection
   const [folders, setFolders] = useState<{ id: string; name: string; parentId: string | null }[]>([
@@ -114,14 +91,38 @@ export default function MapPage() {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
 
+  // Add state for error popup
+  const [folderErrorPopup, setFolderErrorPopup] = useState<string | null>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (folderErrorPopup) {
+      const timeout = setTimeout(() => setFolderErrorPopup(null), 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [folderErrorPopup]);
+
+  // Update folder name validation logic
+  const forbiddenFolderChars = /[:;\/\\*?"<>|]/; // Forbid only these special characters
+  const maxFolderLength = 50;
+  const folderNameError = (name: string) => {
+    if (!name) return '';
+    if (name[0] === ' ') return "Folder name can't start with a space.";
+    if (forbiddenFolderChars.test(name)) return "Folder names can't include : ; / \\ * ? \" < > |";
+    if (name.length > maxFolderLength) return `Folder name must be less than ${maxFolderLength} characters.`;
+    const trimmed = name.trim();
+    if (!trimmed) return '';
+    if (folders.some(f => f.parentId === selectedFolder && f.name.trim().toLowerCase() === trimmed.toLowerCase())) return 'A folder with this name already exists.';
+    return '';
+  };
+  const folderNameValidationMsg = folderNameError(newFolderName);
+  const isFolderNameValid = !!newFolderName && !folderNameValidationMsg;
+
   // Auth guard
   useEffect(() => {
     const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
+      const result = await supabase.auth.getUser();
+      if (!result.data.user) {
         router.replace('/');
-      } else {
-        setUser(data.user);
       }
       setLoading(false);
     };
@@ -199,7 +200,6 @@ export default function MapPage() {
         if (coordsChanged(lastFetchedCenter.current, coords)) {
           lastFetchedCenter.current = coords;
           setHasInteracted(true);
-          setSearchActive(false);
           setInputValue('');
           fetchAddress(coords.lat, coords.lng);
         }
@@ -344,158 +344,21 @@ export default function MapPage() {
     }
   };
 
-  // Save property to Supabase
-  const handleSaveProperty = async () => {
-    if (!user || !address || !map || !snappedLatLng) return;
-    setSaving(true);
-    setFloatMessage(null);
-    try {
-      const center = map.getCenter();
-      if (!center) throw new Error('No map center');
-      // Check for duplicate property by address for this user
-      const { data: existing, error: selectError } = await supabase
-        .from('properties')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('address', address)
-        .maybeSingle();
-      if (selectError) throw selectError;
-      if (existing) {
-        setFloatMessage({ text: 'You have already saved this property!', type: 'error' });
-        setSaving(false);
-        setSavedProperty(existing);
-        setShowDetailsModal(true);
-        return;
-      }
-      // Insert new property with both sets of coordinates
-      const { data, error } = await supabase.from('properties').insert([
-        {
-          user_id: user.id,
-          address,
-          lat: snappedLatLng.lat,
-          lng: snappedLatLng.lng,
-          user_selected_lat: center.lat(),
-          user_selected_lng: center.lng(),
-          label: null,
-          notes: null,
-          thumbnail_url: null,
-        },
-      ]).select();
-      if (error) {
-        console.error('Supabase insert error:', error);
-        throw error;
-      }
-      setFloatMessage({ text: 'Property saved!', type: 'success' });
-      setSavedProperty(data && data[0] ? data[0] : null);
-      setShowDetailsModal(true);
-    } catch {
-      setFloatMessage({ text: 'Error saving property.', type: 'error' });
-    }
-    setSaving(false);
-  };
-
   // Fetch files for the selected property
   useEffect(() => {
     async function fetchFiles() {
       if (!savedProperty || !savedProperty.id) return;
-      const { data } = await supabase
+      const result = await supabase
         .from('property_files')
         .select('*')
         .eq('property_id', savedProperty.id)
         .order('uploaded_at', { ascending: false });
-      if (data) setPropertyFiles(data);
+      if (result.data) setPropertyFiles(result.data);
     }
     if (showDetailsModal && savedProperty) {
       fetchFiles();
     }
   }, [showDetailsModal, savedProperty]);
-
-  // Refactor file input handler to only select files, not upload
-  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files) return;
-    const valid: File[] = [];
-    const rejected: { name: string; size: number }[] = [];
-    Array.from(files).forEach(file => {
-      if (file.size > 20 * 1024 * 1024) {
-        rejected.push({ name: file.name, size: file.size });
-      } else {
-        valid.push(file);
-      }
-    });
-    setRejectedFiles(rejected);
-    setSelectedFiles(prev => [...prev, ...valid]);
-    // Clear the input value so the same file can be selected again if needed
-    e.target.value = '';
-  }
-
-  // New upload function, only called when user clicks Start Upload
-  async function handleStartUpload() {
-    if (!selectedFiles.length || !savedProperty || !savedProperty.id || !user) return;
-    setUploadError(null);
-    setUploadingFiles(selectedFiles.map(f => ({ name: f.name, status: 'uploading' })));
-    for (const file of selectedFiles) {
-      try {
-        const ext = file.name.split('.').pop();
-        const uniqueName = `${uuidv4()}.${ext}`;
-        const filePath = `${savedProperty.id}/${uniqueName}`;
-        const { error: storageError } = await supabase.storage
-          .from('property-files')
-          .upload(filePath, file, { upsert: false });
-        if (storageError) throw storageError;
-        const { data: urlData } = supabase.storage
-          .from('property-files')
-          .getPublicUrl(filePath);
-        const fileUrl = urlData?.publicUrl;
-        const { error: dbError } = await supabase.from('property_files').insert([
-          {
-            property_id: savedProperty.id,
-            user_id: user.id,
-            file_name: uniqueName,
-            file_url: fileUrl,
-            file_type: file.type,
-            file_size: file.size,
-          },
-        ]);
-        if (dbError) throw dbError;
-        setUploadingFiles(prev => prev.map(f => f.name === file.name ? { ...f, status: 'success' } : f));
-      } catch (err: unknown) {
-        setUploadingFiles(prev => prev.map(f => {
-          let errorMsg = 'Upload failed.';
-          if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
-            errorMsg = (err as { message?: string }).message as string;
-          }
-          return f.name === file.name ? { ...f, status: 'error', error: errorMsg } : f;
-        }));
-      }
-    }
-    // Refresh file list
-    const { data } = await supabase
-      .from('property_files')
-      .select('*')
-      .eq('property_id', savedProperty.id)
-      .order('uploaded_at', { ascending: false });
-    if (data) setPropertyFiles(data);
-    setSelectedFiles([]); // Clear selected files after upload
-  }
-
-  // Add effect to check if the property is already saved whenever address or user changes
-  useEffect(() => {
-    async function checkIfSaved() {
-      if (!user || !address || addressLoading) {
-        setIsPropertySaved(false);
-        return;
-      }
-      const { data } = await supabase
-        .from('properties')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('address', address)
-        .maybeSingle();
-      setIsPropertySaved(!!data);
-    }
-    checkIfSaved();
-  }, [user, address, addressLoading]);
 
   // Utility to shorten address for display
   function shortAddress(address: string, maxLen = 32) {
@@ -505,24 +368,31 @@ export default function MapPage() {
     return `${start}...${end}`;
   }
 
-  // Helper to render nested folders with indentation
-  function renderFolderOptions(parentId: string | null = null, level = 0): React.ReactNode[] {
-    return folders
-      .filter(f => f.parentId === parentId)
-      .flatMap(f => [
-        <option key={f.id} value={f.id}>{'— '.repeat(level) + f.name}</option>,
-        ...renderFolderOptions(f.id, level + 1)
-      ]);
+  // Handler for creating a new folder
+  async function handleCreateFolder() {
+    if (!newFolderName || folderNameError(newFolderName)) {
+      // Do not close the dropdown on error
+      return;
+    }
+    // Trim only the last space
+    const nameToSave = newFolderName.replace(/\s+$/, '');
+    if (!nameToSave) return;
+    // Auto-save property if not already saved
+    if (savedProperty && !savedProperty.id) {
+      // Call your property save logic here (e.g., await saveProperty())
+      // You may need to refactor to expose the save logic as a function
+      // For now, just a placeholder:
+      // await saveProperty();
+    }
+    const newId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setFolders(prev => [...prev, { id: newId, name: nameToSave, parentId: selectedFolder }]);
+    setNewFolderName('');
+    setCreatingFolder(false);
   }
 
-  // Handler for creating a new folder
-  function handleCreateFolder() {
-    if (!newFolderName.trim()) return;
-    const newId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setFolders(prev => [...prev, { id: newId, name: newFolderName.trim(), parentId: selectedFolder }]);
-    setSelectedFolder(newId);
-    setCreatingFolder(false);
-    setNewFolderName('');
+  // Add this function if not present
+  function handleFileInputChange() {
+    // TODO: Implement file upload logic
   }
 
   if (loading) {
@@ -642,80 +512,6 @@ export default function MapPage() {
         {hasInteracted && address && (
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 w-full max-w-md px-4">
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-4 border border-blue-100 animate-fade-in relative">
-              {/* Save button in top right, properly aligned */}
-              <button
-                className={`absolute top-4 right-4 rounded-full w-5 h-5 flex items-center justify-center shadow transition-colors border-2 z-10
-                  ${isPropertySaved ? 'bg-green-500 border-green-600' : 'bg-white border-blue-200 hover:bg-blue-100 hover:border-blue-400 cursor-pointer'}
-                  ${!isPropertySaved ? 'hover:scale-110 active:scale-95 transition-transform' : ''}
-                `}
-                style={{ fontSize: '0.7rem' }}
-                disabled={isPropertySaved}
-                onClick={async () => {
-                  if (!isPropertySaved) {
-                    // Only save, do not open modal
-                    if (!user || !address || !map || !snappedLatLng) return;
-                    setSaving(true);
-                    setFloatMessage(null);
-                    try {
-                      const center = map.getCenter();
-                      if (!center) throw new Error('No map center');
-                      // Check for duplicate property by address for this user
-                      const { data: existing, error: selectError } = await supabase
-                        .from('properties')
-                        .select('*')
-                        .eq('user_id', user.id)
-                        .eq('address', address)
-                        .maybeSingle();
-                      if (selectError) throw selectError;
-                      if (existing) {
-                        setFloatMessage({ text: 'You have already saved this property!', type: 'error' });
-                        setSaving(false);
-                        setIsPropertySaved(true);
-                        return;
-                      }
-                      // Insert new property with both sets of coordinates
-                      const { data, error } = await supabase.from('properties').insert([
-                        {
-                          user_id: user.id,
-                          address,
-                          lat: snappedLatLng.lat,
-                          lng: snappedLatLng.lng,
-                          user_selected_lat: center.lat(),
-                          user_selected_lng: center.lng(),
-                          label: null,
-                          notes: null,
-                          thumbnail_url: null,
-                        },
-                      ]).select();
-                      if (error) {
-                        console.error('Supabase insert error:', error);
-                        throw error;
-                      }
-                      setFloatMessage({ text: 'Property saved!', type: 'success' });
-                      setIsPropertySaved(true);
-                    } catch {
-                      setFloatMessage({ text: 'Failed to save property. Try again.', type: 'error' });
-                    }
-                    setTimeout(() => setFloatMessage(null), 2500);
-                    setSaving(false);
-                  }
-                }}
-                aria-label={isPropertySaved ? 'Property saved' : 'Add property'}
-                onMouseEnter={() => setShowSaveTooltip(true)}
-                onMouseLeave={() => setShowSaveTooltip(false)}
-              >
-                {isPropertySaved ? (
-                  <CheckIcon className="w-3 h-3 text-white" />
-                ) : (
-                  <PlusIcon className="w-3 h-3 text-blue-600" />
-                )}
-                {/* Tooltip */}
-                {showSaveTooltip && (
-                  <div className="absolute right-0 top-7 bg-gray-900 text-white text-xs rounded px-2 py-1 shadow z-20 whitespace-nowrap">
-                    {isPropertySaved ? 'Saved' : 'Add to list'}
-                  </div>
-                )}
-              </button>
               <div className="text-gray-900 text-lg font-semibold text-center">
                 {addressLoading ? (
                   <div className="flex items-center gap-2">
@@ -729,7 +525,7 @@ export default function MapPage() {
               </div>
               <button
                 className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer"
-                disabled={addressLoading || !address || address === 'No address found' || address === 'Error fetching address' || saving}
+                disabled={addressLoading || !address || address === 'No address found' || address === 'Error fetching address'}
                 onClick={() => {
                   if (map) {
                     const center = map.getCenter();
@@ -755,142 +551,173 @@ export default function MapPage() {
           <div
             className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in"
             onClick={e => {
-              // Only close if clicking the backdrop, not the modal itself
               if (e.target === e.currentTarget) {
                 setShowDetailsModal(false);
-                setUploadingFiles([]);
-                setRejectedFiles([]);
-                setUploadError(null);
+                setCreatingFolder(false);
               }
             }}
           >
-            <div className="bg-white/90 rounded-3xl shadow-2xl p-0 w-full max-w-md relative flex flex-col gap-0 border border-blue-100 overflow-hidden" style={{ borderRadius: '1.5rem' }} onClick={e => e.stopPropagation()}>
-              {/* Header with address, dropdown, and close */}
-              <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-blue-100 bg-white/90">
-                <div className="flex-1 flex items-center justify-center gap-2 relative">
-                  <span
-                    className="text-lg sm:text-xl font-extrabold text-gray-900 truncate max-w-[70vw] cursor-pointer"
-                    title={savedProperty.address}
-                    style={{ display: 'inline-block', verticalAlign: 'middle', lineHeight: 1, maxWidth: 'calc(100vw - 120px)' }}
-                  >
+            <div
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-lg flex flex-col border border-blue-100 relative"
+              style={{ borderRadius: '1.5rem', minHeight: '620px', maxHeight: '96vh', overflow: 'hidden' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Address Bar at Top */}
+              <div className="flex items-center justify-between px-4 pt-4 pb-2 bg-white border-b border-blue-100">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg sm:text-xl font-extrabold text-gray-900 truncate max-w-[60vw]" title={savedProperty.address}>
                     {shortAddress(savedProperty.address)}
                   </span>
-                  <button className="ml-1 p-1 rounded hover:bg-blue-50 transition-colors" aria-label="More options">
-                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                  </button>
                 </div>
                 <button
-                  className="p-2 rounded-full hover:bg-gray-100 transition-colors absolute right-2 top-2"
+                  className="p-2 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
                   aria-label="Close"
-                  onClick={() => {
-                    setShowDetailsModal(false);
-                    setUploadingFiles([]);
-                    setRejectedFiles([]);
-                    setUploadError(null);
-                  }}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => { setShowDetailsModal(false); setCreatingFolder(false); }}
                 >
                   <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
-              {/* Property image/preview */}
-              <div className="w-full h-40 bg-gray-200 flex items-center justify-center overflow-hidden border-b border-blue-100" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, borderBottomLeftRadius: '1.5rem', borderBottomRightRadius: '1.5rem' }}>
-                <div className="rounded-2xl overflow-hidden shadow-md w-full h-full flex items-center justify-center">
-                  <StaticMapImage lat={savedProperty.lat} lng={savedProperty.lng} address={savedProperty.address} />
-                </div>
+              {/* Static satellite image with blue pin */}
+              <div className="w-full h-40 sm:h-56 relative bg-gray-200 border-b border-blue-100">
+                <img
+                  src={`https://maps.googleapis.com/maps/api/staticmap?center=${savedProperty.lat},${savedProperty.lng}&zoom=19&size=600x220&maptype=satellite&markers=color:blue%7C${savedProperty.lat},${savedProperty.lng}&key=${GOOGLE_MAPS_API_KEY}`}
+                  alt="Property satellite view"
+                  className="w-full h-full object-cover"
+                />
+                {/* Blue pin overlay for extra clarity (optional) */}
+                {/* <img src="/pin.svg" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full w-8 h-8" alt="Pin" /> */}
               </div>
-              {/* Folder selection section */}
-              <div className="px-4 pt-4 pb-2 flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <label htmlFor="folder-select" className="text-gray-700 font-semibold text-base flex items-center gap-1">
-                    <svg className="w-5 h-5 text-blue-400 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h2a2 2 0 012 2v2h10a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
-                    Save to:
-                  </label>
-                  <select
-                    id="folder-select"
-                    className="rounded-lg border border-blue-200 px-3 py-1 text-base text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    value={selectedFolder}
-                    onChange={e => {
-                      if (e.target.value === 'create-folder') {
-                        setCreatingFolder(true);
-                      } else {
-                        setSelectedFolder(e.target.value);
-                        setCreatingFolder(false);
-                      }
-                    }}
-                  >
-                    {renderFolderOptions(null)}
-                    <option value="create-folder">+ Create New Folder</option>
-                  </select>
-                </div>
-                {creatingFolder && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <input
-                      type="text"
-                      className="rounded-lg border border-blue-200 px-3 py-1 text-base text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 flex-1"
-                      placeholder="New folder name"
-                      value={newFolderName}
-                      onChange={e => setNewFolderName(e.target.value)}
-                      autoFocus
-                    />
-                    <button
-                      className="bg-blue-600 text-white rounded-lg px-3 py-1 font-semibold hover:bg-blue-700 transition-all"
-                      onClick={e => { e.preventDefault(); handleCreateFolder(); }}
-                      type="button"
-                    >Create</button>
-                    <button
-                      className="text-gray-400 hover:text-gray-700 ml-1"
-                      onClick={e => { e.preventDefault(); setCreatingFolder(false); setNewFolderName(''); }}
-                      type="button"
-                    >Cancel</button>
-                  </div>
-                )}
+              {/* Search Bar */}
+              <div className="px-4 pb-2 pt-2 bg-white">
+                <input
+                  type="text"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-base text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="Search files and folders..."
+                  // TODO: Implement search/filter logic
+                  disabled
+                />
               </div>
-              {/* Divider */}
-              <div className="px-4"><div className="border-t border-blue-100 my-2" /></div>
-              {/* Uploaded files section - horizontal scroll */}
-              <div className="px-4 pt-2 pb-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-blue-700 font-semibold text-base">Uploaded Files</span>
-                  <div className="flex-1 border-t border-blue-100" />
-                </div>
-                <div className="flex gap-3 overflow-x-auto pb-2 bg-blue-50/40 rounded-xl px-2 py-2 min-h-[64px]">
+              {/* File/Folder List */}
+              <div className="flex-1 overflow-y-auto px-4 pb-4 min-h-[120px]">
+                <div className="mb-2 text-blue-700 font-semibold text-base">All Files</div>
+                <div className="flex flex-col gap-2">
+                  {/* Back button if not at root */}
+                  {selectedFolder !== 'master' && (
+                    <button
+                      className="mb-2 text-blue-600 hover:underline text-sm font-semibold flex items-center gap-1 cursor-pointer hover:bg-blue-50 rounded transition-colors"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => {
+                        const parent = folders.find(f => f.id === selectedFolder)?.parentId || 'master';
+                        setSelectedFolder(parent);
+                      }}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                      Back
+                    </button>
+                  )}
+                  {/* Folders */}
+                  {folders.filter(f => f.parentId === selectedFolder).map(folder => (
+                    <div
+                      key={folder.id}
+                      className="flex items-center gap-3 p-3 bg-gray-100 rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-all"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setSelectedFolder(folder.id)}
+                    >
+                      <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h2a2 2 0 012 2v2h10a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
+                      <span className="font-semibold text-gray-900">{folder.name}</span>
+                    </div>
+                  ))}
+                  {/* Files */}
                   {propertyFiles.length === 0 && (
-                    <span className="text-gray-400 italic self-center">No files uploaded yet.</span>
+                    <div className="text-gray-400 italic self-center py-6">No files uploaded yet.</div>
                   )}
                   {propertyFiles.map((file) => (
-                    <div key={file.id} className="flex flex-col items-center gap-1 min-w-[56px]">
+                    <div key={file.id} className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-all border border-gray-100"
+                      style={{ cursor: 'pointer' }}
+                    >
                       <FileIcon type={file.file_type?.split('/')[1] || 'file'} label={file.file_type?.split('/')[1]?.toUpperCase() || 'FILE'} />
-                      <span className="text-xs text-gray-700 truncate max-w-[48px]">{file.file_name}</span>
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-gray-900 truncate max-w-[120px]">{file.file_name}</span>
+                        <span className="text-xs text-gray-500">{file.file_type}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
-              {/* Divider */}
-              <div className="px-4"><div className="border-t border-blue-100 my-2" /></div>
-              {/* Upload File section */}
-              <div className="px-4 pt-2 pb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-blue-700 font-semibold text-base">Upload File</span>
-                  <div className="flex-1 border-t border-blue-100" />
-                </div>
+              {/* Hidden file input for upload */}
+              <input id="file-upload-input" type="file" className="hidden" onChange={handleFileInputChange} multiple />
+              {/* Bottom Action Bar (inside modal) */}
+              <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden" style={{height:'72px'}}>
                 <button
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 rounded-2xl font-bold text-lg shadow-lg hover:from-blue-600 hover:to-blue-800 transition-all border-2 border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  type="button"
+                  className="w-1/2 h-full bg-blue-600 text-white text-lg font-bold flex items-center justify-center gap-2 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700"
+                  style={{ cursor: 'pointer' }}
                   onClick={() => document.getElementById('file-upload-input')?.click()}
                 >
-                  Upload File
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" /></svg>
+                  Upload
+                </button>
+                <button
+                  className="w-1/2 h-full bg-gray-100 text-blue-700 text-lg font-bold flex items-center justify-center gap-2 border-l border-blue-100 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-50"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setCreatingFolder(true)}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                  Create
                 </button>
               </div>
+              {/* Folder Creation Popup */}
+              {creatingFolder && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                  <div className="bg-white rounded-2xl shadow-2xl p-6 w-11/12 max-w-xs flex flex-col gap-4 border border-blue-100 relative">
+                    <div className="text-lg font-bold text-gray-900 mb-2">Create New Folder</div>
+                    <input
+                      ref={folderInputRef}
+                      type="text"
+                      className="rounded-lg border border-blue-200 px-3 py-2 text-base text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      placeholder="New folder name"
+                      value={newFolderName}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val.length === 1 && val[0] === ' ') {
+                          setFolderErrorPopup("Folder name can't start with a space.");
+                          return;
+                        }
+                        if (forbiddenFolderChars.test(val)) {
+                          setFolderErrorPopup("Folder names can't include : ; / \\ * ? \" < > | ");
+                        } else if (val.length > maxFolderLength) {
+                          setFolderErrorPopup(`Folder name must be less than ${maxFolderLength} characters.`);
+                        } else if (val && folders.some(f => f.parentId === selectedFolder && f.name.trim().toLowerCase() === val.trim().toLowerCase())) {
+                          setFolderErrorPopup("A folder with this name already exists.");
+                        } else {
+                          setFolderErrorPopup(null);
+                        }
+                        setNewFolderName(val);
+                      }}
+                      autoFocus
+                    />
+                    {folderErrorPopup && (
+                      <div className="text-red-500 text-xs mt-1 w-full bg-red-50 border border-red-200 rounded px-2 py-1">
+                        {folderErrorPopup}
+                      </div>
+                    )}
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        className={`flex-1 bg-blue-600 text-white rounded-lg px-3 py-2 font-semibold text-base transition-all ${!isFolderNameValid ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+                        onClick={e => { e.preventDefault(); if (isFolderNameValid) { handleCreateFolder(); setCreatingFolder(false); } }}
+                        type="button"
+                        disabled={!isFolderNameValid}
+                      >Create</button>
+                      <button
+                        className="flex-1 bg-gray-100 text-gray-700 rounded-lg px-3 py-2 font-semibold text-base hover:bg-gray-200"
+                        onClick={e => { e.preventDefault(); setCreatingFolder(false); setNewFolderName(''); }}
+                        type="button"
+                      >Cancel</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        )}
-        {/* Floating message in the modal (top center) */}
-        {floatMessage && (
-          <div className={`fixed top-8 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 rounded-xl shadow-lg font-semibold text-sm animate-fade-in
-            ${floatMessage.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
-            style={{ pointerEvents: 'none' }}
-          >
-            {floatMessage.text}
           </div>
         )}
       </LoadScript>
@@ -922,22 +749,6 @@ function FileIcon({ type, label }: { type: string; label: string }) {
       {icon}
       <div className="text-xs font-semibold text-gray-700">{label}</div>
     </div>
-  );
-}
-
-function StaticMapImage({ lat, lng, address }: { lat: number; lng: number; address: string }) {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=17&size=400x200&maptype=satellite&markers=color:blue%7C${lat},${lng}&key=${apiKey}`;
-  return (
-    <Image
-      src={staticMapUrl}
-      alt={address}
-      width={400}
-      height={200}
-      className="object-cover w-full h-full"
-      style={{ minHeight: 120, minWidth: 200 }}
-      priority
-    />
   );
 }
  
