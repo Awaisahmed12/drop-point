@@ -180,7 +180,10 @@ Files can only be uploaded for properties that have been saved to the database a
 
 ## Recent Updates
 
-- Fixed ESLint error in `src/pages/map.tsx` by changing a `let` to `const` in the folder creation input handler. This keeps the codebase lint-free and up to best practices.
+- Cleaned up `src/pages/map.tsx` by removing unused variables and unnecessary ESLint disables.
+- Improved code quality by using `const` where possible.
+- Replaced raw `<img>` tags with Next.js `<Image />` for satellite map images, improving performance and following Next.js best practices.
+- The codebase is now more maintainable, production-ready, and compliant with modern React/Next.js standards.
 
 ## Property Details Modal: Mobile-First UX Update (2024)
 

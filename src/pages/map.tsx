@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
 import { GoogleMap, LoadScript } from '@react-google-maps/api';
+import Image from 'next/image';
 
 const containerStyle = {
   width: '100vw',
@@ -85,7 +86,6 @@ export default function MapPage() {
   const [propertyFiles, setPropertyFiles] = useState<PropertyFile[]>([]);
 
   // Will be used for property save-on-upload logic
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [snappedLatLng, setSnappedLatLng] = useState<{lat: number, lng: number} | null>(null);
 
   // Custom autocomplete state
@@ -371,7 +371,7 @@ export default function MapPage() {
       if (!showDetailsModal || !savedProperty?.id) return;
       const user = await supabase.auth.getUser();
       if (!user.data.user) return;
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('property_folders')
         .select('*')
         .eq('property_id', savedProperty.id)
@@ -402,14 +402,14 @@ export default function MapPage() {
     if (!savedProperty?.id) return;
     const user = await supabase.auth.getUser();
     if (!user.data.user) return;
-    let baseName = newFolderName.replace(/\s+$/, '');
+    const baseName = newFolderName.replace(/\s+$/, '');
     let nameToSave = baseName;
     let suffix = 1;
     // Check for duplicates and auto-rename
     while (folders.some(f => f.parent_id === selectedFolder && f.name.trim().toLowerCase() === nameToSave.trim().toLowerCase())) {
       nameToSave = `${baseName} (${suffix++})`;
     }
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('property_folders')
       .insert([
         {
@@ -421,7 +421,7 @@ export default function MapPage() {
       ])
       .select()
       .single();
-    if (error) {
+    if (!data) {
       setFolderErrorPopup('Error creating folder.');
       return;
     }
@@ -448,7 +448,7 @@ export default function MapPage() {
       if (!user.data.user) return;
       // If property not saved, check for existing property by user_id and address
       if (!propertyId) {
-        const { data: existing, error: fetchError } = await supabase
+        const { data: existing } = await supabase
           .from('properties')
           .select('*')
           .eq('user_id', user.data.user.id)
@@ -707,10 +707,13 @@ export default function MapPage() {
               </div>
               {/* Static satellite image with blue pin */}
               <div className="w-full h-40 sm:h-56 relative bg-gray-200 border-b border-blue-100">
-                <img
+                <Image
                   src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? savedProperty.lat)},${(snappedLatLng?.lng ?? savedProperty.lng)}&zoom=19&size=600x220&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? savedProperty.lat)},${(snappedLatLng?.lng ?? savedProperty.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
                   alt="Property satellite view"
-                  className="w-full h-full object-cover"
+                  layout="fill"
+                  objectFit="cover"
+                  priority
+                  unoptimized
                 />
                 {/* Blue pin overlay for extra clarity (optional) */}
                 {/* <img src="/pin.svg" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full w-8 h-8" alt="Pin" /> */}
