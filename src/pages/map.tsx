@@ -49,6 +49,7 @@ export type PropertyFile = {
   user_id: string;
   file_type: string;
   file_size: number;
+  folder_id: string | null;
 };
 
 // Add a type for folders
@@ -439,13 +440,25 @@ export default function MapPage() {
   }
 
   function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    if (!savedProperty) return;
+    console.log('File input changed');
+    const filesArray = Array.from(e.target.files || []);
+    if (filesArray.length === 0) {
+      console.log('No files selected, exiting');
+      return;
+    }
+    if (!savedProperty) {
+      console.log('No savedProperty, exiting');
+      return;
+    }
+    console.log('Starting async upload logic');
     (async () => {
       let propertyId = savedProperty.id;
       const user = await supabase.auth.getUser();
-      if (!user.data.user) return;
+      console.log('User:', user.data.user);
+      if (!user.data.user) {
+        console.log('No user, exiting');
+        return;
+      }
       // If property not saved, check for existing property by user_id and address
       if (!propertyId) {
         const { data: existing } = await supabase
@@ -475,6 +488,7 @@ export default function MapPage() {
             .single();
           if (error || !data) {
             alert('Error saving property before upload.');
+            console.log('Error saving property before upload:', error);
             return;
           }
           setSavedProperty(data);
@@ -483,9 +497,13 @@ export default function MapPage() {
           setSavedProperty(existing);
         }
       }
-      // Upload each file
-      for (const file of Array.from(files)) {
+      console.log('propertyId for upload:', propertyId);
+      console.log('Files to upload:', filesArray.length);
+      for (const file of filesArray) {
+        console.log('Preparing to upload file:', file.name);
         const filePath = `${propertyId}/${file.name}`;
+        const folderIdForUpload = selectedFolder === 'master' ? null : selectedFolder;
+        console.log('Uploading file to folder_id:', folderIdForUpload);
         const { data: uploadData, error: uploadError } = await supabase.storage.from('property-files').upload(filePath, file, { upsert: true });
         if (uploadError) {
           alert(`Error uploading file: ${file.name}`);
@@ -494,6 +512,7 @@ export default function MapPage() {
         }
         // Insert file record in DB
         const userId = user.data.user.id;
+        console.log('Uploading file to folder_id:', folderIdForUpload);
         const { error: dbError } = await supabase.from('property_files').insert([
           {
             property_id: propertyId,
@@ -503,6 +522,7 @@ export default function MapPage() {
             user_id: userId,
             file_type: file.type,
             file_size: file.size,
+            folder_id: folderIdForUpload,
           },
         ]);
         if (dbError) {
@@ -653,17 +673,33 @@ export default function MapPage() {
               <button
                 className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer"
                 disabled={addressLoading || !address || address === 'No address found' || address === 'Error fetching address'}
-                onClick={() => {
+                onClick={async () => {
                   if (map) {
                     const center = map.getCenter();
-                    setSavedProperty({
-                      address,
-                      lat: center?.lat() ?? 0,
-                      lng: center?.lng() ?? 0,
-                      label: null,
-                      notes: null,
-                      id: null, // Not saved yet
-                    });
+                    // Try to fetch property from Supabase by address and user
+                    const user = await supabase.auth.getUser();
+                    let dbProperty = null;
+                    if (user.data.user) {
+                      const { data: existing } = await supabase
+                        .from('properties')
+                        .select('*')
+                        .eq('user_id', user.data.user.id)
+                        .eq('address', address)
+                        .single();
+                      dbProperty = existing;
+                    }
+                    if (dbProperty) {
+                      setSavedProperty(dbProperty);
+                    } else {
+                      setSavedProperty({
+                        address,
+                        lat: center?.lat() ?? 0,
+                        lng: center?.lng() ?? 0,
+                        label: null,
+                        notes: null,
+                        id: null, // Not saved yet
+                      });
+                    }
                     setShowDetailsModal(true);
                   }
                 }}
@@ -730,7 +766,27 @@ export default function MapPage() {
               </div>
               {/* File/Folder List */}
               <div className="flex-1 overflow-y-auto px-4 pb-4 min-h-[120px]">
-                <div className="mb-2 text-blue-700 font-semibold text-base">All Files</div>
+                <div className="flex items-center gap-2 mb-2 text-sm text-blue-700 font-semibold">
+                  <span
+                    className={`cursor-pointer hover:underline ${selectedFolder === 'master' ? 'font-bold' : ''}`}
+                    onClick={() => setSelectedFolder('master')}
+                  >Root</span>
+                  {selectedFolder !== 'master' && (() => {
+                    // Refactor breadcrumb path building to a for loop for type safety
+                    let path = [];
+                    for (let crumbCurrent = folders.find(f => f.id === selectedFolder); crumbCurrent; crumbCurrent = crumbCurrent.parent_id ? folders.find(f => f.id === crumbCurrent.parent_id) : undefined) {
+                      path.unshift(crumbCurrent);
+                    }
+                    return path.map((folder, idx) => [
+                      <span key={`sep-${folder!.id}`}>/</span>,
+                      <span
+                        key={folder!.id}
+                        className={`cursor-pointer hover:underline ${idx === path.length - 1 ? 'font-bold' : ''}`}
+                        onClick={() => setSelectedFolder(folder!.id)}
+                      >{folder!.name}</span>
+                    ]);
+                  })()}
+                </div>
                 <div className="flex flex-col gap-2">
                   {/* Back button if not at root */}
                   {selectedFolder !== 'master' && (
@@ -738,7 +794,8 @@ export default function MapPage() {
                       className="mb-2 text-blue-600 hover:underline text-sm font-semibold flex items-center gap-1 cursor-pointer hover:bg-blue-50 rounded transition-colors"
                       style={{ cursor: 'pointer' }}
                       onClick={() => {
-                        const parent = folders.find(f => f.parent_id === selectedFolder)?.parent_id || 'master';
+                        const currentFolder = folders.find(f => f.id === selectedFolder);
+                        const parent = currentFolder?.parent_id || 'master';
                         setSelectedFolder(parent);
                       }}
                     >
@@ -759,10 +816,10 @@ export default function MapPage() {
                     </div>
                   ))}
                   {/* Files */}
-                  {propertyFiles.length === 0 && (
+                  {propertyFiles.filter(file => (selectedFolder === 'master' ? !file.folder_id : file.folder_id === selectedFolder)).length === 0 && (
                     <div className="text-gray-400 italic self-center py-6">No files uploaded yet.</div>
                   )}
-                  {propertyFiles.map((file) => (
+                  {propertyFiles.filter(file => (selectedFolder === 'master' ? !file.folder_id : file.folder_id === selectedFolder)).map((file) => (
                     <div key={file.id} className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-all border border-gray-100"
                       style={{ cursor: 'pointer' }}
                     >

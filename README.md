@@ -224,3 +224,5 @@ Files can only be uploaded for properties that have been saved to the database a
 - All data is private to the user unless shared (future-proofed for teams/sharing).
 
 For more details, see the code in `
+
+- Fixed a bug where the property modal did not show folders/files or allow uploads for existing properties. Now, when opening a property, the app fetches the full property row from Supabase (by address and user) and uses that as context. This ensures all modal features work for both new and existing properties.
