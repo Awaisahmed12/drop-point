@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
 import { GoogleMap, LoadScript } from '@react-google-maps/api';
 import Image from 'next/image';
+import MoveModal from '../components/MoveModal';
 
 const containerStyle = {
   width: '100vw',
@@ -15,7 +16,8 @@ const US_CENTER = {
 };
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
-const GOOGLE_MAP_LIBRARIES = ["places"] as const;
+// If Library type is available, use it. Otherwise, fallback to any[]
+const GOOGLE_MAP_LIBRARIES: any[] = ["places"];
 
 const DEFAULT_ZOOM = 12;
 const SEARCH_ZOOM = 19;
@@ -63,6 +65,20 @@ export type PropertyFolder = {
   updated_at: string;
   deleted_at: string | null;
 };
+
+// Update PendingUpload type for cancel/retry
+interface PendingUpload {
+  id: string;
+  file: File;
+  name: string;
+  status: 'uploading' | 'success' | 'error';
+  progress: number;
+  error?: string;
+  folder_id: string | null;
+  property_id: string;
+  retry?: () => void;
+  cancel?: () => void;
+}
 
 export default function MapPage() {
   const router = useRouter();
@@ -122,6 +138,27 @@ export default function MapPage() {
   };
   const folderNameValidationMsg = folderNameError(newFolderName);
   const isFolderNameValid = !!newFolderName && !folderNameValidationMsg;
+
+  // Add state for pending uploads
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+
+  // Add state for renaming folders and moving files (move to top of component)
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renamingFolderName, setRenamingFolderName] = useState('');
+  const [movingFileId, setMovingFileId] = useState<string | null>(null);
+  const [moveTargetFolder, setMoveTargetFolder] = useState<string | null>(null);
+
+  // Add ref for menu click outside
+  const folderMenuRef = useRef<HTMLDivElement | null>(null);
+  const fileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Add state for renaming files
+  const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
+  const [renamingFileName, setRenamingFileName] = useState('');
+
+  // Add state for move modal
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [moveFileTarget, setMoveFileTarget] = useState<PropertyFile | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -352,6 +389,7 @@ export default function MapPage() {
 
   // Fetch files for the selected property
   useEffect(() => {
+    setPropertyFiles([]); // Clear before fetching
     async function fetchFiles() {
       if (!savedProperty || !savedProperty.id) return;
       const result = await supabase
@@ -439,6 +477,47 @@ export default function MapPage() {
     setCreatingFolder(false);
   }
 
+  // Add beforeunload warning if uploads are pending
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (pendingUploads.some(p => p.status === 'uploading')) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [pendingUploads]);
+
+  // Clear pendingUploads and propertyFiles when switching properties
+  useEffect(() => {
+    setPendingUploads([]);
+    setPropertyFiles([]);
+  }, [savedProperty?.id]);
+
+  // Helper to generate a unique file name in a folder (like Google Drive)
+  function getUniqueFileName(baseName: string, folderId: string | null, propertyFiles: PropertyFile[]): string {
+    const extMatch = baseName.match(/(.*?)(\.[^.]*)?$/);
+    const name = extMatch ? extMatch[1] : baseName;
+    const ext = extMatch && extMatch[2] ? extMatch[2] : '';
+    let candidate = baseName;
+    let suffix = 1;
+    const filesInFolder = propertyFiles.filter(f => (f.folder_id || 'master') === (folderId || 'master'));
+    while (filesInFolder.some(f => f.file_name === candidate)) {
+      candidate = `${name} (${suffix++})${ext}`;
+    }
+    return candidate;
+  }
+
+  // Helper to sanitize file names for storage
+  function sanitizeFileName(name: string): string {
+    // Remove or replace any characters not allowed in URLs or Supabase storage
+    // For simplicity, allow alphanumerics, dash, underscore, dot, space, and parentheses
+    return name.replace(/[^a-zA-Z0-9.\- _()]/g, '_').replace(/\s+/g, ' ').trim();
+  }
+
+  // In handleFileInputChange, before uploading, sanitize the unique file name
   function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     console.log('File input changed');
     const filesArray = Array.from(e.target.files || []);
@@ -450,86 +529,125 @@ export default function MapPage() {
       console.log('No savedProperty, exiting');
       return;
     }
-    console.log('Starting async upload logic');
-    (async () => {
-      let propertyId = savedProperty.id;
-      const user = await supabase.auth.getUser();
-      console.log('User:', user.data.user);
-      if (!user.data.user) {
-        console.log('No user, exiting');
-        return;
-      }
-      // If property not saved, check for existing property by user_id and address
-      if (!propertyId) {
-        const { data: existing } = await supabase
-          .from('properties')
-          .select('*')
-          .eq('user_id', user.data.user.id)
-          .eq('address', savedProperty.address)
-          .single();
-        propertyId = existing?.id;
-        if (!propertyId) {
-          const { lat, lng } = snappedLatLng || { lat: savedProperty.lat, lng: savedProperty.lng };
-          const { data, error } = await supabase
-            .from('properties')
-            .insert([
-              {
-                address: savedProperty.address,
-                lat,
-                lng,
-                user_selected_lat: savedProperty.user_selected_lat ?? lat,
-                user_selected_lng: savedProperty.user_selected_lng ?? lng,
-                label: savedProperty.label,
-                notes: savedProperty.notes,
-                user_id: user.data.user.id,
-              },
-            ])
-            .select()
-            .single();
-          if (error || !data) {
-            alert('Error saving property before upload.');
-            console.log('Error saving property before upload:', error);
-            return;
-          }
-          setSavedProperty(data);
-          propertyId = data.id;
-        } else {
-          setSavedProperty(existing);
-        }
-      }
-      console.log('propertyId for upload:', propertyId);
-      console.log('Files to upload:', filesArray.length);
-      for (const file of filesArray) {
-        console.log('Preparing to upload file:', file.name);
-        const filePath = `${propertyId}/${file.name}`;
-        const folderIdForUpload = selectedFolder === 'master' ? null : selectedFolder;
-        console.log('Uploading file to folder_id:', folderIdForUpload);
-        const { data: uploadData, error: uploadError } = await supabase.storage.from('property-files').upload(filePath, file, { upsert: true });
-        if (uploadError) {
-          alert(`Error uploading file: ${file.name}`);
-          console.error('Upload error:', uploadError);
-          continue;
-        }
-        // Insert file record in DB
-        const userId = user.data.user.id;
-        console.log('Uploading file to folder_id:', folderIdForUpload);
-        const { error: dbError } = await supabase.from('property_files').insert([
+    const propertyId = savedProperty.id;
+    const folderIdForUpload = selectedFolder === 'master' ? null : selectedFolder;
+    const newPending = filesArray.map(file => {
+      // Generate unique file name for this folder
+      let uniqueName = getUniqueFileName(file.name, folderIdForUpload, propertyFiles);
+      uniqueName = sanitizeFileName(uniqueName);
+      if (!uniqueName) {
+        setPendingUploads(prev => [
+          ...prev,
           {
-            property_id: propertyId,
-            file_name: file.name,
-            file_url: uploadData?.path || filePath,
-            uploaded_at: new Date().toISOString(),
-            user_id: userId,
-            file_type: file.type,
-            file_size: file.size,
+            id: `${Date.now()}-invalid-${Math.random()}`,
+            file,
+            name: file.name,
+            status: 'error',
+            progress: 100,
+            error: 'Invalid file name. Please rename your file and try again.',
             folder_id: folderIdForUpload,
-          },
+            property_id: propertyId || '', // always string
+          } as PendingUpload,
         ]);
-        if (dbError) {
-          alert(`Error saving file record for: ${file.name}`);
-          console.error('DB insert error:', dbError);
-        }
+        return null;
       }
+      let progress = 0;
+      let interval: NodeJS.Timeout | null = null;
+      let cancelled = false;
+      const id = `${Date.now()}-${uniqueName}-${Math.random()}`;
+      const cancel = () => {
+        cancelled = true;
+        setPendingUploads(prev => prev.filter(p => p.id !== id));
+        if (interval) clearInterval(interval);
+      };
+      const retry = () => {
+        setPendingUploads(prev => prev.map(p => p.id === id ? { ...p, status: 'uploading', error: undefined, progress: 0 } : p));
+        handleFileInputChange({ target: { files: [file] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+      };
+      // Simulate progress
+      interval = setInterval(() => {
+        if (cancelled) {
+          if (interval) clearInterval(interval);
+          return;
+        }
+        progress += Math.random() * 20;
+        if (progress >= 100) progress = 99;
+        setPendingUploads(prev => prev.map(p => p.id === id ? { ...p, progress } : p));
+      }, 300);
+      return {
+        id,
+        file,
+        name: uniqueName,
+        status: 'uploading' as 'uploading',
+        progress: 0,
+        folder_id: folderIdForUpload,
+        property_id: propertyId || '', // always string
+        cancel,
+        retry,
+      } as PendingUpload;
+    }).filter((p): p is PendingUpload => !!p);
+    setPendingUploads(prev => [...prev, ...newPending]);
+    (async () => {
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) return;
+      await Promise.all(newPending.map(async (pending) => {
+        if (!pending) return;
+        if (pending.property_id !== savedProperty?.id) return; // Only upload for current property
+        const file = pending.file;
+        // Use the unique name for upload and DB
+        const filePath = `${pending.property_id}/${pending.name}`;
+        console.log('Uploading to:', filePath, 'File name:', pending.name, 'Folder ID:', pending.folder_id);
+        if (!pending.name) {
+          setPendingUploads(prev => prev.map(p => p.id === pending.id ? { ...p, status: 'error', error: 'Invalid file name. Please rename your file and try again.', progress: 100 } : p));
+          return;
+        }
+        // Log the values for RLS debugging
+        console.log('DB Insert:', {
+          user_id: user.data.user.id,
+          property_id: pending.property_id,
+          folder_id: pending.folder_id,
+        });
+        try {
+          if (pending.status === 'error') return;
+          if (pending.status === 'success') return;
+          const { data: uploadData, error: uploadError } = await supabase.storage.from('property-files').upload(filePath, file, { upsert: true });
+          if (uploadError) throw uploadError;
+          if (!user.data.user) throw new Error('User not authenticated');
+          const userId = user.data.user.id;
+          const { error: dbError } = await supabase.from('property_files').insert([
+            {
+              property_id: pending.property_id,
+              file_name: pending.name, // use unique name
+              file_url: uploadData?.path || filePath,
+              uploaded_at: new Date().toISOString(),
+              user_id: userId,
+              file_type: file.type,
+              file_size: file.size,
+              folder_id: pending.folder_id,
+            },
+          ]);
+          if (dbError) throw dbError;
+          setPendingUploads(prev => prev.map(p => p.id === pending.id ? { ...p, status: 'success', progress: 100 } : p));
+        } catch (err: unknown) {
+          let errorMsg = 'Upload failed';
+          if (typeof err === 'string') {
+            errorMsg = err;
+          } else if (err && typeof err === 'object') {
+            if ('message' in err && typeof (err as any).message === 'string') {
+              errorMsg = (err as any).message;
+            } else if ('error' in err && typeof (err as any).error === 'string') {
+              errorMsg = (err as any).error;
+            } else {
+              try {
+                errorMsg = JSON.stringify(err);
+              } catch {
+                errorMsg = 'Upload failed';
+              }
+            }
+          }
+          setPendingUploads(prev => prev.map(p => p.id === pending.id ? { ...p, status: 'error', error: errorMsg || 'Upload failed', progress: 100 } : p));
+        }
+      }));
       // Refresh file list
       const result = await supabase
         .from('property_files')
@@ -537,9 +655,33 @@ export default function MapPage() {
         .eq('property_id', propertyId)
         .order('uploaded_at', { ascending: false });
       if (result.data) setPropertyFiles(result.data);
+      setPendingUploads(prev => prev.filter(p => p.status !== 'success'));
     })();
-    // Reset file input
     e.target.value = '';
+  }
+
+  // Add state for action menus
+  const [folderMenuId, setFolderMenuId] = useState<string | null>(null);
+  const [fileMenuId, setFileMenuId] = useState<string | null>(null);
+
+  // Update click outside handler to only close if click is outside menu
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        folderMenuRef.current && !folderMenuRef.current.contains(e.target as Node) &&
+        fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)
+      ) {
+        setFolderMenuId(null);
+        setFileMenuId(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // Helper to get all folders for move dropdown
+  function getAllFolders(): PropertyFolder[] {
+    return folders;
   }
 
   if (loading) {
@@ -554,7 +696,7 @@ export default function MapPage() {
     <div className="relative w-screen h-screen overflow-hidden">
       <LoadScript
         googleMapsApiKey={GOOGLE_MAPS_API_KEY}
-        libraries={[...GOOGLE_MAP_LIBRARIES]}
+        libraries={GOOGLE_MAP_LIBRARIES}
       >
         <GoogleMap
           mapContainerStyle={containerStyle}
@@ -767,13 +909,20 @@ export default function MapPage() {
               {/* File/Folder List */}
               <div className="flex-1 overflow-y-auto px-4 pb-4 min-h-[120px]">
                 <div className="flex items-center gap-2 mb-2 text-sm text-blue-700 font-semibold">
-                  <span
-                    className={`cursor-pointer hover:underline ${selectedFolder === 'master' ? 'font-bold' : ''}`}
-                    onClick={() => setSelectedFolder('master')}
-                  >Root</span>
-                  {selectedFolder !== 'master' && (() => {
+                  {selectedFolder !== 'master' && (
+                    <span
+                      className="cursor-pointer hover:underline flex items-center"
+                      onClick={() => setSelectedFolder('master')}
+                      title="Go to root"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.5 1.5 0 012.121 0L22.25 12M4.5 10.5V19a2 2 0 002 2h2.25m6.5 0H17.5a2 2 0 002-2v-8.5m-10.25 10.5v-6.25a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75V21" />
+                      </svg>
+                    </span>
+                  )}
+                  {(() => {
                     // Refactor breadcrumb path building to a for loop for type safety
-                    let path = [];
+                    const path = [];
                     for (let crumbCurrent = folders.find(f => f.id === selectedFolder); crumbCurrent; crumbCurrent = crumbCurrent.parent_id ? folders.find(f => f.id === crumbCurrent.parent_id) : undefined) {
                       path.unshift(crumbCurrent);
                     }
@@ -807,12 +956,71 @@ export default function MapPage() {
                   {getChildFolders(selectedFolder === 'master' ? null : selectedFolder).map(folder => (
                     <div
                       key={folder.id}
-                      className="flex items-center gap-3 p-3 bg-gray-100 rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-all"
+                      className="flex items-center gap-3 p-3 bg-gray-100 rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-all relative"
                       style={{ cursor: 'pointer' }}
                       onClick={() => setSelectedFolder(folder.id)}
                     >
                       <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h2a2 2 0 012 2v2h10a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
-                      <span className="font-semibold text-gray-900">{folder.name}</span>
+                      {renamingFolderId === folder.id ? (
+                        <input
+                          className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-sm w-32"
+                          value={renamingFolderName}
+                          autoFocus
+                          onChange={e => setRenamingFolderName(e.target.value)}
+                          onBlur={async () => {
+                            if (renamingFolderName && renamingFolderName !== folder.name) {
+                              await supabase.from('property_folders').update({ name: renamingFolderName }).eq('id', folder.id);
+                              // Refresh folders
+                              const user = await supabase.auth.getUser();
+                              if (user.data.user) {
+                                const { data } = await supabase
+                                  .from('property_folders')
+                                  .select('*')
+                                  .eq('property_id', savedProperty?.id)
+                                  .eq('user_id', user.data.user.id)
+                                  .is('deleted_at', null)
+                                  .order('created_at', { ascending: true });
+                                if (data) setFolders(data);
+                              }
+                            }
+                            setRenamingFolderId(null);
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                        />
+                      ) : (
+                        <span className="font-semibold text-gray-900">{folder.name}</span>
+                      )}
+                      {/* Folder actions menu */}
+                      <div className="ml-auto relative">
+                        <button
+                          className="p-1 rounded hover:bg-blue-100 cursor-pointer"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setFolderMenuId(folderMenuId === folder.id ? null : folder.id);
+                          }}
+                          title="Folder actions"
+                        >
+                          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                        </button>
+                        {folderMenuId === folder.id && (
+                          <div ref={folderMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
+                            <button
+                              className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setRenamingFolderId(folder.id);
+                                setRenamingFolderName(folder.name);
+                                setFolderMenuId(null);
+                              }}
+                            >Rename</button>
+                            {/* Future: Delete folder */}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                   {/* Files */}
@@ -820,18 +1028,161 @@ export default function MapPage() {
                     <div className="text-gray-400 italic self-center py-6">No files uploaded yet.</div>
                   )}
                   {propertyFiles.filter(file => (selectedFolder === 'master' ? !file.folder_id : file.folder_id === selectedFolder)).map((file) => (
-                    <div key={file.id} className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-all border border-gray-100"
+                    <div key={file.id} className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-all border border-gray-100 relative"
                       style={{ cursor: 'pointer' }}
                     >
                       <FileIcon type={file.file_type?.split('/')[1] || 'file'} label={file.file_type?.split('/')[1]?.toUpperCase() || 'FILE'} />
                       <div className="flex flex-col">
-                        <span className="font-semibold text-gray-900 truncate max-w-[120px]">{file.file_name}</span>
+                        {renamingFileId === file.id ? (
+                          <input
+                            className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-sm w-32"
+                            value={renamingFileName}
+                            autoFocus
+                            onChange={e => setRenamingFileName(e.target.value)}
+                            onBlur={async () => {
+                              if (renamingFileName && renamingFileName !== file.file_name) {
+                                await supabase.from('property_files').update({ file_name: renamingFileName }).eq('id', file.id);
+                                // Refresh files
+                                const result = await supabase
+                                  .from('property_files')
+                                  .select('*')
+                                  .eq('property_id', file.property_id)
+                                  .order('uploaded_at', { ascending: false });
+                                if (result.data) setPropertyFiles(result.data);
+                              }
+                              setRenamingFileId(null);
+                            }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span
+                            className="font-semibold text-gray-900 truncate max-w-[120px] hover:underline"
+                            style={{ cursor: 'pointer' }}
+                            onClick={e => {
+                              e.stopPropagation();
+                              // Open file in new tab
+                              window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
+                            }}
+                          >{file.file_name}</span>
+                        )}
                         <span className="text-xs text-gray-500">{file.file_type}</span>
+                      </div>
+                      <div className="ml-auto relative">
+                        <button
+                          className="p-1 rounded hover:bg-blue-100 cursor-pointer"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setFileMenuId(fileMenuId === file.id ? null : file.id);
+                          }}
+                          title="File actions"
+                        >
+                          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                        </button>
+                        {fileMenuId === file.id && (
+                          <div ref={fileMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
+                            <button
+                              className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setRenamingFileId(file.id);
+                                setRenamingFileName(file.file_name);
+                                setFileMenuId(null);
+                              }}
+                            >Rename</button>
+                            <button
+                              className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setMoveFileTarget(file);
+                                setShowMoveModal(true);
+                                setFileMenuId(null);
+                              }}
+                            >Move</button>
+                            <button
+                              className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                              onClick={e => {
+                                e.stopPropagation();
+                                window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
+                                setFileMenuId(null);
+                              }}
+                            >Open</button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
+              {/* Pending uploads */}
+              {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === savedProperty?.id).length > 0 && (
+                <>
+                  {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === savedProperty?.id).map(pending => (
+                    <div key={pending.id} className={`flex items-center justify-between p-2 rounded-lg border-2 ${pending.status === 'error' ? 'border-red-400 bg-white/95' : 'border-gray-100 opacity-80'} relative mb-2`}>
+                      <span className="font-semibold text-gray-900 truncate max-w-[120px] mr-2">{pending.name}</span>
+                      {pending.status === 'uploading' && (
+                        <span className="text-xs text-blue-600 font-medium">Uploading...</span>
+                      )}
+                      {pending.status === 'error' && (
+                        <div className="flex items-center flex-1 min-w-0">
+                          <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
+                            <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth="2.5"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path d="M12 8v4m0 4h.01" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            {typeof pending.error === 'string' && pending.error.includes('Unauthorized') ? 'You don\'t have permission to upload.' : 'Upload failed'}
+                            <button
+                              className="ml-2 text-xs text-blue-600 underline hover:text-blue-800 focus:outline-none"
+                              style={{ background: 'none', border: 'none', padding: 0, fontWeight: 500, cursor: 'pointer' }}
+                              onClick={() => {
+                                setPendingUploads(prev => prev.filter(p => p.id !== pending.id));
+                                handleFileInputChange({ target: { files: [pending.file] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                              }}
+                              title="Retry upload"
+                              aria-label="Retry upload"
+                            >
+                              Retry?
+                            </button>
+                          </span>
+                          <div className="flex items-center gap-2 ml-auto">
+                            <button
+                              className="w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 focus:outline-none transition-colors"
+                              style={{ cursor: 'pointer', background: 'none', border: 'none' }}
+                              onClick={() => setPendingUploads(prev => prev.filter(p => p.id !== pending.id))}
+                              title="Remove failed upload"
+                              aria-label="Remove failed upload"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {pending.status === 'success' && (
+                        <span className="text-xs text-green-600 font-medium">Uploaded!</span>
+                      )}
+                      {pending.status === 'uploading' && (
+                        <div className="ml-auto flex items-center gap-1">
+                          <div className="relative w-6 h-6">
+                            <svg className="absolute top-0 left-0" width="24" height="24" viewBox="0 0 24 24">
+                              <circle cx="12" cy="12" r="10" stroke="#e5e7eb" strokeWidth="3" fill="none" />
+                              <circle cx="12" cy="12" r="10" stroke="#2563eb" strokeWidth="3" fill="none" strokeDasharray={2 * Math.PI * 10} strokeDashoffset={2 * Math.PI * 10 * (1 - pending.progress / 100)} style={{ transition: 'stroke-dashoffset 0.2s' }} />
+                            </svg>
+                            <button
+                              className="absolute top-0 left-0 w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 focus:outline-none"
+                              style={{ cursor: 'pointer', background: 'none', border: 'none' }}
+                              onClick={pending.cancel}
+                              title="Cancel upload"
+                              aria-label="Cancel upload"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
               {/* Hidden file input for upload */}
               <input id="file-upload-input" type="file" className="hidden" onChange={handleFileInputChange} multiple />
               {/* Bottom Action Bar (inside modal) */}
@@ -908,6 +1259,57 @@ export default function MapPage() {
           </div>
         )}
       </LoadScript>
+      {/* MoveModal for files */}
+      {showMoveModal && moveFileTarget && (
+        <MoveModal
+          open={showMoveModal}
+          folders={folders}
+          currentItemId={moveFileTarget.id}
+          currentItemType="file"
+          currentFolderId={moveFileTarget.folder_id}
+          onMove={async (targetFolderId) => {
+            // Only rename if moving to a different folder
+            let newName = moveFileTarget.file_name;
+            if (moveFileTarget.folder_id !== targetFolderId) {
+              newName = getUniqueFileName(moveFileTarget.file_name, targetFolderId, propertyFiles);
+              newName = sanitizeFileName(newName);
+            }
+            if (!newName) {
+              alert('Invalid file name. Please rename your file and try again.');
+              return;
+            }
+            // If name changed, update both storage and DB
+            if (newName !== moveFileTarget.file_name) {
+              // Rename in storage: copy to new name, then delete old
+              const oldPath = `${moveFileTarget.property_id}/${moveFileTarget.file_name}`;
+              const newPath = `${moveFileTarget.property_id}/${newName}`;
+              await supabase.storage.from('property-files').copy(oldPath, newPath);
+              await supabase.storage.from('property-files').remove([oldPath]);
+              await supabase.from('property_files').update({
+                folder_id: targetFolderId,
+                file_name: newName,
+                file_url: newPath,
+              }).eq('id', moveFileTarget.id);
+            } else {
+              // Just update folder_id
+              await supabase.from('property_files').update({ folder_id: targetFolderId }).eq('id', moveFileTarget.id);
+            }
+            setShowMoveModal(false);
+            setMoveFileTarget(null);
+            // Refresh files
+            const result = await supabase
+              .from('property_files')
+              .select('*')
+              .eq('property_id', moveFileTarget.property_id)
+              .order('uploaded_at', { ascending: false });
+            if (result.data) setPropertyFiles(result.data);
+          }}
+          onCancel={() => {
+            setShowMoveModal(false);
+            setMoveFileTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }

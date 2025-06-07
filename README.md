@@ -226,3 +226,18 @@ Files can only be uploaded for properties that have been saved to the database a
 For more details, see the code in `
 
 - Fixed a bug where the property modal did not show folders/files or allow uploads for existing properties. Now, when opening a property, the app fetches the full property row from Supabase (by address and user) and uses that as context. This ensures all modal features work for both new and existing properties.
+
+## File/Folder Move Modal (Tree View)
+
+- **Modern Google Drive–style Move Modal:**
+  - When a user clicks "Move" on a file, a modal opens with a tree view of all folders for the current property.
+  - The user can expand/collapse folders, select a destination, and confirm the move.
+  - Invalid moves (e.g., moving a folder into itself or its descendants) are visually prevented (for folders, coming soon).
+  - The UI is glassmorphic, mobile-friendly, and visually polished.
+  - This replaces the old flat move dropdown for files, making the UX scalable and intuitive.
+  - Folder moves and folder creation via tree view are coming soon.
+
+- **Architecture:**
+  - The MoveModal is a reusable component, designed to support both files and folders.
+  - It receives the folder structure, current item, and move/cancel handlers as props.
+  - All state and Supabase updates are handled in the parent (map.tsx), keeping the modal stateless and focused on UX.
