@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
-import { GoogleMap, LoadScript } from '@react-google-maps/api';
+import { GoogleMap, LoadScript, Libraries } from '@react-google-maps/api';
 import Image from 'next/image';
 import MoveModal from '../components/MoveModal';
 
@@ -16,8 +16,8 @@ const US_CENTER = {
 };
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
-// If Library type is available, use it. Otherwise, fallback to any[]
-const GOOGLE_MAP_LIBRARIES: any[] = ["places"];
+// eslint-disable-next-line @typescript-eslint/prefer-as-const
+const GOOGLE_MAP_LIBRARIES = ["places"] as Libraries;
 
 const DEFAULT_ZOOM = 12;
 const SEARCH_ZOOM = 19;
@@ -145,8 +145,6 @@ export default function MapPage() {
   // Add state for renaming folders and moving files (move to top of component)
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [renamingFolderName, setRenamingFolderName] = useState('');
-  const [movingFileId, setMovingFileId] = useState<string | null>(null);
-  const [moveTargetFolder, setMoveTargetFolder] = useState<string | null>(null);
 
   // Add ref for menu click outside
   const folderMenuRef = useRef<HTMLDivElement | null>(null);
@@ -578,7 +576,7 @@ export default function MapPage() {
         id,
         file,
         name: uniqueName,
-        status: 'uploading' as 'uploading',
+        status: 'uploading' as const,
         progress: 0,
         folder_id: folderIdForUpload,
         property_id: propertyId || '', // always string
@@ -602,11 +600,13 @@ export default function MapPage() {
           return;
         }
         // Log the values for RLS debugging
-        console.log('DB Insert:', {
-          user_id: user.data.user.id,
-          property_id: pending.property_id,
-          folder_id: pending.folder_id,
-        });
+        if (user.data.user) {
+          console.log('DB Insert:', {
+            user_id: user.data.user.id,
+            property_id: pending.property_id,
+            folder_id: pending.folder_id,
+          });
+        }
         try {
           if (pending.status === 'error') return;
           if (pending.status === 'success') return;
@@ -633,10 +633,10 @@ export default function MapPage() {
           if (typeof err === 'string') {
             errorMsg = err;
           } else if (err && typeof err === 'object') {
-            if ('message' in err && typeof (err as any).message === 'string') {
-              errorMsg = (err as any).message;
-            } else if ('error' in err && typeof (err as any).error === 'string') {
-              errorMsg = (err as any).error;
+            if ('message' in err && typeof (err as { message: string }).message === 'string') {
+              errorMsg = (err as { message: string }).message;
+            } else if ('error' in err && typeof (err as { error: string }).error === 'string') {
+              errorMsg = (err as { error: string }).error;
             } else {
               try {
                 errorMsg = JSON.stringify(err);
@@ -678,11 +678,6 @@ export default function MapPage() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
-
-  // Helper to get all folders for move dropdown
-  function getAllFolders(): PropertyFolder[] {
-    return folders;
-  }
 
   if (loading) {
     return (

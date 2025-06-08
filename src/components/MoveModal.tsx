@@ -11,13 +11,15 @@ interface MoveModalProps {
   onCancel: () => void;
 }
 
+type FolderWithChildren = PropertyFolder & { children: FolderWithChildren[] };
+
 // Helper to build a tree from flat folder list
-function buildFolderTree(folders: PropertyFolder[]): Array<PropertyFolder & { children: Array<PropertyFolder & { children: any[] }> }> {
-  const map: Record<string, PropertyFolder & { children: any[] }> = {};
+function buildFolderTree(folders: PropertyFolder[]): FolderWithChildren[] {
+  const map: Record<string, FolderWithChildren> = {};
   folders.forEach(f => {
     map[f.id] = { ...f, children: [] };
   });
-  const roots: Array<PropertyFolder & { children: any[] }> = [];
+  const roots: FolderWithChildren[] = [];
   Object.values(map).forEach(f => {
     if (f.parent_id && map[f.parent_id]) {
       map[f.parent_id].children.push(f);
@@ -69,7 +71,7 @@ export const MoveModal: React.FC<MoveModalProps> = ({
 
   const tree = useMemo(() => buildFolderTree(folders), [folders]);
 
-  function renderTree(nodes: (PropertyFolder & { children: any[] })[], depth = 0) {
+  function renderTree(nodes: FolderWithChildren[], depth = 0) {
     return nodes.map(node => {
       const isExpanded = expanded.has(node.id);
       const isInvalid = invalidTargetIds.has(node.id);
