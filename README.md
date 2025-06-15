@@ -241,3 +241,18 @@ For more details, see the code in `
   - The MoveModal is a reusable component, designed to support both files and folders.
   - It receives the folder structure, current item, and move/cancel handlers as props.
   - All state and Supabase updates are handled in the parent (map.tsx), keeping the modal stateless and focused on UX.
+
+## UI/UX Improvements (File List)
+
+- The file list UI is now more compact: smaller icons, reduced padding/gap, and smaller font sizes for file names and types.
+- Only the file extension (e.g., DOCX, PNG, PDF) is shown instead of the full MIME type, preventing layout issues with long file types.
+- File rows are visually tighter and more consistent, improving usability and aesthetics, especially for users with many files or long file names/types.
+- The file icon component now accepts a `size` prop for flexible sizing.
+
+These changes make the file/folder browser more professional, readable, and user-friendly.
+
+## Iconography
+
+This project uses [Heroicons](https://heroicons.com/) via the `@heroicons/react` npm package for all file, folder, and document icons. Heroicons is MIT-licensed and free for commercial use. It provides a modern, professional look and is used for PDF, DOCX, and generic file types, while image files show a real thumbnail preview.
+
+To update or add icons, see the Heroicons documentation or browse the available icons at https://heroicons.com/.

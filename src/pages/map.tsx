@@ -4,6 +4,8 @@ import { supabase } from '../utils/supabaseClient';
 import { GoogleMap, LoadScript, Libraries } from '@react-google-maps/api';
 import Image from 'next/image';
 import MoveModal from '../components/MoveModal';
+import { DocumentIcon, FolderIcon, HomeIcon, PhotoIcon, VideoCameraIcon, TableCellsIcon } from '@heroicons/react/24/solid';
+import { DocumentTextIcon, DocumentArrowDownIcon, PresentationChartBarIcon } from '@heroicons/react/24/outline';
 
 const containerStyle = {
   width: '100vw',
@@ -79,6 +81,30 @@ interface PendingUpload {
   retry?: () => void;
   cancel?: () => void;
 }
+
+// Add this near the top of the file (before MapPage)
+const imageTypes = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+
+// Google Drive-inspired color map
+const fileTypeColorMap: Record<string, string> = {
+  doc: '#1a73e8', // Google blue
+  docx: '#1a73e8',
+  xls: '#188038', // Google green
+  xlsx: '#188038',
+  csv: '#188038',
+  ppt: '#e37400', // Google orange
+  pptx: '#e37400',
+  pdf: '#d93025', // Google red
+  png: '#d93025', // Google red for images
+  jpg: '#d93025',
+  jpeg: '#d93025',
+  gif: '#d93025',
+  webp: '#d93025',
+  mp4: '#a142f4', // Google purple
+  mov: '#a142f4',
+  avi: '#a142f4',
+  webm: '#a142f4',
+};
 
 export default function MapPage() {
   const router = useRouter();
@@ -679,6 +705,17 @@ export default function MapPage() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  // Helper to get file name without extension
+  function getFileNameWithoutExtension(name: string) {
+    const lastDot = name.lastIndexOf('.');
+    if (lastDot === -1) return name;
+    return name.substring(0, lastDot);
+  }
+
+  // Before rendering the list, compute if there are any folders or files in the current folder
+  const hasFolders = folders.filter(folder => (selectedFolder === 'master' ? folder.parent_id === null : folder.parent_id === selectedFolder)).length > 0;
+  const hasFiles = propertyFiles.filter(file => (selectedFolder === 'master' ? !file.folder_id : file.folder_id === selectedFolder)).length > 0;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -726,8 +763,8 @@ export default function MapPage() {
           </div>
         </GoogleMap>
         {/* Floating search bar */}
-        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-20 w-full max-w-xl px-4">
-          <div className="relative">
+        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-full max-w-xl px-4">
+          <div className="relative w-full">
             <input
               ref={inputRef}
               type="text"
@@ -774,10 +811,8 @@ export default function MapPage() {
               </div>
             )}
           </div>
-        </div>
-        {/* Map type toggle */}
-        <div className="absolute top-6 left-6 z-30">
-          <div className="flex gap-2 bg-white rounded-lg shadow-lg p-2">
+          {/* Mobile toggle below search bar */}
+          <div className="flex gap-2 mt-2 sm:hidden">
             <button
               className={`px-3 py-1 rounded font-semibold text-sm ${mapType === 'roadmap' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800 border border-gray-300'} cursor-pointer`}
               onClick={() => setMapType('roadmap')}
@@ -791,6 +826,21 @@ export default function MapPage() {
               Satellite
             </button>
           </div>
+        </div>
+        {/* Desktop toggle in top left */}
+        <div className="hidden sm:flex absolute top-6 left-6 z-30 gap-2 bg-white rounded-lg shadow-lg p-2">
+          <button
+            className={`px-3 py-1 rounded font-semibold text-sm ${mapType === 'roadmap' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800 border border-gray-300'} cursor-pointer`}
+            onClick={() => setMapType('roadmap')}
+          >
+            Map
+          </button>
+          <button
+            className={`px-3 py-1 rounded font-semibold text-sm ${mapType === 'satellite' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800 border border-gray-300'} cursor-pointer`}
+            onClick={() => setMapType('satellite')}
+          >
+            Satellite
+          </button>
         </div>
         {/* Property info card at bottom */}
         {hasInteracted && address && (
@@ -879,7 +929,7 @@ export default function MapPage() {
                 </button>
               </div>
               {/* Static satellite image with blue pin */}
-              <div className="w-full h-40 sm:h-56 relative bg-gray-200 border-b border-blue-100">
+              <div className="relative w-full h-40 sm:h-56 bg-gray-200 border-b border-blue-100">
                 <Image
                   src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? savedProperty.lat)},${(snappedLatLng?.lng ?? savedProperty.lng)}&zoom=19&size=600x220&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? savedProperty.lat)},${(snappedLatLng?.lng ?? savedProperty.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
                   alt="Property satellite view"
@@ -888,8 +938,6 @@ export default function MapPage() {
                   priority
                   unoptimized
                 />
-                {/* Blue pin overlay for extra clarity (optional) */}
-                {/* <img src="/pin.svg" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full w-8 h-8" alt="Pin" /> */}
               </div>
               {/* Search Bar */}
               <div className="px-4 pb-2 pt-2 bg-white">
@@ -910,9 +958,7 @@ export default function MapPage() {
                       onClick={() => setSelectedFolder('master')}
                       title="Go to root"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955a1.5 1.5 0 012.121 0L22.25 12M4.5 10.5V19a2 2 0 002 2h2.25m6.5 0H17.5a2 2 0 002-2v-8.5m-10.25 10.5v-6.25a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75V21" />
-                      </svg>
+                      <HomeIcon style={{ width: 24, height: 24, color: '#1a73e8' }} />
                     </span>
                   )}
                   {(() => {
@@ -927,7 +973,9 @@ export default function MapPage() {
                         key={folder!.id}
                         className={`cursor-pointer hover:underline ${idx === path.length - 1 ? 'font-bold' : ''}`}
                         onClick={() => setSelectedFolder(folder!.id)}
-                      >{folder!.name}</span>
+                      >
+                        {folder!.name}
+                      </span>
                     ]);
                   })()}
                 </div>
@@ -948,58 +996,26 @@ export default function MapPage() {
                     </button>
                   )}
                   {/* Folders */}
-                  {getChildFolders(selectedFolder === 'master' ? null : selectedFolder).map(folder => (
+                  {folders.filter(folder => (selectedFolder === 'master' ? folder.parent_id === null : folder.parent_id === selectedFolder)).map(folder => (
                     <div
                       key={folder.id}
-                      className="flex items-center gap-3 p-3 bg-gray-100 rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-all relative"
-                      style={{ cursor: 'pointer' }}
+                      className="flex items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
+                      style={{ cursor: 'pointer', minHeight: 40 }}
                       onClick={() => setSelectedFolder(folder.id)}
                     >
-                      <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h2a2 2 0 012 2v2h10a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
-                      {renamingFolderId === folder.id ? (
-                        <input
-                          className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-sm w-32"
-                          value={renamingFolderName}
-                          autoFocus
-                          onChange={e => setRenamingFolderName(e.target.value)}
-                          onBlur={async () => {
-                            if (renamingFolderName && renamingFolderName !== folder.name) {
-                              await supabase.from('property_folders').update({ name: renamingFolderName }).eq('id', folder.id);
-                              // Refresh folders
-                              const user = await supabase.auth.getUser();
-                              if (user.data.user) {
-                                const { data } = await supabase
-                                  .from('property_folders')
-                                  .select('*')
-                                  .eq('property_id', savedProperty?.id)
-                                  .eq('user_id', user.data.user.id)
-                                  .is('deleted_at', null)
-                                  .order('created_at', { ascending: true });
-                                if (data) setFolders(data);
-                              }
-                            }
-                            setRenamingFolderId(null);
-                          }}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                        />
-                      ) : (
-                        <span className="font-semibold text-gray-900">{folder.name}</span>
-                      )}
-                      {/* Folder actions menu */}
-                      <div className="ml-auto relative">
+                      <FolderIcon style={{ width: 28, height: 28, color: '#fbbf24' }} />
+                      <span className="ml-3 flex-1 truncate text-gray-900 font-medium">{folder.name}</span>
+                      <div className="ml-2 relative flex items-center">
                         <button
-                          className="p-1 rounded hover:bg-blue-100 cursor-pointer"
+                          className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
+                          style={{ minWidth: 24, minHeight: 24 }}
                           onClick={e => {
                             e.stopPropagation();
                             setFolderMenuId(folderMenuId === folder.id ? null : folder.id);
                           }}
                           title="Folder actions"
                         >
-                          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
                         </button>
                         {folderMenuId === folder.id && (
                           <div ref={folderMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
@@ -1012,25 +1028,30 @@ export default function MapPage() {
                                 setFolderMenuId(null);
                               }}
                             >Rename</button>
-                            {/* Future: Delete folder */}
                           </div>
                         )}
                       </div>
                     </div>
                   ))}
                   {/* Files */}
-                  {propertyFiles.filter(file => (selectedFolder === 'master' ? !file.folder_id : file.folder_id === selectedFolder)).length === 0 && (
+                  {!hasFolders && !hasFiles && (
                     <div className="text-gray-400 italic self-center py-6">No files uploaded yet.</div>
                   )}
                   {propertyFiles.filter(file => (selectedFolder === 'master' ? !file.folder_id : file.folder_id === selectedFolder)).map((file) => (
-                    <div key={file.id} className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-all border border-gray-100 relative"
-                      style={{ cursor: 'pointer' }}
+                    <div
+                      key={file.id}
+                      className="flex items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
+                      style={{ cursor: 'pointer', minHeight: 40 }}
                     >
-                      <FileIcon type={file.file_type?.split('/')[1] || 'file'} label={file.file_type?.split('/')[1]?.toUpperCase() || 'FILE'} />
-                      <div className="flex flex-col">
+                      <FileIcon
+                        type={file.file_name.split('.').pop() || 'file'}
+                        label={(file.file_name.split('.').pop() || 'FILE').toUpperCase()}
+                        size={28}
+                      />
+                      <div className="ml-3 flex-1 min-w-0 flex items-center">
                         {renamingFileId === file.id ? (
                           <input
-                            className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-sm w-32"
+                            className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-44"
                             value={renamingFileName}
                             autoFocus
                             onChange={e => setRenamingFileName(e.target.value)}
@@ -1055,27 +1076,26 @@ export default function MapPage() {
                           />
                         ) : (
                           <span
-                            className="font-semibold text-gray-900 truncate max-w-[120px] hover:underline"
+                            className="font-medium text-gray-900 truncate text-base hover:underline"
                             style={{ cursor: 'pointer' }}
                             onClick={e => {
                               e.stopPropagation();
-                              // Open file in new tab
                               window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
                             }}
-                          >{file.file_name}</span>
+                          >{getFileNameWithoutExtension(file.file_name)}</span>
                         )}
-                        <span className="text-xs text-gray-500">{file.file_type}</span>
                       </div>
-                      <div className="ml-auto relative">
+                      <div className="ml-2 relative flex items-center">
                         <button
-                          className="p-1 rounded hover:bg-blue-100 cursor-pointer"
+                          className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
+                          style={{ minWidth: 24, minHeight: 24 }}
                           onClick={e => {
                             e.stopPropagation();
                             setFileMenuId(fileMenuId === file.id ? null : file.id);
                           }}
                           title="File actions"
                         >
-                          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
                         </button>
                         {fileMenuId === file.id && (
                           <div ref={fileMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
@@ -1183,20 +1203,20 @@ export default function MapPage() {
               {/* Bottom Action Bar (inside modal) */}
               <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden" style={{height:'72px'}}>
                 <button
-                  className="w-1/2 h-full bg-blue-600 text-white text-lg font-bold flex items-center justify-center gap-2 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => document.getElementById('file-upload-input')?.click()}
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" /></svg>
-                  Upload
-                </button>
-                <button
-                  className="w-1/2 h-full bg-gray-100 text-blue-700 text-lg font-bold flex items-center justify-center gap-2 border-l border-blue-100 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-50"
+                  className="w-1/2 h-full bg-gray-100 text-blue-700 text-lg font-bold flex items-center justify-center gap-2 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-50"
                   style={{ cursor: 'pointer' }}
                   onClick={() => setCreatingFolder(true)}
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                   Create
+                </button>
+                <button
+                  className="w-1/2 h-full bg-blue-600 text-white text-lg font-bold flex items-center justify-center gap-2 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => document.getElementById('file-upload-input')?.click()}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" /></svg>
+                  Upload
                 </button>
               </div>
               {/* Folder Creation Popup */}
@@ -1311,28 +1331,28 @@ export default function MapPage() {
 
 // --- Helper components ---
 
-function FileIcon({ type, label }: { type: string; label: string }) {
-  // Simple icon based on type
-  let icon;
-  if (type === 'pdf') {
-    icon = (
-      <svg width="36" height="36" fill="none" viewBox="0 0 36 36"><rect x="4" y="6" width="28" height="24" rx="4" fill="#2563eb" fillOpacity="0.08"/><rect x="8" y="10" width="20" height="16" rx="2" fill="#2563eb" fillOpacity="0.18"/><rect x="14" y="18" width="8" height="4" rx="1" fill="#2563eb" fillOpacity="0.4"/></svg>
-    );
-  } else if (type === 'doc') {
-    icon = (
-      <svg width="36" height="36" fill="none" viewBox="0 0 36 36"><rect x="4" y="6" width="28" height="24" rx="4" fill="#2563eb" fillOpacity="0.08"/><rect x="8" y="10" width="20" height="16" rx="2" fill="#2563eb" fillOpacity="0.18"/><rect x="12" y="16" width="12" height="2" rx="1" fill="#2563eb" fillOpacity="0.4"/></svg>
-    );
-  } else {
-    // img or other
-    icon = (
-      <svg width="36" height="36" fill="none" viewBox="0 0 36 36"><rect x="4" y="6" width="28" height="24" rx="4" fill="#2563eb" fillOpacity="0.08"/><rect x="8" y="10" width="20" height="16" rx="2" fill="#2563eb" fillOpacity="0.18"/><circle cx="18" cy="18" r="4" fill="#2563eb" fillOpacity="0.4"/></svg>
-    );
+function FileIcon({ type, label, size = 28 }: { type: string; label: string; size?: number }) {
+  const ext = type.toLowerCase();
+  const color = fileTypeColorMap[ext] || '#5f6368'; // Google gray fallback
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
+    return <PhotoIcon style={{ width: size, height: size, color }} />;
   }
-  return (
-    <div className="flex flex-col items-center gap-1">
-      {icon}
-      <div className="text-xs font-semibold text-gray-700">{label}</div>
-    </div>
-  );
+  if (["mp4", "mov", "avi", "webm"].includes(ext)) {
+    return <VideoCameraIcon style={{ width: size, height: size, color }} />;
+  }
+  if (["xls", "xlsx", "csv"].includes(ext)) {
+    return <TableCellsIcon style={{ width: size, height: size, color }} />;
+  }
+  if (["ppt", "pptx"].includes(ext)) {
+    return <PresentationChartBarIcon style={{ width: size, height: size, color }} />;
+  }
+  if (["pdf"].includes(ext)) {
+    return <DocumentTextIcon style={{ width: size, height: size, color }} />;
+  }
+  if (["doc", "docx"].includes(ext)) {
+    return <DocumentIcon style={{ width: size, height: size, color }} />;
+  }
+  // fallback for other files
+  return <DocumentArrowDownIcon style={{ width: size, height: size, color }} />;
 }
  

@@ -5,6 +5,13 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
     domains: ["maps.googleapis.com"],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'bxfydeqjmfjeanapfhpr.supabase.co',
+        pathname: '/storage/v1/object/public/property-files/**',
+      },
+    ],
   },
 };
 
