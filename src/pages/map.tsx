@@ -5,6 +5,21 @@ import { GoogleMap, LoadScript, Libraries } from '@react-google-maps/api';
 import Image from 'next/image';
 import MoveModal from '../components/MoveModal';
 import { HomeIcon, FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
+import { 
+  DocumentIcon, 
+  DocumentTextIcon, 
+  DocumentArrowDownIcon, 
+  DocumentChartBarIcon, 
+  PhotoIcon, 
+  FilmIcon, 
+  GifIcon, 
+  PresentationChartBarIcon, 
+  ArchiveBoxIcon, 
+  MusicalNoteIcon, 
+  ExclamationTriangleIcon, 
+  LockClosedIcon, 
+  GlobeAltIcon 
+} from '@heroicons/react/24/solid';
 
 const containerStyle = {
   width: '100vw',
@@ -816,6 +831,10 @@ export default function MapPage() {
     return [name.slice(0, lastDot), name.slice(lastDot)];
   }
 
+  useEffect(() => {
+    console.log('renamingFileId changed:', renamingFileId);
+  }, [renamingFileId]);
+
   return (
     <div className="relative w-screen h-screen overflow-hidden">
       <LoadScript
@@ -1162,17 +1181,7 @@ export default function MapPage() {
                               }}
                             />
                           ) : (
-                            <div
-                              className="text-gray-900 font-medium truncate hover:underline"
-                              style={{ cursor: 'pointer' }}
-                              onClick={e => {
-                                e.stopPropagation();
-                                setRenamingFileId(folder.id);
-                                setRenamingFileName(folder.name);
-                                setFileMenuId(null);
-                                setFolderMenuId(null);
-                              }}
-                            >
+                            <div className="text-gray-900 font-medium truncate">
                               {folder.name}
                             </div>
                           )}
@@ -1267,17 +1276,7 @@ export default function MapPage() {
                           }}
                         />
                       ) : (
-                        <span
-                          className="ml-3 flex-1 truncate text-gray-900 font-medium hover:underline"
-                          style={{ cursor: 'pointer' }}
-                          onClick={e => {
-                            e.stopPropagation();
-                            setRenamingFileId(folder.id);
-                            setRenamingFileName(folder.name);
-                            setFileMenuId(null);
-                            setFolderMenuId(null);
-                          }}
-                        >
+                        <span className="ml-3 flex-1 truncate text-gray-900 font-medium">
                           {folder.name}
                         </span>
                       )}
@@ -1321,6 +1320,13 @@ export default function MapPage() {
                         key={file.id}
                         className="hidden sm:grid grid-cols-12 gap-4 items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
                         style={{ cursor: 'pointer', minHeight: 40 }}
+                        onClick={(e) => {
+                          // Don't open file if clicking on menu button or menu items
+                          if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
+                            return;
+                          }
+                          window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
+                        }}
                       >
                         <div className="col-span-6 flex items-center min-w-0">
                           <FileIcon
@@ -1348,7 +1354,7 @@ export default function MapPage() {
                                       return;
                                     }
                                     // Validate extension
-                                    const [newBase, newExt] = splitFileNameAndExt(trimmed);
+                                    const [, newExt] = splitFileNameAndExt(trimmed);
                                     if (!newExt && ext) {
                                       alert('Removing the file extension may make the file unusable.');
                                       setRenamingFileId(null);
@@ -1380,16 +1386,10 @@ export default function MapPage() {
                               </span>
                             ) : (
                               <span
-                                className="hover:underline"
-                                style={{ cursor: 'pointer' }}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setRenamingFileId(file.id);
-                                  setRenamingFileName(file.file_name);
-                                  setFileMenuId(null);
-                                  setFolderMenuId(null);
-                                }}
-                              >{getFileNameWithoutExtension(file.file_name)}{ext}</span>
+                                className="text-gray-900 font-medium truncate"
+                              >
+                                {getFileNameWithoutExtension(file.file_name)}{ext}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -1418,8 +1418,11 @@ export default function MapPage() {
                                   e.stopPropagation();
                                   setRenamingFileId(file.id);
                                   setRenamingFileName(file.file_name);
-                                  setFileMenuId(null);
-                                  setFolderMenuId(null);
+                                  console.log('Rename menu clicked for', file.id, file.file_name);
+                                  setTimeout(() => {
+                                    setFileMenuId(null);
+                                    setFolderMenuId(null);
+                                  }, 50);
                                 }}
                               >Rename</button>
                               <button
@@ -1453,6 +1456,13 @@ export default function MapPage() {
                         key={file.id}
                         className="sm:hidden flex items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
                         style={{ cursor: 'pointer', minHeight: 40 }}
+                        onClick={(e) => {
+                          // Don't open file if clicking on menu button or menu items
+                          if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
+                            return;
+                          }
+                          window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
+                        }}
                       >
                         <FileIcon
                           type={file.file_name.split('.').pop() || 'file'}
@@ -1479,7 +1489,7 @@ export default function MapPage() {
                                     return;
                                   }
                                   // Validate extension
-                                  const [newBase, newExt] = splitFileNameAndExt(trimmed);
+                                  const [, newExt] = splitFileNameAndExt(trimmed);
                                   if (!newExt && ext) {
                                     alert('Removing the file extension may make the file unusable.');
                                     setRenamingFileId(null);
@@ -1511,16 +1521,10 @@ export default function MapPage() {
                             </span>
                           ) : (
                             <span
-                              className="hover:underline"
-                              style={{ cursor: 'pointer' }}
-                              onClick={e => {
-                                e.stopPropagation();
-                                setRenamingFileId(file.id);
-                                setRenamingFileName(file.file_name);
-                                setFileMenuId(null);
-                                setFolderMenuId(null);
-                              }}
-                            >{getFileNameWithoutExtension(file.file_name)}{ext}</span>
+                              className="text-gray-900 font-medium truncate"
+                            >
+                              {getFileNameWithoutExtension(file.file_name)}{ext}
+                            </span>
                           )}
                         </div>
                         <div className="ml-2 relative flex items-center">
@@ -1544,8 +1548,11 @@ export default function MapPage() {
                                   e.stopPropagation();
                                   setRenamingFileId(file.id);
                                   setRenamingFileName(file.file_name);
-                                  setFileMenuId(null);
-                                  setFolderMenuId(null);
+                                  console.log('Rename menu clicked for', file.id, file.file_name);
+                                  setTimeout(() => {
+                                    setFileMenuId(null);
+                                    setFolderMenuId(null);
+                                  }, 50);
                                 }}
                               >Rename</button>
                               <button
@@ -1775,12 +1782,24 @@ export default function MapPage() {
 function FileIcon({ type, size = 28 }: { type: string; size?: number }) {
   const ext = type.toLowerCase();
   const color = fileTypeColorMap[ext] || '#5f6368'; // Google gray fallback
+  let IconComponent = DocumentIcon;
+  // Map extensions to Heroicons
+  if (["doc", "docx", "rtf", "odt"].includes(ext)) IconComponent = DocumentTextIcon;
+  else if (["xls", "xlsx", "csv", "ods"].includes(ext)) IconComponent = DocumentChartBarIcon;
+  else if (["ppt", "pptx", "odp"].includes(ext)) IconComponent = PresentationChartBarIcon;
+  else if (["pdf"].includes(ext)) IconComponent = DocumentArrowDownIcon;
+  else if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "svg", "heic"].includes(ext)) IconComponent = PhotoIcon;
+  else if (["mp4", "mov", "avi", "webm", "mkv", "wmv"].includes(ext)) IconComponent = FilmIcon;
+  else if (["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(ext)) IconComponent = MusicalNoteIcon;
+  else if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) IconComponent = ArchiveBoxIcon;
+  else if (["gif"].includes(ext)) IconComponent = GifIcon;
+  else if (["key", "pem", "cert"].includes(ext)) IconComponent = LockClosedIcon;
+  else if (["json", "xml", "html", "js", "ts", "jsx", "tsx", "css", "scss", "py", "java", "c", "cpp", "cs", "rb", "go", "php", "sh", "bat", "sql", "yml", "yaml"].includes(ext)) IconComponent = GlobeAltIcon;
+  else if (["exe", "msi", "apk", "dmg", "pkg"].includes(ext)) IconComponent = ExclamationTriangleIcon;
+  // fallback: DocumentIcon (neutral) for all other unknowns
   return (
     <div className="flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M14 2V8H20" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
+      <IconComponent style={{ width: size, height: size, color }} />
     </div>
   );
 }

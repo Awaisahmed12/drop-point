@@ -184,6 +184,8 @@ Files can only be uploaded for properties that have been saved to the database a
 - Improved code quality by using `const` where possible.
 - Replaced raw `<img>` tags with Next.js `<Image />` for satellite map images, improving performance and following Next.js best practices.
 - The codebase is now more maintainable, production-ready, and compliant with modern React/Next.js standards.
+- Fixed ESLint errors in file renaming functionality by removing unused `newBase` variables, ensuring clean builds.
+- **Fixed click behavior**: Clicking on files/folders now opens them properly instead of triggering rename. Rename functionality is now only available through the "..." menu, providing a more intuitive user experience.
 
 ## Property Details Modal: Mobile-First UX Update (2024)
 
@@ -251,8 +253,8 @@ For more details, see the code in `
 
 These changes make the file/folder browser more professional, readable, and user-friendly.
 
-## Iconography
+## Icon Usage & Licensing
 
-This project uses [Heroicons](https://heroicons.com/) via the `@heroicons/react` npm package for all file, folder, and document icons. Heroicons is MIT-licensed and free for commercial use. It provides a modern, professional look and is used for PDF, DOCX, and generic file types, while image files show a real thumbnail preview.
+This project uses [Heroicons](https://heroicons.com/) via the `@heroicons/react` npm package for all file, folder, and document icons. Heroicons is MIT-licensed and free for commercial use. It provides a modern, professional look and is used for PDF, DOCX, image, spreadsheet, video, and other file types throughout the app.
 
 To update or add icons, see the Heroicons documentation or browse the available icons at https://heroicons.com/.
