@@ -816,13 +816,10 @@ export default function MapPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-lg text-gray-600">Loading...</div>
-      </div>
-    );
-  }
+  // Debug effect for renamingFileId changes
+  useEffect(() => {
+    console.log('renamingFileId changed:', renamingFileId);
+  }, [renamingFileId]);
 
   // Helper to split file name and extension
   function splitFileNameAndExt(name: string): [string, string] {
@@ -831,9 +828,39 @@ export default function MapPage() {
     return [name.slice(0, lastDot), name.slice(lastDot)];
   }
 
-  useEffect(() => {
-    console.log('renamingFileId changed:', renamingFileId);
-  }, [renamingFileId]);
+  // FileIcon component for rendering file type icons
+  function FileIcon({ type, size = 28 }: { type: string; size?: number }) {
+    const ext = type.toLowerCase();
+    const color = fileTypeColorMap[ext] || '#5f6368'; // Google gray fallback
+    let IconComponent = DocumentIcon;
+    // Map extensions to Heroicons
+    if (["doc", "docx", "rtf", "odt"].includes(ext)) IconComponent = DocumentTextIcon;
+    else if (["xls", "xlsx", "csv", "ods"].includes(ext)) IconComponent = DocumentChartBarIcon;
+    else if (["ppt", "pptx", "odp"].includes(ext)) IconComponent = PresentationChartBarIcon;
+    else if (["pdf"].includes(ext)) IconComponent = DocumentArrowDownIcon;
+    else if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "svg", "heic"].includes(ext)) IconComponent = PhotoIcon;
+    else if (["mp4", "mov", "avi", "webm", "mkv", "wmv"].includes(ext)) IconComponent = FilmIcon;
+    else if (["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(ext)) IconComponent = MusicalNoteIcon;
+    else if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) IconComponent = ArchiveBoxIcon;
+    else if (["gif"].includes(ext)) IconComponent = GifIcon;
+    else if (["key", "pem", "cert"].includes(ext)) IconComponent = LockClosedIcon;
+    else if (["json", "xml", "html", "js", "ts", "jsx", "tsx", "css", "scss", "py", "java", "c", "cpp", "cs", "rb", "go", "php", "sh", "bat", "sql", "yml", "yaml"].includes(ext)) IconComponent = GlobeAltIcon;
+    else if (["exe", "msi", "apk", "dmg", "pkg"].includes(ext)) IconComponent = ExclamationTriangleIcon;
+    // fallback: DocumentIcon (neutral) for all other unknowns
+    return (
+      <div className="flex items-center justify-center" style={{ width: size, height: size }}>
+        <IconComponent style={{ width: size, height: size, color }} />
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-lg text-gray-600">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">
@@ -1776,33 +1803,4 @@ export default function MapPage() {
     </div>
   );
 }
-
-// --- Helper components ---
-
-function FileIcon({ type, size = 28 }: { type: string; size?: number }) {
-  const ext = type.toLowerCase();
-  const color = fileTypeColorMap[ext] || '#5f6368'; // Google gray fallback
-  let IconComponent = DocumentIcon;
-  // Map extensions to Heroicons
-  if (["doc", "docx", "rtf", "odt"].includes(ext)) IconComponent = DocumentTextIcon;
-  else if (["xls", "xlsx", "csv", "ods"].includes(ext)) IconComponent = DocumentChartBarIcon;
-  else if (["ppt", "pptx", "odp"].includes(ext)) IconComponent = PresentationChartBarIcon;
-  else if (["pdf"].includes(ext)) IconComponent = DocumentArrowDownIcon;
-  else if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "svg", "heic"].includes(ext)) IconComponent = PhotoIcon;
-  else if (["mp4", "mov", "avi", "webm", "mkv", "wmv"].includes(ext)) IconComponent = FilmIcon;
-  else if (["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(ext)) IconComponent = MusicalNoteIcon;
-  else if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) IconComponent = ArchiveBoxIcon;
-  else if (["gif"].includes(ext)) IconComponent = GifIcon;
-  else if (["key", "pem", "cert"].includes(ext)) IconComponent = LockClosedIcon;
-  else if (["json", "xml", "html", "js", "ts", "jsx", "tsx", "css", "scss", "py", "java", "c", "cpp", "cs", "rb", "go", "php", "sh", "bat", "sql", "yml", "yaml"].includes(ext)) IconComponent = GlobeAltIcon;
-  else if (["exe", "msi", "apk", "dmg", "pkg"].includes(ext)) IconComponent = ExclamationTriangleIcon;
-  // fallback: DocumentIcon (neutral) for all other unknowns
-  return (
-    <div className="flex items-center justify-center" style={{ width: size, height: size }}>
-      <IconComponent style={{ width: size, height: size, color }} />
-    </div>
-  );
-}
-
-// FolderIcon component removed as it was unused - using HeroFolderIcon from @heroicons/react instead
  
