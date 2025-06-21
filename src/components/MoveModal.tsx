@@ -133,7 +133,12 @@ export const MoveModal: React.FC<MoveModalProps> = ({
             disabled={currentFolderId === null}
             type="button"
           >
-            <span className="flex items-center"><svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9" /></svg>Root</span>
+            <span className="flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9" />
+              </svg>
+              Root
+            </span>
           </button>
           {renderTree(tree)}
         </div>

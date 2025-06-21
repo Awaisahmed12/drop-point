@@ -471,81 +471,216 @@ export default function MapPage() {
   async function handleCreateFolder() {
     if (!newFolderName || folderNameError(newFolderName)) return;
     if (!savedProperty?.id) return;
-    
+
     setIsCreatingFolder(true);
     setFolderErrorPopup(null);
-    
+
     const user = await supabase.auth.getUser();
     if (!user.data.user) {
       setFolderErrorPopup('User not authenticated');
       setIsCreatingFolder(false);
       return;
     }
-    
-    const baseName = newFolderName.replace(/\s+$/, '');
-    let nameToSave = baseName;
+
+    const baseName = newFolderName.trim();
+    let nameToTry = baseName;
     let suffix = 1;
-    
-    // Check for duplicates and auto-rename
-    while (folders.some(f => (selectedFolder === 'master' ? f.parent_id === null : f.parent_id === selectedFolder) && f.name.trim().toLowerCase() === nameToSave.trim().toLowerCase())) {
-      nameToSave = `${baseName} (${suffix++})`;
+    const maxAttempts = 10;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const { data: newFolder, error } = await supabase
+          .from('property_folders')
+          .insert([
+            {
+              property_id: savedProperty.id,
+              user_id: user.data.user.id,
+              name: nameToTry,
+              parent_id: selectedFolder === 'master' ? null : selectedFolder,
+            },
+          ])
+          .select()
+          .single();
+
+        if (error) {
+          if (error.code === '23505') { // Unique constraint violation
+            nameToTry = `${baseName} (${suffix})`;
+            suffix++;
+            continue; // Try again with new name
+          }
+          // Other error - show to user and exit
+          throw error;
+        }
+
+        // Success! Refresh folder list and clean up
+        if (newFolder) {
+          const { data: refreshedFolders, error: fetchError } = await supabase
+            .from('property_folders')
+            .select('*')
+            .eq('property_id', savedProperty.id)
+            .eq('user_id', user.data.user.id)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: true });
+
+          if (fetchError) {
+            console.error('Error fetching folders:', fetchError);
+            setFolderErrorPopup('Folder created, but failed to refresh list.');
+          } else if (refreshedFolders) {
+            setFolders(refreshedFolders);
+          }
+
+          // Reset form and close
+          setNewFolderName('');
+          setCreatingFolder(false);
+          setFolderErrorPopup(null);
+          setIsCreatingFolder(false);
+          return;
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+        setFolderErrorPopup(`Error creating folder: ${errorMessage}`);
+        setIsCreatingFolder(false);
+        return;
+      }
     }
-    
+
+    // If we get here, we've exhausted all attempts
+    setFolderErrorPopup('Could not create a folder with a unique name. Please try a different name.');
+    setIsCreatingFolder(false);
+  }
+
+  // Centralized handler for renaming files and folders
+  async function handleRename(item: PropertyFile | PropertyFolder, newName: string) {
+    const originalName = 'file_name' in item ? item.file_name : item.name;
+    const trimmedNewName = newName.trim();
+    if (!trimmedNewName || trimmedNewName === originalName) {
+      setRenamingFileId(null);
+      setRenamingFileName('');
+      return;
+    }
+  
+    // Type guard
+    const isFile = 'file_name' in item;
+  
     try {
-      const { data: newFolder, error } = await supabase
-        .from('property_folders')
-        .insert([
-          {
-            property_id: savedProperty.id,
-            user_id: user.data.user.id,
-            name: nameToSave,
-            parent_id: selectedFolder === 'master' ? null : selectedFolder,
-          },
-        ])
-        .select()
-        .single();
+      if (isFile) {
+        const file = item as PropertyFile;
+        // File-specific logic
+        const existingFile = propertyFiles.find(f => f.folder_id === file.folder_id && f.file_name.toLowerCase() === trimmedNewName.toLowerCase() && f.id !== file.id);
+        if (existingFile) {
+          throw new Error('A file with this name already exists in this folder.');
+        }
+
+        const oldPath = file.file_url;
+        const newPath = `${file.property_id}/${trimmedNewName}`;
         
-      if (error) {
-        console.error('Error creating folder:', error);
-        setFolderErrorPopup(`Error creating folder: ${error.message}`);
-        setIsCreatingFolder(false);
-        return;
-      }
-      
-      if (!newFolder) {
-        setFolderErrorPopup('Error creating folder: No data returned');
-        setIsCreatingFolder(false);
-        return;
-      }
-      
-      // Refresh folders
-      const { data: refreshedFolders, error: fetchError } = await supabase
-        .from('property_folders')
-        .select('*')
-        .eq('property_id', savedProperty.id)
-        .eq('user_id', user.data.user.id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true });
+        const { error: moveError } = await supabase.storage.from('property-files').move(oldPath, newPath);
+        if (moveError) throw new Error(`Storage error: ${moveError.message}`);
+
+        const { error: dbError } = await supabase.from('property_files').update({
+          file_name: trimmedNewName,
+          file_url: newPath,
+        }).eq('id', file.id);
+        if (dbError) throw dbError;
+
+        setPropertyFiles(files => files.map(f => f.id === file.id ? { ...f, file_name: trimmedNewName, file_url: newPath } : f));
+      } else {
+        const folder = item as PropertyFolder;
+        // Folder-specific logic
+        const existingFolder = folders.find(f => f.parent_id === folder.parent_id && f.name.toLowerCase() === trimmedNewName.toLowerCase() && f.id !== folder.id);
+        if (existingFolder) {
+          throw new Error('A folder with this name already exists here.');
+        }
         
-      if (fetchError) {
-        console.error('Error fetching folders:', fetchError);
-        setFolderErrorPopup('Error refreshing folders');
-        setIsCreatingFolder(false);
-        return;
+        const { error } = await supabase.from('property_folders').update({ name: trimmedNewName }).eq('id', folder.id);
+        if (error) throw error;
+
+        setFolders(folders => folders.map(f => f.id === folder.id ? { ...f, name: trimmedNewName } : f));
       }
-      
-      if (refreshedFolders) setFolders(refreshedFolders);
-      
-      // Only clear and close if everything succeeded
-      setNewFolderName('');
-      setCreatingFolder(false);
-      setFolderErrorPopup(null);
-      setIsCreatingFolder(false);
-      
-    } catch (err) {
-      console.error('Unexpected error creating folder:', err);
-      setFolderErrorPopup('Unexpected error creating folder');
-      setIsCreatingFolder(false);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Rename failed';
+      alert(`Rename failed: ${errorMessage}`);
+    } finally {
+      setRenamingFileId(null);
+      setRenamingFileName('');
+    }
+  }
+
+  // Handler for deleting a file
+  async function handleDeleteFile(file: PropertyFile) {
+    if (!file) return;
+
+    const isConfirmed = window.confirm(`Are you sure you want to delete "${file.file_name}"? This action cannot be undone.`);
+
+    if (isConfirmed) {
+        try {
+            // 1. Delete from storage
+            const { error: storageError } = await supabase.storage
+                .from('property-files')
+                .remove([`${file.property_id}/${file.file_name}`]);
+
+            if (storageError) {
+                console.warn('Storage deletion warning (may be harmless if file was already gone):', storageError.message);
+            }
+
+            // 2. Delete from database
+            const { error: dbError } = await supabase
+                .from('property_files')
+                .delete()
+                .eq('id', file.id);
+
+            if (dbError) throw dbError;
+
+            // 3. Update local state
+            setPropertyFiles(prevFiles => prevFiles.filter(f => f.id !== file.id));
+
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to delete file';
+            alert(`Failed to delete file: ${errorMessage}`);
+        } finally {
+            setFileMenuId(null);
+        }
+    } else {
+        setFileMenuId(null);
+    }
+  }
+
+  // Handler for deleting a folder
+  async function handleDeleteFolder(folder: PropertyFolder) {
+    if (!folder) return;
+
+    const hasChildrenFolders = folders.some(f => f.parent_id === folder.id);
+    const hasChildrenFiles = propertyFiles.some(f => f.folder_id === folder.id);
+
+    if (hasChildrenFolders || hasChildrenFiles) {
+        alert("Folder must be empty before it can be deleted.");
+        setFolderMenuId(null);
+        return;
+    }
+
+    const isConfirmed = window.confirm(`Are you sure you want to delete the folder "${folder.name}"?`);
+
+    if (isConfirmed) {
+        try {
+            // Soft delete from the database
+            const { error } = await supabase
+                .from('property_folders')
+                .update({ deleted_at: new Date().toISOString() })
+                .eq('id', folder.id);
+
+            if (error) throw error;
+
+            // Update local state
+            setFolders(prevFolders => prevFolders.filter(f => f.id !== folder.id));
+        
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to delete folder';
+            alert(`Failed to delete folder: ${errorMessage}`);
+        } finally {
+            setFolderMenuId(null);
+        }
+    } else {
+        setFolderMenuId(null);
     }
   }
 
@@ -740,10 +875,17 @@ export default function MapPage() {
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
+      
       // Don't close if clicking on a menu button
       if (target.closest('button[title="Folder actions"]') || target.closest('button[title="File actions"]')) {
         return;
       }
+      
+      // Don't close if clicking inside a menu
+      if (target.closest('[role="menu"]') || target.closest('.absolute.right-0.mt-2')) {
+        return;
+      }
+      
       // Close folder menu if click is outside
       if (folderMenuRef.current && !folderMenuRef.current.contains(target)) {
         setFolderMenuId(null);
@@ -754,20 +896,9 @@ export default function MapPage() {
       }
     }
 
-    // Add blur handler to close menus when focus is lost
-    function handleBlur(e: FocusEvent) {
-      const target = e.relatedTarget as HTMLElement;
-      if (!target || (!target.closest('[role="menu"]') && !target.closest('button[title="Folder actions"]') && !target.closest('button[title="File actions"]'))) {
-        setFolderMenuId(null);
-        setFileMenuId(null);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('focusout', handleBlur);
+    document.addEventListener('click', handleClick);
     return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('focusout', handleBlur);
+      document.removeEventListener('click', handleClick);
     };
   }, []);
 
@@ -862,6 +993,15 @@ export default function MapPage() {
   useEffect(() => {
     console.log('renamingFileId changed:', renamingFileId);
   }, [renamingFileId]);
+
+  // Debug effect for menu state changes
+  useEffect(() => {
+    console.log('folderMenuId changed:', folderMenuId);
+  }, [folderMenuId]);
+
+  useEffect(() => {
+    console.log('fileMenuId changed:', fileMenuId);
+  }, [fileMenuId]);
 
   // Helper to split file name and extension
   function splitFileNameAndExt(name: string): [string, string] {
@@ -1102,9 +1242,9 @@ export default function MapPage() {
                 </button>
               </div>
               {/* Static satellite image with blue pin */}
-              <div className="relative w-full h-40 sm:h-56 bg-gray-200 border-b border-blue-100">
+              <div className="relative w-full h-48 sm:h-64 bg-gray-200 border-b border-blue-100">
                 <Image
-                  src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? savedProperty.lat)},${(snappedLatLng?.lng ?? savedProperty.lng)}&zoom=19&size=600x220&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? savedProperty.lat)},${(snappedLatLng?.lng ?? savedProperty.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
+                  src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? savedProperty.lat)},${(snappedLatLng?.lng ?? savedProperty.lng)}&zoom=19&size=640x213&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? savedProperty.lat)},${(snappedLatLng?.lng ?? savedProperty.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
                   alt="Property satellite view"
                   layout="fill"
                   objectFit="cover"
@@ -1113,7 +1253,7 @@ export default function MapPage() {
                 />
               </div>
               {/* Breadcrumb - now above search bar and styled blue */}
-              <div className="flex items-center gap-2 mb-2 text-sm text-blue-700 font-semibold px-4 pt-4">
+              <div className="flex items-center gap-2 mb-2 text-sm text-blue-700 font-semibold px-4 pt-2">
                 {selectedFolder !== 'master' && (
                   <span
                     className="cursor-pointer hover:underline flex items-center"
@@ -1156,7 +1296,7 @@ export default function MapPage() {
                 </button>
               )}
               {/* Search Bar */}
-              <div className="px-4 pb-2 pt-2 bg-white">
+              <div className="px-4 pb-2 bg-white">
                 <input
                   type="text"
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-base text-gray-900 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -1212,34 +1352,7 @@ export default function MapPage() {
                               }}
                               onChange={e => setRenamingFileName(e.target.value)}
                               onBlur={async () => {
-                                const trimmed = renamingFileName.trim();
-                                if (!trimmed || trimmed === folder.name) {
-                                  setRenamingFileId(null);
-                                  setRenamingFileName('');
-                                  return;
-                                }
-                                // Validate folder name
-                                if (folders.some(f => f.parent_id === folder.parent_id && f.name.trim().toLowerCase() === trimmed.toLowerCase() && f.id !== folder.id)) {
-                                  alert('A folder with this name already exists.');
-                                  setRenamingFileId(null);
-                                  setRenamingFileName('');
-                                  return;
-                                }
-                                await supabase.from('property_folders').update({ name: trimmed }).eq('id', folder.id);
-                                // Refresh folders
-                                const user = await supabase.auth.getUser();
-                                if (user.data.user) {
-                                  const { data: allFolders } = await supabase
-                                    .from('property_folders')
-                                    .select('*')
-                                    .eq('property_id', savedProperty.id)
-                                    .eq('user_id', user.data.user.id)
-                                    .is('deleted_at', null)
-                                    .order('created_at', { ascending: true });
-                                  if (allFolders) setFolders(allFolders);
-                                }
-                                setRenamingFileId(null);
-                                setRenamingFileName('');
+                                await handleRename(folder, renamingFileName);
                               }}
                               onKeyDown={e => {
                                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -1275,7 +1388,7 @@ export default function MapPage() {
                         {folderMenuId === folder.id && (
                           <div ref={folderMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
                             <button
-                              className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                              className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                               onClick={e => {
                                 e.stopPropagation();
                                 setRenamingFileId(folder.id);
@@ -1283,6 +1396,13 @@ export default function MapPage() {
                                 setFolderMenuId(null);
                               }}
                             >Rename</button>
+                            <button
+                              className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleDeleteFolder(folder);
+                              }}
+                            >Delete</button>
                           </div>
                         )}
                       </div>
@@ -1308,33 +1428,7 @@ export default function MapPage() {
                           }}
                           onChange={e => setRenamingFileName(e.target.value)}
                           onBlur={async () => {
-                            const trimmed = renamingFileName.trim();
-                            if (!trimmed || trimmed === folder.name) {
-                              setRenamingFileId(null);
-                              setRenamingFileName('');
-                              return;
-                            }
-                            if (folders.some(f => f.parent_id === folder.parent_id && f.name.trim().toLowerCase() === trimmed.toLowerCase() && f.id !== folder.id)) {
-                              alert('A folder with this name already exists.');
-                              setRenamingFileId(null);
-                              setRenamingFileName('');
-                              return;
-                            }
-                            await supabase.from('property_folders').update({ name: trimmed }).eq('id', folder.id);
-                            // Refresh folders
-                            const user = await supabase.auth.getUser();
-                            if (user.data.user) {
-                              const { data: allFolders } = await supabase
-                                .from('property_folders')
-                                .select('*')
-                                .eq('property_id', savedProperty.id)
-                                .eq('user_id', user.data.user.id)
-                                .is('deleted_at', null)
-                                .order('created_at', { ascending: true });
-                              if (allFolders) setFolders(allFolders);
-                            }
-                            setRenamingFileId(null);
-                            setRenamingFileName('');
+                            await handleRename(folder, renamingFileName);
                           }}
                           onKeyDown={e => {
                             if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -1365,7 +1459,7 @@ export default function MapPage() {
                         {folderMenuId === folder.id && (
                           <div ref={folderMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
                             <button
-                              className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                              className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                               onClick={e => {
                                 e.stopPropagation();
                                 setRenamingFileId(folder.id);
@@ -1373,6 +1467,13 @@ export default function MapPage() {
                                 setFolderMenuId(null);
                               }}
                             >Rename</button>
+                            <button
+                              className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleDeleteFolder(folder);
+                              }}
+                            >Delete</button>
                           </div>
                         )}
                       </div>
@@ -1417,31 +1518,15 @@ export default function MapPage() {
                                   onChange={e => setRenamingFileName(e.target.value)}
                                   onBlur={async () => {
                                     const trimmed = renamingFileName.trim();
-                                    if (!trimmed) {
-                                      setRenamingFileId(null);
-                                      setRenamingFileName('');
-                                      return;
-                                    }
-                                    // Validate extension
                                     const [, newExt] = splitFileNameAndExt(trimmed);
-                                    if (!newExt && ext) {
-                                      alert('Removing the file extension may make the file unusable.');
+                                    const [, oldExt] = splitFileNameAndExt(file.file_name);
+                                    if (!newExt && oldExt) {
+                                      alert('File extension cannot be removed. Aborting rename.');
                                       setRenamingFileId(null);
                                       setRenamingFileName('');
                                       return;
                                     }
-                                    if (trimmed !== file.file_name) {
-                                      await supabase.from('property_files').update({ file_name: trimmed }).eq('id', file.id);
-                                      // Refresh files
-                                      const result = await supabase
-                                        .from('property_files')
-                                        .select('*')
-                                        .eq('property_id', file.property_id)
-                                        .order('uploaded_at', { ascending: false });
-                                      if (result.data) setPropertyFiles(result.data);
-                                    }
-                                    setRenamingFileId(null);
-                                    setRenamingFileName('');
+                                    await handleRename(file, trimmed);
                                   }}
                                   onKeyDown={e => {
                                     if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -1482,7 +1567,7 @@ export default function MapPage() {
                           {fileMenuId === file.id && (
                             <div ref={fileMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
                               <button
-                                className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                                 onClick={e => {
                                   e.stopPropagation();
                                   setRenamingFileId(file.id);
@@ -1495,7 +1580,7 @@ export default function MapPage() {
                                 }}
                               >Rename</button>
                               <button
-                                className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                                 onClick={e => {
                                   e.stopPropagation();
                                   setMoveFileTarget(file);
@@ -1504,13 +1589,20 @@ export default function MapPage() {
                                 }}
                               >Move</button>
                               <button
-                                className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                                 onClick={e => {
                                   e.stopPropagation();
                                   window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
                                   setFileMenuId(null);
                                 }}
                               >Open</button>
+                              <button
+                                className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleDeleteFile(file);
+                                }}
+                              >Delete</button>
                             </div>
                           )}
                         </div>
@@ -1552,31 +1644,15 @@ export default function MapPage() {
                                 onChange={e => setRenamingFileName(e.target.value)}
                                 onBlur={async () => {
                                   const trimmed = renamingFileName.trim();
-                                  if (!trimmed) {
-                                    setRenamingFileId(null);
-                                    setRenamingFileName('');
-                                    return;
-                                  }
-                                  // Validate extension
                                   const [, newExt] = splitFileNameAndExt(trimmed);
-                                  if (!newExt && ext) {
-                                    alert('Removing the file extension may make the file unusable.');
+                                  const [, oldExt] = splitFileNameAndExt(file.file_name);
+                                  if (!newExt && oldExt) {
+                                    alert('File extension cannot be removed. Aborting rename.');
                                     setRenamingFileId(null);
                                     setRenamingFileName('');
                                     return;
                                   }
-                                  if (trimmed !== file.file_name) {
-                                    await supabase.from('property_files').update({ file_name: trimmed }).eq('id', file.id);
-                                    // Refresh files
-                                    const result = await supabase
-                                      .from('property_files')
-                                      .select('*')
-                                      .eq('property_id', file.property_id)
-                                      .order('uploaded_at', { ascending: false });
-                                    if (result.data) setPropertyFiles(result.data);
-                                  }
-                                  setRenamingFileId(null);
-                                  setRenamingFileName('');
+                                  await handleRename(file, trimmed);
                                 }}
                                 onKeyDown={e => {
                                   if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -1612,7 +1688,7 @@ export default function MapPage() {
                           {fileMenuId === file.id && (
                             <div ref={fileMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
                               <button
-                                className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                                 onClick={e => {
                                   e.stopPropagation();
                                   setRenamingFileId(file.id);
@@ -1625,7 +1701,7 @@ export default function MapPage() {
                                 }}
                               >Rename</button>
                               <button
-                                className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                                 onClick={e => {
                                   e.stopPropagation();
                                   setMoveFileTarget(file);
@@ -1634,13 +1710,20 @@ export default function MapPage() {
                                 }}
                               >Move</button>
                               <button
-                                className="block w-full text-left px-4 py-2 rounded transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                                 onClick={e => {
                                   e.stopPropagation();
                                   window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
                                   setFileMenuId(null);
                                 }}
                               >Open</button>
+                              <button
+                                className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleDeleteFile(file);
+                                }}
+                              >Delete</button>
                             </div>
                           )}
                         </div>
@@ -1718,21 +1801,21 @@ export default function MapPage() {
               {/* Hidden file input for upload */}
               <input id="file-upload-input" type="file" className="hidden" onChange={handleFileInputChange} multiple />
               {/* Bottom Action Bar (inside modal) */}
-              <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden" style={{height:'72px'}}>
+              <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden" style={{height:'112px'}}>
                 <button
-                  className="w-1/2 h-full bg-gray-100 text-blue-700 text-lg font-bold flex items-center justify-center gap-2 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-50"
+                  className="w-1/2 h-full bg-gray-100 text-blue-700 text-xl font-bold flex items-center justify-center gap-3 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95"
                   style={{ cursor: 'pointer' }}
                   onClick={() => setCreatingFolder(true)}
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                  <svg className="w-9 h-9" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                   Create
                 </button>
                 <button
-                  className="w-1/2 h-full bg-blue-600 text-white text-lg font-bold flex items-center justify-center gap-2 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700"
+                  className="w-1/2 h-full bg-blue-600 text-white text-xl font-bold flex items-center justify-center gap-3 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95"
                   style={{ cursor: 'pointer' }}
                   onClick={() => document.getElementById('file-upload-input')?.click()}
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" /></svg>
+                  <svg className="w-9 h-9" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" /></svg>
                   Upload
                 </button>
               </div>

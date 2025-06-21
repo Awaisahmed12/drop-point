@@ -180,29 +180,52 @@ Files can only be uploaded for properties that have been saved to the database a
 
 ## Recent Updates
 
+- **Fixed folder menu functionality**: Resolved issue where folder rename and delete menus weren't opening due to a race condition between click handlers and blur events. Removed conflicting blur handler and optimized click-outside detection.
+- **Enhanced button UX**: Made upload and create buttons larger (112px height) with bigger icons and press effects for better mobile experience.
+- **Improved satellite preview**: Increased satellite image height for better property visualization.
+- **Clean folder creation**: Implemented robust auto-rename logic that handles duplicate folder names gracefully with sequential numbering (e.g., "Folder" → "Folder (1)" → "Folder (2)").
+- **Better error handling**: Added proper TypeScript error types and improved error messages throughout the application.
 - Cleaned up `src/pages/map.tsx` by removing unused variables and unnecessary ESLint disables.
 - Improved code quality by using `const` where possible.
 - Replaced raw `<img>` tags with Next.js `<Image />` for satellite map images, improving performance and following Next.js best practices.
 - The codebase is now more maintainable, production-ready, and compliant with modern React/Next.js standards.
 - Fixed ESLint errors in file renaming functionality by removing unused `newBase` variables, ensuring clean builds.
 - **Fixed click behavior**: Clicking on files/folders now opens them properly instead of triggering rename. Rename functionality is now only available through the "..." menu, providing a more intuitive user experience.
-- **Fixed folder creation bug**: Resolved an issue where creating a folder with a duplicate name would close the popup without creating the folder or showing an error. The fix includes:
-  - Improved error handling with proper async/await patterns
-  - Added loading states to prevent multiple submissions
-  - Better user feedback with error messages that stay visible
-  - Auto-rename logic for duplicate folder names (e.g., "Folder (1)", "Folder (2)")
-  - Disabled UI elements during folder creation to prevent race conditions
+- **Enhanced file management**: Added proper file/folder menus with rename, delete, move, and open options.
+- **Improved sorting**: Added sortable columns for name, date, and size with visual indicators.
+- **Better mobile experience**: Responsive design with mobile-optimized folder and file lists.
+- **Robust upload handling**: Added progress indicators, error handling, retry functionality, and duplicate name resolution.
+- **Professional UI**: Google Drive-inspired design with consistent colors, icons, and interactions.
 
 ## Property Details Modal: Mobile-First UX Update (2024)
 
 - The property details modal now features a fixed bottom action bar with large, easy-to-tap Upload and Create Folder buttons (split 50/50), inspired by the big Select button in the property selection modal.
 - Folder creation is now handled via a dedicated popup/modal, not a dropdown, making it much more usable on mobile and preventing overflow/cutoff issues.
 - The top of the modal displays a static satellite image of the property with a blue pin, using the Google Static Maps API, for instant visual context.
-- All controls are accessible, uncluttered, and optimized for older/less tech-savvy users in real estate.
 
----
+## Latest UI/UX Enhancements (2024)
 
-## Database Schema Updates (2024)
+### Enhanced Action Buttons
+- **Larger buttons for better mobile UX**: Upload and Create buttons increased to 112px height with bigger icons (w-9 h-9) and improved spacing
+- **Visual feedback**: Added active:scale-95 press effect for tactile feedback on button interactions
+- **Consistent focus states**: Create button uses gray focus ring, Upload button uses blue focus ring for better visual hierarchy
+- **Improved accessibility**: Larger touch targets make the app more accessible on mobile devices
+
+### Satellite Image Preview
+- **Taller preview images**: Increased satellite image height from h-48 sm:h-64 to provide better property visualization
+- **Optimized spacing**: Reduced whitespace between satellite image and search bar for better content density
+- **Dynamic image sizing**: Google Maps API image dimensions adjusted to match UI improvements (640x213)
+
+### Clean Folder Creation Logic
+- **Simplified auto-rename system**: Replaced complex dual-check system with a clean, single retry loop
+- **Sequential numbering**: Duplicate folder names are handled gracefully with "Folder", "Folder (1)", "Folder (2)" pattern
+- **Better error handling**: Single try-catch block with clear error messages and proper cleanup
+- **Improved reliability**: Maximum 10 attempts with early exit on success prevents infinite loops
+
+### Technical Improvements
+- **Consistent code patterns**: All async operations follow the same error handling pattern
+- **Better state management**: Loading and error states are properly managed throughout the folder creation flow
+- **Clean separation of concerns**: UI state, business logic, and database operations are clearly separated
 
 ## React Hook Rule Fix (Latest Update)
 
