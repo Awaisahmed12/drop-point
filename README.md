@@ -186,6 +186,12 @@ Files can only be uploaded for properties that have been saved to the database a
 - The codebase is now more maintainable, production-ready, and compliant with modern React/Next.js standards.
 - Fixed ESLint errors in file renaming functionality by removing unused `newBase` variables, ensuring clean builds.
 - **Fixed click behavior**: Clicking on files/folders now opens them properly instead of triggering rename. Rename functionality is now only available through the "..." menu, providing a more intuitive user experience.
+- **Fixed folder creation bug**: Resolved an issue where creating a folder with a duplicate name would close the popup without creating the folder or showing an error. The fix includes:
+  - Improved error handling with proper async/await patterns
+  - Added loading states to prevent multiple submissions
+  - Better user feedback with error messages that stay visible
+  - Auto-rename logic for duplicate folder names (e.g., "Folder (1)", "Folder (2)")
+  - Disabled UI elements during folder creation to prevent race conditions
 
 ## Property Details Modal: Mobile-First UX Update (2024)
 

@@ -159,6 +159,7 @@ export default function MapPage() {
   const [selectedFolder, setSelectedFolder] = useState('master');
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   // Update folder name validation logic
   const forbiddenFolderChars = /[:;\/\\*?"<>|]/; // Forbid only these special characters
@@ -170,7 +171,8 @@ export default function MapPage() {
     if (name.length > maxFolderLength) return `Folder name must be less than ${maxFolderLength} characters.`;
     const trimmed = name.trim();
     if (!trimmed) return '';
-    if (folders.some(f => f.parent_id === selectedFolder && f.name.trim().toLowerCase() === trimmed.toLowerCase())) return 'A folder with this name already exists.';
+    // NOTE: The duplicate name check has been removed from here.
+    // It is now handled exclusively by the auto-rename logic in handleCreateFolder.
     return '';
   };
   const folderNameValidationMsg = folderNameError(newFolderName);
@@ -469,42 +471,82 @@ export default function MapPage() {
   async function handleCreateFolder() {
     if (!newFolderName || folderNameError(newFolderName)) return;
     if (!savedProperty?.id) return;
+    
+    setIsCreatingFolder(true);
+    setFolderErrorPopup(null);
+    
     const user = await supabase.auth.getUser();
-    if (!user.data.user) return;
+    if (!user.data.user) {
+      setFolderErrorPopup('User not authenticated');
+      setIsCreatingFolder(false);
+      return;
+    }
+    
     const baseName = newFolderName.replace(/\s+$/, '');
     let nameToSave = baseName;
     let suffix = 1;
+    
     // Check for duplicates and auto-rename
-    while (folders.some(f => f.parent_id === selectedFolder && f.name.trim().toLowerCase() === nameToSave.trim().toLowerCase())) {
+    while (folders.some(f => (selectedFolder === 'master' ? f.parent_id === null : f.parent_id === selectedFolder) && f.name.trim().toLowerCase() === nameToSave.trim().toLowerCase())) {
       nameToSave = `${baseName} (${suffix++})`;
     }
-    const { data } = await supabase
-      .from('property_folders')
-      .insert([
-        {
-          property_id: savedProperty.id,
-          user_id: user.data.user.id,
-          name: nameToSave,
-          parent_id: selectedFolder === 'master' ? null : selectedFolder,
-        },
-      ])
-      .select()
-      .single();
-    if (!data) {
-      setFolderErrorPopup('Error creating folder.');
-      return;
+    
+    try {
+      const { data: newFolder, error } = await supabase
+        .from('property_folders')
+        .insert([
+          {
+            property_id: savedProperty.id,
+            user_id: user.data.user.id,
+            name: nameToSave,
+            parent_id: selectedFolder === 'master' ? null : selectedFolder,
+          },
+        ])
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('Error creating folder:', error);
+        setFolderErrorPopup(`Error creating folder: ${error.message}`);
+        setIsCreatingFolder(false);
+        return;
+      }
+      
+      if (!newFolder) {
+        setFolderErrorPopup('Error creating folder: No data returned');
+        setIsCreatingFolder(false);
+        return;
+      }
+      
+      // Refresh folders
+      const { data: refreshedFolders, error: fetchError } = await supabase
+        .from('property_folders')
+        .select('*')
+        .eq('property_id', savedProperty.id)
+        .eq('user_id', user.data.user.id)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true });
+        
+      if (fetchError) {
+        console.error('Error fetching folders:', fetchError);
+        setFolderErrorPopup('Error refreshing folders');
+        setIsCreatingFolder(false);
+        return;
+      }
+      
+      if (refreshedFolders) setFolders(refreshedFolders);
+      
+      // Only clear and close if everything succeeded
+      setNewFolderName('');
+      setCreatingFolder(false);
+      setFolderErrorPopup(null);
+      setIsCreatingFolder(false);
+      
+    } catch (err) {
+      console.error('Unexpected error creating folder:', err);
+      setFolderErrorPopup('Unexpected error creating folder');
+      setIsCreatingFolder(false);
     }
-    // Refresh folders
-    const { data: allFolders } = await supabase
-      .from('property_folders')
-      .select('*')
-      .eq('property_id', savedProperty.id)
-      .eq('user_id', user.data.user.id)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true });
-    if (allFolders) setFolders(allFolders);
-    setNewFolderName('');
-    setCreatingFolder(false);
   }
 
   // Add beforeunload warning if uploads are pending
@@ -1706,23 +1748,13 @@ export default function MapPage() {
                       placeholder="New folder name"
                       value={newFolderName}
                       onChange={e => {
+                        if (isCreatingFolder) return;
                         const val = e.target.value;
-                        if (val.length === 1 && val[0] === ' ') {
-                          setFolderErrorPopup("Folder name can't start with a space.");
-                          return;
-                        }
-                        if (forbiddenFolderChars.test(val)) {
-                          setFolderErrorPopup("Folder names can't include : ; / \\ * ? \" < > | ");
-                        } else if (val.length > maxFolderLength) {
-                          setFolderErrorPopup(`Folder name must be less than ${maxFolderLength} characters.`);
-                        } else if (val && folders.some(f => f.parent_id === selectedFolder && f.name.trim().toLowerCase() === val.trim().toLowerCase())) {
-                          setFolderErrorPopup("A folder with this name already exists.");
-                        } else {
-                          setFolderErrorPopup(null);
-                        }
                         setNewFolderName(val);
+                        setFolderErrorPopup(folderNameError(val));
                       }}
                       autoFocus
+                      disabled={isCreatingFolder}
                     />
                     {folderErrorPopup && (
                       <div className="text-red-500 text-xs mt-1 w-full bg-red-50 border border-red-200 rounded px-2 py-1">
@@ -1731,15 +1763,18 @@ export default function MapPage() {
                     )}
                     <div className="flex gap-2 mt-2">
                       <button
-                        className={`flex-1 bg-blue-600 text-white rounded-lg px-3 py-2 font-semibold text-base transition-all ${!isFolderNameValid ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
-                        onClick={e => { e.preventDefault(); if (isFolderNameValid) { handleCreateFolder(); setCreatingFolder(false); } }}
+                        className={`flex-1 bg-blue-600 text-white rounded-lg px-3 py-2 font-semibold text-base transition-all ${(!isFolderNameValid || isCreatingFolder) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+                        onClick={e => { e.preventDefault(); if (isFolderNameValid && !isCreatingFolder) { handleCreateFolder(); } }}
                         type="button"
-                        disabled={!isFolderNameValid}
-                      >Create</button>
+                        disabled={!isFolderNameValid || isCreatingFolder}
+                      >
+                        {isCreatingFolder ? 'Creating...' : 'Create'}
+                      </button>
                       <button
                         className="flex-1 bg-gray-100 text-gray-700 rounded-lg px-3 py-2 font-semibold text-base hover:bg-gray-200"
-                        onClick={e => { e.preventDefault(); setCreatingFolder(false); setNewFolderName(''); }}
+                        onClick={e => { e.preventDefault(); setCreatingFolder(false); setNewFolderName(''); setFolderErrorPopup(null); setIsCreatingFolder(false); }}
                         type="button"
+                        disabled={isCreatingFolder}
                       >Cancel</button>
                     </div>
                   </div>
