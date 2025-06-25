@@ -1346,6 +1346,7 @@ export default function MapPage() {
                               className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-32"
                               value={renamingFileName}
                               autoFocus
+                              onClick={e => e.stopPropagation()}
                               onFocus={e => {
                                 const input = e.target as HTMLInputElement;
                                 input.setSelectionRange(0, folder.name.length);
@@ -1422,6 +1423,7 @@ export default function MapPage() {
                           className="ml-3 flex-1 font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-32"
                           value={renamingFileName}
                           autoFocus
+                          onClick={e => e.stopPropagation()}
                           onFocus={e => {
                             const input = e.target as HTMLInputElement;
                             input.setSelectionRange(0, folder.name.length);
@@ -1510,6 +1512,7 @@ export default function MapPage() {
                                   className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-32"
                                   value={renamingFileName}
                                   autoFocus
+                                  onClick={e => e.stopPropagation()}
                                   onFocus={e => {
                                     // Select only the base name, not the extension
                                     const input = e.target as HTMLInputElement;
@@ -1636,6 +1639,7 @@ export default function MapPage() {
                                 className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-32"
                                 value={renamingFileName}
                                 autoFocus
+                                onClick={e => e.stopPropagation()}
                                 onFocus={e => {
                                   // Select only the base name, not the extension
                                   const input = e.target as HTMLInputElement;
