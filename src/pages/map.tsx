@@ -421,6 +421,108 @@ export default function MapPage() {
   const [foldersLoading, setFoldersLoading] = useState(true);
   const [filesLoading, setFilesLoading] = useState(true);
 
+  // Add these near the top of the MapPage component, with other state declarations
+  // Cache for property data
+  const [propertyCache, setPropertyCache] = useState<Record<string, {
+    files: PropertyFile[];
+    folders: PropertyFolder[];
+    lastFetched: number;
+  }>>({});
+
+  // Cache timeout in milliseconds (5 minutes)
+  const CACHE_TIMEOUT = 5 * 60 * 1000;
+
+  // Add state for address cache
+  const [addressCache, setAddressCache] = useState<Record<string, {
+    address: string;
+    snappedLatLng: { lat: number; lng: number } | null;
+    lastFetched: number;
+  }>>({});
+
+  // Helper to check if coordinates are in cache
+  const getAddressFromCache = (lat: number, lng: number) => {
+    const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+    const cached = addressCache[key];
+    if (cached && (Date.now() - cached.lastFetched) < CACHE_TIMEOUT) {
+      return cached;
+    }
+    return null;
+  };
+
+  // Helper to save address to cache
+  const saveAddressToCache = (lat: number, lng: number, address: string, snappedLatLng: { lat: number; lng: number } | null) => {
+    const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+    setAddressCache(prev => ({
+      ...prev,
+      [key]: {
+        address,
+        snappedLatLng,
+        lastFetched: Date.now()
+      }
+    }));
+  };
+
+  // Quick check if property exists
+  const checkPropertyExists = async (address: string): Promise<boolean> => {
+    const user = await supabase.auth.getUser();
+    if (!user.data.user) return false;
+
+    // First check cache
+    const cacheKey = `${user.data.user.id}-${address}`;
+    const cached = propertyCache[cacheKey];
+    if (cached && (Date.now() - cached.lastFetched) < CACHE_TIMEOUT) {
+      return true;
+    }
+
+    // If not in cache, do a lightweight query
+    const { count } = await supabase
+      .from('properties')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.data.user.id)
+      .eq('address', address);
+    
+    return count ? count > 0 : false;
+  };
+
+  // Function to check if property data is cached and valid
+  const isPropertyDataCached = async (address: string): Promise<boolean> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const cacheKey = `${user.id}-${address}`;
+    const cached = propertyCache[cacheKey];
+    return cached && (Date.now() - cached.lastFetched) < CACHE_TIMEOUT;
+  };
+
+  // Function to cache property data
+  const cachePropertyData = async (address: string, files: PropertyFile[], folders: PropertyFolder[]) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const cacheKey = `${user.id}-${address}`;
+    setPropertyCache(prev => ({
+      ...prev,
+      [cacheKey]: {
+        files,
+        folders,
+        lastFetched: Date.now()
+      }
+    }));
+  };
+
+  // Function to get cached property data
+  const getCachedPropertyData = async (address: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const cacheKey = `${user.id}-${address}`;
+    const cached = propertyCache[cacheKey];
+    if (cached && (Date.now() - cached.lastFetched) < CACHE_TIMEOUT) {
+      return cached;
+    }
+    return null;
+  };
+
   // Auth guard
   useEffect(() => {
     const getUser = async () => {
@@ -496,7 +598,7 @@ export default function MapPage() {
   }
 
   // On dragend or zoom_changed, set hasInteracted and fetch address if center changed
-  const handleUserInteraction = useCallback(() => {
+  const handleUserInteraction = useCallback(async () => {
     if (map) {
       const center = map.getCenter();
       if (center) {
@@ -505,7 +607,53 @@ export default function MapPage() {
           lastFetchedCenter.current = coords;
           setHasInteracted(true);
           setInputValue('');
-          fetchAddress(coords.lat, coords.lng);
+          
+          // Check address cache first
+          const cached = getAddressFromCache(coords.lat, coords.lng);
+          if (cached) {
+            setAddress(cached.address);
+            setSnappedLatLng(cached.snappedLatLng);
+            setAddressLoading(false);
+
+            // Try to prefetch property data if this is a saved property
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              const { data: property } = await supabase
+                .from('properties')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('address', cached.address)
+                .single();
+
+              if (property) {
+                // Check if we already have this property's data cached
+                const isCached = await isPropertyDataCached(cached.address);
+                if (!isCached) {
+                  // Start prefetching the property's files and folders
+                  const [folderResult, filesResult] = await Promise.all([
+                    supabase
+                      .from('property_folders')
+                      .select('*')
+                      .eq('property_id', property.id)
+                      .eq('user_id', user.id)
+                      .is('deleted_at', null)
+                      .order('created_at', { ascending: true }),
+                    supabase
+                      .from('property_files')
+                      .select('*')
+                      .eq('property_id', property.id)
+                      .order('uploaded_at', { ascending: false })
+                  ]);
+
+                  if (folderResult.data && filesResult.data) {
+                    await cachePropertyData(cached.address, filesResult.data, folderResult.data);
+                  }
+                }
+              }
+            }
+          } else {
+            fetchAddress(coords.lat, coords.lng);
+          }
         }
       }
     }
@@ -565,25 +713,41 @@ export default function MapPage() {
     }
   }, [mapType, map]);
 
-  // Fetch address for center point
+  // Update fetchAddress to use cache
   const fetchAddress = async (lat: number, lng: number) => {
+    // Check cache first
+    const cached = getAddressFromCache(lat, lng);
+    if (cached) {
+      setAddress(cached.address);
+      setSnappedLatLng(cached.snappedLatLng);
+      setAddressLoading(false);
+      return;
+    }
+
     setAddressLoading(true);
     setAddress('');
     try {
       const res = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
       const data = await res.json();
       if (data.results && data.results[0]) {
-        setAddress(data.results[0].formatted_address);
-        // Save snapped address coordinates
+        const address = data.results[0].formatted_address;
         const snapped = data.results[0].geometry.location;
-        setSnappedLatLng({ lat: snapped.lat, lng: snapped.lng });
+        const snappedLatLng = { lat: snapped.lat, lng: snapped.lng };
+        
+        setAddress(address);
+        setSnappedLatLng(snappedLatLng);
+        
+        // Save to cache
+        saveAddressToCache(lat, lng, address, snappedLatLng);
       } else {
         setAddress('No address found');
         setSnappedLatLng(null);
+        saveAddressToCache(lat, lng, 'No address found', null);
       }
     } catch {
       setAddress('Error fetching address');
       setSnappedLatLng(null);
+      saveAddressToCache(lat, lng, 'Error fetching address', null);
     }
     setAddressLoading(false);
   };
@@ -650,70 +814,77 @@ export default function MapPage() {
 
   // Fetch files for the selected property
   useEffect(() => {
-    setPropertyFiles([]); // Clear before fetching
+    if (showDetailsModal && savedProperty) {
+      // Only fetch if we don't have the data in cache
+      const checkCache = async () => {
+        const cached = await getCachedPropertyData(savedProperty.address);
+        if (!cached) {
+          fetchFiles();
+        }
+      };
+      checkCache();
+    }
+  }, [showDetailsModal, savedProperty]);
+
+  // Modify the fetchFiles function to use cache
+  async function fetchFiles() {
+    if (!savedProperty || !savedProperty.id) return;
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    setFoldersLoading(true);
     setFilesLoading(true);
-    async function fetchFiles() {
-      if (!savedProperty || !savedProperty.id) return;
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      // First fetch folders since they're typically smaller
-      setFoldersLoading(true);
-      const folderResult = await supabase
-        .from('property_folders')
-        .select('*')
-        .eq('property_id', savedProperty.id)
-        .eq('user_id', user.id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true });
-      
-      if (folderResult.data) {
-        setFolders(folderResult.data);
+
+    try {
+      // Check cache first
+      const cached = await getCachedPropertyData(savedProperty.address);
+      if (cached) {
+        console.log('Using cached property data');
+        setFolders(cached.folders);
+        setPropertyFiles(cached.files);
+        setFoldersLoading(false);
+        setFilesLoading(false);
+        return;
       }
-      setFoldersLoading(false);
 
-      // Then fetch files in batches of 20
-      const batchSize = 20;
-      let lastFetchedId = null;
-      let hasMore = true;
-
-      while (hasMore) {
-        const query = supabase
+      console.log('Cache miss - fetching property data');
+      
+      // If not cached, fetch as normal
+      const [folderResult, filesResult] = await Promise.all([
+        supabase
+          .from('property_folders')
+          .select('*')
+          .eq('property_id', savedProperty.id)
+          .eq('user_id', user.id)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: true }),
+        supabase
           .from('property_files')
           .select('*')
           .eq('property_id', savedProperty.id)
           .order('uploaded_at', { ascending: false })
-          .limit(batchSize);
+      ]);
 
-        if (lastFetchedId) {
-          query.lt('id', lastFetchedId);
-        }
-
-        const result = await query;
-
-        if (result.data) {
-          if (result.data.length < batchSize) {
-            hasMore = false;
-          }
-          if (result.data.length > 0) {
-            lastFetchedId = result.data[result.data.length - 1].id;
-            setPropertyFiles(prev => [...prev, ...result.data]);
-          }
-        } else {
-          hasMore = false;
-        }
-
-        // Small delay between batches to prevent UI freezing
-        await new Promise(resolve => setTimeout(resolve, 100));
+      if (folderResult.data) {
+        setFolders(folderResult.data);
       }
+
+      if (filesResult.data) {
+        setPropertyFiles(filesResult.data);
+      }
+
+      // Cache the fetched data
+      if (folderResult.data && filesResult.data) {
+        await cachePropertyData(savedProperty.address, filesResult.data, folderResult.data);
+      }
+    } catch (error) {
+      console.error('Error fetching property data:', error);
+    } finally {
+      setFoldersLoading(false);
       setFilesLoading(false);
     }
-
-    if (showDetailsModal && savedProperty) {
-      fetchFiles();
-    }
-  }, [showDetailsModal, savedProperty]);
+  }
 
   // Load folders from Supabase when opening property details modal
   useEffect(() => {
@@ -1310,6 +1481,83 @@ export default function MapPage() {
     );
   }
 
+  // Add state for hover loading
+  const [hoverAddress, setHoverAddress] = useState<string | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Function to prefetch property data
+  const prefetchPropertyData = async (address: string) => {
+    // Quick check if property exists and isn't already cached
+    const exists = await checkPropertyExists(address);
+    const isCached = await isPropertyDataCached(address);
+    if (!exists || isCached) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Fetch the property first
+    const { data: property } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('address', address)
+      .single();
+
+    if (!property) return;
+
+    // Then fetch folders and files
+    const [folderResult, filesResult] = await Promise.all([
+      supabase
+        .from('property_folders')
+        .select('*')
+        .eq('property_id', property.id)
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('property_files')
+        .select('*')
+        .eq('property_id', property.id)
+        .order('uploaded_at', { ascending: false })
+    ]);
+
+    if (folderResult.data && filesResult.data) {
+      await cachePropertyData(address, filesResult.data, folderResult.data);
+    }
+  };
+
+  // Add hover handlers to the Select button
+  const handlePropertyHover = (address: string) => {
+    setHoverAddress(address);
+    
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+
+    // Set new timeout
+    hoverTimeoutRef.current = setTimeout(() => {
+      prefetchPropertyData(address);
+    }, 500); // Wait 500ms before starting prefetch
+  };
+
+  const handlePropertyHoverEnd = () => {
+    setHoverAddress(null);
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -1439,7 +1687,11 @@ export default function MapPage() {
         {/* Property info card at bottom */}
         {hasInteracted && address && (
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 w-full max-w-md px-4">
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-4 border border-blue-100 animate-fade-in relative">
+            <div 
+              className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-4 border border-blue-100 animate-fade-in relative"
+              onMouseEnter={() => handlePropertyHover(address)}
+              onMouseLeave={handlePropertyHoverEnd}
+            >
               <div className="text-gray-900 text-lg font-semibold text-center">
                 {addressLoading ? (
                   <div className="flex items-center gap-2">
@@ -1458,19 +1710,28 @@ export default function MapPage() {
                   if (map) {
                     const center = map.getCenter();
                     // Try to fetch property from Supabase by address and user
-                    const user = await supabase.auth.getUser();
+                    const { data: { user } } = await supabase.auth.getUser();
                     let dbProperty = null;
-                    if (user.data.user) {
+                    if (user) {
                       const { data: existing } = await supabase
                         .from('properties')
                         .select('*')
-                        .eq('user_id', user.data.user.id)
+                        .eq('user_id', user.id)
                         .eq('address', address)
                         .single();
                       dbProperty = existing;
                     }
                     if (dbProperty) {
                       setSavedProperty(dbProperty);
+                      // Check if we have cached data
+                      const cached = await getCachedPropertyData(address);
+                      if (cached) {
+                        // Use cached data immediately
+                        setFolders(cached.folders);
+                        setPropertyFiles(cached.files);
+                        setFoldersLoading(false);
+                        setFilesLoading(false);
+                      }
                     } else {
                       setSavedProperty({
                         address,
