@@ -24,3 +24,45 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Optimize scrolling performance */
+.file-list {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  content-visibility: auto;
+  contain: content;
+}
+
+.file-list-item {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: layout style paint;
+}
+
+/* Optimize hover animations */
+.hover-optimized {
+  transition: background-color 0.2s ease-out;
+  will-change: background-color;
+}
+
+/* Optimize menu transitions */
+.menu-transition {
+  transition: opacity 0.15s ease-out;
+  will-change: opacity, transform;
+}
+
+/* Optimize skeleton animations */
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
+  background: linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 50%, #f3f4f6 100%);
+  background-size: 200% 100%;
+  will-change: background-position;
+}
