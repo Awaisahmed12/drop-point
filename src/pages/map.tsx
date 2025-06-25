@@ -804,7 +804,106 @@ export default function MapPage() {
       setZoom(SEARCH_ZOOM);
       setHasInteracted(true);
       lastFetchedCenter.current = loc;
-      fetchAddress(loc.lat, loc.lng);
+      
+      // First check if we have this address cached
+      const cached = getAddressFromCache(loc.lat, loc.lng);
+      if (cached) {
+        setAddress(cached.address);
+        setSnappedLatLng(cached.snappedLatLng);
+        setAddressLoading(false);
+        
+        // Try to prefetch property data
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: property } = await supabase
+            .from('properties')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('address', cached.address)
+            .single();
+
+          if (property) {
+            // Check if we already have this property's data cached
+            const isCached = await isPropertyDataCached(cached.address);
+            if (!isCached) {
+              // Start prefetching the property's files and folders
+              const [folderResult, filesResult] = await Promise.all([
+                supabase
+                  .from('property_folders')
+                  .select('*')
+                  .eq('property_id', property.id)
+                  .eq('user_id', user.id)
+                  .is('deleted_at', null)
+                  .order('created_at', { ascending: true }),
+                supabase
+                  .from('property_files')
+                  .select('*')
+                  .eq('property_id', property.id)
+                  .order('uploaded_at', { ascending: false })
+              ]);
+
+              if (folderResult.data && filesResult.data) {
+                await cachePropertyData(cached.address, filesResult.data, folderResult.data);
+              }
+            }
+          }
+        }
+      } else {
+        // If not cached, fetch address and then try to prefetch property data
+        const res = await fetch(`/api/reverse-geocode?lat=${loc.lat}&lng=${loc.lng}`);
+        const data = await res.json();
+        if (data.results && data.results[0]) {
+          const address = data.results[0].formatted_address;
+          const snapped = data.results[0].geometry.location;
+          const snappedLatLng = { lat: snapped.lat, lng: snapped.lng };
+          
+          setAddress(address);
+          setSnappedLatLng(snappedLatLng);
+          saveAddressToCache(loc.lat, loc.lng, address, snappedLatLng);
+
+          // Try to prefetch property data
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: property } = await supabase
+              .from('properties')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('address', address)
+              .single();
+
+            if (property) {
+              // Check if we already have this property's data cached
+              const isCached = await isPropertyDataCached(address);
+              if (!isCached) {
+                // Start prefetching the property's files and folders
+                const [folderResult, filesResult] = await Promise.all([
+                  supabase
+                    .from('property_folders')
+                    .select('*')
+                    .eq('property_id', property.id)
+                    .eq('user_id', user.id)
+                    .is('deleted_at', null)
+                    .order('created_at', { ascending: true }),
+                  supabase
+                    .from('property_files')
+                    .select('*')
+                    .eq('property_id', property.id)
+                    .order('uploaded_at', { ascending: false })
+                ]);
+
+                if (folderResult.data && filesResult.data) {
+                  await cachePropertyData(address, filesResult.data, folderResult.data);
+                }
+              }
+            }
+          }
+        } else {
+          setAddress('No address found');
+          setSnappedLatLng(null);
+          saveAddressToCache(loc.lat, loc.lng, 'No address found', null);
+        }
+      }
+
       if (map) {
         map.panTo(loc);
         map.setZoom(SEARCH_ZOOM);
@@ -1841,9 +1940,9 @@ export default function MapPage() {
                 />
               </div>
               {/* File/Folder List */}
-              <div className="flex-1 overflow-hidden min-h-[120px] file-list">
+              <div className="flex-1 overflow-y-auto min-h-[120px] file-list">
                 {/* Sort headers - hidden on mobile */}
-                <div className="hidden sm:grid grid-cols-12 gap-4 px-3 py-2 text-sm border-b border-gray-200 mb-2">
+                <div className="hidden sm:grid grid-cols-12 gap-4 px-3 py-2 text-sm border-b border-gray-200 mb-2 sticky top-0 bg-white z-10">
                   <button 
                     className="col-span-6 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
                     onClick={() => toggleSort('name')}
@@ -1891,7 +1990,7 @@ export default function MapPage() {
                         No files uploaded yet.
                       </div>
                     ) : (
-                      <div className="h-full overflow-auto content-visibility-auto">
+                      <div className="h-full overflow-y-auto px-4">
                         {/* Folders */}
                         {sortedFolders.map(folder => (
                           <div
