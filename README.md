@@ -124,6 +124,9 @@ MapPage
   - ✅ **Preserved all caching mechanisms** - performance optimizations maintained
   - ✅ **Removed duplicate code** - utility functions centralized and imported properly
   - ✅ **Fixed search predictions** - resolved API parameter mismatch causing "Failed to fetch predictions" errors
+  - ✅ **UI Polish**: Fixed Size column alignment and modal corner styling for consistent design
+  - ✅ **File Display**: Removed file extensions from displayed names for cleaner appearance
+  - ✅ **Enhanced Modal**: Wider modal on large screens with better space utilization and enhanced address display (street + city/state)
 - **Design/UX:** Modern, glassmorphic, blue-accented, mobile-first, premium feel.
 - **How to Help:**
   - The refactoring preserves all existing functionality while improving code organization

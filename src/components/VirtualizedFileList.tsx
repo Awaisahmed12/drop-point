@@ -1,5 +1,6 @@
 import { FixedSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
+import { createPortal } from 'react-dom';
 import { FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 import { FileIcon } from './FileIcon';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../utils/formatting';
@@ -43,14 +44,23 @@ const Row = ({ index, style, data }: RowProps) => {
         <div
           className="hidden sm:grid grid-cols-12 gap-4 items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
           style={{ cursor: 'pointer', minHeight: 40 }}
-          onClick={() => data.onFolderClick?.(folder.id)}
+          onClick={() => {
+            // If any menu is open, close it instead of navigating to folder
+            if (data.fileMenuId || data.folderMenuId) {
+              data.setFileMenuId?.(null);
+              data.setFolderMenuId?.(null);
+              return;
+            }
+            
+            data.onFolderClick?.(folder.id);
+          }}
         >
-          <div className="col-span-6 flex items-center min-w-0">
+          <div className="col-span-7 flex items-center min-w-0">
             <HeroFolderIcon style={{ width: 28, height: 28, color: '#fbbf24' }} />
             <div className="ml-3 flex-1 min-w-0">
               {data.renamingFileId === folder.id ? (
                 <input
-                  className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-32"
+                  className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-40"
                   value={data.renamingFileName}
                   autoFocus
                   onClick={e => e.stopPropagation()}
@@ -80,7 +90,7 @@ const Row = ({ index, style, data }: RowProps) => {
           <div className="col-span-3 text-xs text-gray-500">
             {formatDate(folder.created_at)}
           </div>
-          <div className="col-span-3 flex items-center justify-end relative">
+          <div className="col-span-2 flex items-center justify-end relative">
             <button
               className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
               style={{ minWidth: 24, minHeight: 24 }}
@@ -94,7 +104,7 @@ const Row = ({ index, style, data }: RowProps) => {
               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
             </button>
             {data.folderMenuId === folder.id && (
-              <div ref={data.folderMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
+              <div ref={data.folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-xl" style={{ zIndex: '9999 !important' }}>
                 <button
                   className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                   onClick={e => {
@@ -131,10 +141,18 @@ const Row = ({ index, style, data }: RowProps) => {
           if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
             return;
           }
+          
+          // If any menu is open, close it instead of opening the file
+          if (data.fileMenuId || data.folderMenuId) {
+            data.setFileMenuId?.(null);
+            data.setFolderMenuId?.(null);
+            return;
+          }
+          
           window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
         }}
       >
-        <div className="col-span-6 flex items-center min-w-0">
+        <div className="col-span-7 flex items-center min-w-0">
           <FileIcon
             type={file.file_name.split('.').pop() || 'file'}
             size={28}
@@ -143,7 +161,7 @@ const Row = ({ index, style, data }: RowProps) => {
             {data.renamingFileId === file.id ? (
               <span className="flex items-center">
                 <input
-                  className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-32"
+                  className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-40"
                   value={data.renamingFileName}
                   autoFocus
                   onClick={e => e.stopPropagation()}
@@ -176,7 +194,7 @@ const Row = ({ index, style, data }: RowProps) => {
               </span>
             ) : (
               <span className="text-gray-900 font-medium truncate">
-                {getFileNameWithoutExtension(file.file_name)}{ext}
+                {getFileNameWithoutExtension(file.file_name)}
               </span>
             )}
           </div>
@@ -184,7 +202,7 @@ const Row = ({ index, style, data }: RowProps) => {
         <div className="col-span-3 text-xs text-gray-500">
           {formatDate(file.modified_at || file.uploaded_at)}
         </div>
-        <div className="col-span-3 flex items-center justify-end relative">
+        <div className="col-span-2 flex items-center justify-end relative">
           <span className="hidden sm:inline-block text-xs text-gray-500 mr-2">{formatFileSize(file.file_size)}</span>
           <button
             className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
@@ -199,7 +217,7 @@ const Row = ({ index, style, data }: RowProps) => {
             <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
           </button>
           {data.fileMenuId === file.id && (
-            <div ref={data.fileMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
+            <div ref={data.fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-xl" style={{ zIndex: '9999 !important' }}>
               <button
                 className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                 onClick={e => {

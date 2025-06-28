@@ -7,6 +7,7 @@ import { SkeletonItem } from './SkeletonItem';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
+import { parseAddress, formatStreetAddress, formatLocality } from '../../utils/addressParsing';
 import { HomeIcon, FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 
 interface PropertyDetailsModalProps {
@@ -40,17 +41,7 @@ interface PropertyDetailsModalProps {
   cachePropertyData?: (address: string, files: PropertyFile[], folders: PropertyFolder[]) => void;
 }
 
-// Helper function for short addresses
-function shortAddress(address: string, maxLen = 32) {
-  if (address.length <= maxLen) return address;
-  const words = address.split(' ');
-  let result = '';
-  for (const word of words) {
-    if ((result + word).length > maxLen - 3) break;
-    result += (result ? ' ' : '') + word;
-  }
-  return result + '...';
-}
+
 
 export const PropertyDetailsModal = ({ 
   isOpen, 
@@ -209,18 +200,23 @@ export const PropertyDetailsModal = ({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-2xl flex flex-col border border-blue-100 relative"
-           style={{ borderRadius: '1.5rem', minHeight: '620px', maxHeight: '96vh', overflow: 'hidden' }}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative"
+           style={{ borderRadius: '1.5rem', minHeight: '620px', maxHeight: '96vh' }}>
         
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-2 bg-white border-b border-blue-100">
-          <div className="flex items-center gap-2">
-            <span className="text-lg sm:text-xl font-extrabold text-gray-900 truncate max-w-[60vw]" title={property.address}>
-              {shortAddress(property.address)}
+        <div className="flex items-center justify-between px-4 pt-4 pb-2 bg-white border-b border-blue-100 rounded-t-3xl">
+          <div className="flex flex-col gap-1 min-w-0 flex-1 mr-4">
+            <span className="text-lg sm:text-xl font-extrabold text-gray-900 truncate" title={property.address}>
+              {formatStreetAddress(parseAddress(property.address).streetAddress)}
             </span>
+            {parseAddress(property.address).locality && (
+              <span className="text-xs sm:text-sm text-gray-500 truncate">
+                {formatLocality(parseAddress(property.address).locality)}
+              </span>
+            )}
           </div>
           <button
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+            className="p-2 rounded-full hover:bg-gray-100 transition-colors cursor-pointer flex-shrink-0"
             onClick={() => {
               onClose();
               setCreatingFolder(false);
@@ -247,13 +243,31 @@ export const PropertyDetailsModal = ({
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 mb-2 text-sm text-blue-700 font-semibold px-4 pt-2">
           {selectedFolder !== 'master' && (
-            <button
-              className="cursor-pointer hover:underline flex items-center"
-              onClick={() => onFolderChange('master')}
-              title="Go to root"
-            >
-              <HomeIcon style={{ width: 20, height: 20, color: '#1a73e8' }} />
-            </button>
+            <>
+              {/* Back Button */}
+              <button
+                className="cursor-pointer hover:bg-blue-50 rounded-full p-1 flex items-center transition-colors"
+                onClick={() => {
+                  const currentFolder = folders.find(f => f.id === selectedFolder);
+                  const parentId = currentFolder?.parent_id || 'master';
+                  onFolderChange(parentId);
+                }}
+                title="Go back"
+              >
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              
+              {/* Home Button */}
+              <button
+                className="cursor-pointer hover:underline flex items-center"
+                onClick={() => onFolderChange('master')}
+                title="Go to root"
+              >
+                <HomeIcon style={{ width: 20, height: 20, color: '#1a73e8' }} />
+              </button>
+            </>
           )}
           {breadcrumbPath.map((folder) => [
             <span key={`sep-${folder.id}`}>/</span>,
@@ -282,7 +296,7 @@ export const PropertyDetailsModal = ({
           {/* Sort Header */}
           <div className="hidden sm:grid grid-cols-12 gap-4 px-3 py-2 text-sm border-b border-gray-200 mb-2 sticky top-0 bg-white z-10">
             <button
-              className="col-span-6 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+              className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
               onClick={() => toggleSort('name')}
             >
               Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -294,7 +308,7 @@ export const PropertyDetailsModal = ({
               Modified {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
             </button>
             <button
-              className="col-span-3 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+              className="col-span-2 flex items-center justify-end gap-1 text-sm font-medium text-gray-500 hover:text-gray-700 mr-2"
               onClick={() => toggleSort('size')}
             >
               Size {sortField === 'size' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -340,14 +354,23 @@ export const PropertyDetailsModal = ({
                     key={folder.id}
                     className="hidden sm:grid grid-cols-12 gap-4 items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
                     style={{ cursor: 'pointer', minHeight: 40 }}
-                    onClick={() => onFolderChange(folder.id)}
+                    onClick={() => {
+                      // If any menu is open, close it instead of navigating to folder
+                      if (fileMenuId || folderMenuId) {
+                        setFileMenuId(null);
+                        setFolderMenuId(null);
+                        return;
+                      }
+                      
+                      onFolderChange(folder.id);
+                    }}
                   >
-                    <div className="col-span-6 flex items-center min-w-0">
+                    <div className="col-span-7 flex items-center min-w-0">
                       <HeroFolderIcon style={{ width: 28, height: 28, color: '#fbbf24' }} />
                       <div className="ml-3 flex-1 min-w-0">
                         {renamingFileId === folder.id ? (
                           <input
-                            className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-32"
+                            className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-40"
                             value={renamingFileName}
                             autoFocus
                             onClick={e => e.stopPropagation()}
@@ -377,7 +400,7 @@ export const PropertyDetailsModal = ({
                     <div className="col-span-3 text-xs text-gray-500">
                       {formatDate(folder.created_at)}
                     </div>
-                    <div className="col-span-3 flex items-center justify-end relative">
+                    <div className="col-span-2 flex items-center justify-end relative">
                       <button
                         className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
                         style={{ minWidth: 24, minHeight: 24 }}
@@ -393,7 +416,7 @@ export const PropertyDetailsModal = ({
                         </svg>
                       </button>
                       {folderMenuId === folder.id && (
-                        <div ref={folderMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
+                        <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-xl" style={{ zIndex: '9999 !important' }}>
                           <button
                             className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                             onClick={e => {
@@ -428,10 +451,18 @@ export const PropertyDetailsModal = ({
                         if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
                           return;
                         }
+                        
+                        // If any menu is open, close it instead of opening the file
+                        if (fileMenuId || folderMenuId) {
+                          setFileMenuId(null);
+                          setFolderMenuId(null);
+                          return;
+                        }
+                        
                         window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
                       }}
                     >
-                      <div className="col-span-6 flex items-center min-w-0">
+                      <div className="col-span-7 flex items-center min-w-0">
                         <FileIcon
                           type={file.file_name.split('.').pop() || 'file'}
                           size={28}
@@ -440,7 +471,7 @@ export const PropertyDetailsModal = ({
                           {renamingFileId === file.id ? (
                             <span className="flex items-center">
                               <input
-                                className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-32"
+                                className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-40"
                                 value={renamingFileName}
                                 autoFocus
                                 onClick={e => e.stopPropagation()}
@@ -473,7 +504,7 @@ export const PropertyDetailsModal = ({
                             </span>
                           ) : (
                             <span className="text-gray-900 font-medium truncate">
-                              {getFileNameWithoutExtension(file.file_name)}{file.file_name.split('.').pop()}
+                              {getFileNameWithoutExtension(file.file_name)}
                             </span>
                           )}
                         </div>
@@ -481,7 +512,7 @@ export const PropertyDetailsModal = ({
                       <div className="col-span-3 text-xs text-gray-500">
                         {formatDate(file.modified_at || file.uploaded_at)}
                       </div>
-                      <div className="col-span-3 flex items-center justify-end relative">
+                      <div className="col-span-2 flex items-center justify-end relative">
                         <span className="hidden sm:inline-block text-xs text-gray-500 mr-2">{formatFileSize(file.file_size)}</span>
                         <button
                           className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
@@ -498,7 +529,7 @@ export const PropertyDetailsModal = ({
                           </svg>
                         </button>
                         {fileMenuId === file.id && (
-                          <div ref={fileMenuRef} className="absolute right-0 mt-2 w-40 bg-white border border-blue-200 rounded-lg shadow-xl z-50">
+                          <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-xl" style={{ zIndex: '9999 !important' }}>
                             <button
                               className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                               onClick={e => {
