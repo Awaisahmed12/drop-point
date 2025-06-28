@@ -3,7 +3,7 @@ import AutoSizer from 'react-virtualized-auto-sizer';
 import { FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 import { FileIcon } from './FileIcon';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../utils/formatting';
-import { PropertyFile, PropertyFolder } from '../types';
+import { PropertyFile, PropertyFolder } from '../../types';
 
 interface RowProps {
   index: number;
@@ -17,16 +17,18 @@ interface RowProps {
     setRenamingFileName: (name: string) => void;
     handleRename: (item: PropertyFile | PropertyFolder, name: string) => Promise<void>;
     setRenamingFileId: (id: string | null) => void;
-    folderMenuId: string | null;
-    setFolderMenuId: (id: string | null) => void;
-    fileMenuId: string | null;
-    setFileMenuId: (id: string | null) => void;
-    folderMenuRef: React.RefObject<HTMLDivElement>;
-    fileMenuRef: React.RefObject<HTMLDivElement>;
-    handleDeleteFolder: (folder: PropertyFolder) => Promise<void>;
-    handleDeleteFile: (file: PropertyFile) => Promise<void>;
-    setMoveFileTarget: (file: PropertyFile | null) => void;
-    setShowMoveModal: (show: boolean) => void;
+    // Folder-specific props
+    folderMenuId?: string | null;
+    setFolderMenuId?: (id: string | null) => void;
+    folderMenuRef?: React.RefObject<HTMLDivElement>;
+    handleDeleteFolder?: (folder: PropertyFolder) => Promise<void>;
+    // File-specific props (optional - only needed when type === 'file')
+    fileMenuId?: string | null;
+    setFileMenuId?: (id: string | null) => void;
+    fileMenuRef?: React.RefObject<HTMLDivElement>;
+    handleDeleteFile?: (file: PropertyFile) => Promise<void>;
+    setMoveFileTarget?: (file: PropertyFile | null) => void;
+    setShowMoveModal?: (show: boolean) => void;
   };
 }
 
@@ -84,8 +86,8 @@ const Row = ({ index, style, data }: RowProps) => {
               style={{ minWidth: 24, minHeight: 24 }}
               onClick={e => {
                 e.stopPropagation();
-                data.setFileMenuId(null);
-                data.setFolderMenuId(data.folderMenuId === folder.id ? null : folder.id);
+                data.setFileMenuId?.(null);
+                data.setFolderMenuId?.(data.folderMenuId === folder.id ? null : folder.id);
               }}
               title="Folder actions"
             >
@@ -99,14 +101,14 @@ const Row = ({ index, style, data }: RowProps) => {
                     e.stopPropagation();
                     data.setRenamingFileId(folder.id);
                     data.setRenamingFileName(folder.name);
-                    data.setFolderMenuId(null);
+                    data.setFolderMenuId?.(null);
                   }}
                 >Rename</button>
                 <button
                   className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
                   onClick={e => {
                     e.stopPropagation();
-                    data.handleDeleteFolder(folder);
+                    data.handleDeleteFolder?.(folder);
                   }}
                 >Delete</button>
               </div>
@@ -189,8 +191,8 @@ const Row = ({ index, style, data }: RowProps) => {
             style={{ minWidth: 24, minHeight: 24 }}
             onClick={e => {
               e.stopPropagation();
-              data.setFolderMenuId(null);
-              data.setFileMenuId(data.fileMenuId === file.id ? null : file.id);
+              data.setFolderMenuId?.(null);
+              data.setFileMenuId?.(data.fileMenuId === file.id ? null : file.id);
             }}
             title="File actions"
           >
@@ -205,8 +207,8 @@ const Row = ({ index, style, data }: RowProps) => {
                   data.setRenamingFileId(file.id);
                   data.setRenamingFileName(file.file_name);
                   setTimeout(() => {
-                    data.setFileMenuId(null);
-                    data.setFolderMenuId(null);
+                    data.setFileMenuId?.(null);
+                    data.setFolderMenuId?.(null);
                   }, 50);
                 }}
               >Rename</button>
@@ -214,9 +216,9 @@ const Row = ({ index, style, data }: RowProps) => {
                 className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                 onClick={e => {
                   e.stopPropagation();
-                  data.setMoveFileTarget(file);
-                  data.setShowMoveModal(true);
-                  data.setFileMenuId(null);
+                  data.setMoveFileTarget?.(file);
+                  data.setShowMoveModal?.(true);
+                  data.setFileMenuId?.(null);
                 }}
               >Move</button>
               <button
@@ -224,14 +226,14 @@ const Row = ({ index, style, data }: RowProps) => {
                 onClick={e => {
                   e.stopPropagation();
                   window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
-                  data.setFileMenuId(null);
+                  data.setFileMenuId?.(null);
                 }}
               >Open</button>
               <button
                 className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
                 onClick={e => {
                   e.stopPropagation();
-                  data.handleDeleteFile(file);
+                  data.handleDeleteFile?.(file);
                 }}
               >Delete</button>
             </div>

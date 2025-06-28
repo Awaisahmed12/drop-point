@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { PropertyFolder } from '../pages/map';
+import type { PropertyFolder } from '../../types';
 
 interface MoveModalProps {
   open: boolean;

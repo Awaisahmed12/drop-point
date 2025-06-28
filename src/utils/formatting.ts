@@ -31,4 +31,18 @@ export function getFileNameWithoutExtension(name: string): string {
   const lastDot = name.lastIndexOf('.');
   if (lastDot === -1) return name;
   return name.substring(0, lastDot);
-} 
+}
+
+// Import additional functions from fileManagement.ts to maintain compatibility
+export { 
+  getUniqueFileName, 
+  sanitizeFileName, 
+  validateFolderName, 
+  shortAddress,
+  getFileExtension,
+  isImageFile,
+  isDocumentFile,
+  isSpreadsheetFile,
+  isPresentationFile,
+  isVideoFile
+} from '../../utils/fileManagement'; 

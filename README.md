@@ -47,26 +47,89 @@ For a detailed vision, completed steps, and roadmap, see [`PROJECT_OVERVIEW.md`]
 ---
 
 ## Main Files & Structure
+
+### Pages
 - `src/pages/index.tsx`: Landing page, shows login/signup form
-- `src/components/UserAuthForm.tsx`: Handles authentication UI and logic
-- `src/pages/map.tsx`: Main app page, map, property selection, file upload (only for saved properties), property modal
+- `src/pages/map.tsx`: Main map page (refactored to focus only on map functionality)
 - `src/pages/api/autocomplete.ts` and `reverse-geocode.ts`: Google Maps API proxies
+
+### Components
+- `src/components/UserAuthForm.tsx`: Handles authentication UI and logic
+- `src/components/MapSearch.tsx`: Map search bar with Google Places autocomplete
+- `src/components/MapControls.tsx`: Map type toggle controls (satellite/roadmap)
+- `src/components/PropertyInfoCard.tsx`: Bottom card showing property address and Select button
+- `src/components/PropertyDetailsModal.tsx`: Property details modal with file management
+- `src/components/SkeletonItem.tsx`: Loading skeleton for files and folders
+- `src/components/FileIcon.tsx`: File type icons
+- `src/components/MoveModal.tsx`: Modal for moving files between folders
+
+### Types & Constants
+- `types/index.ts`: Centralized type definitions (Property, PropertyFile, PropertyFolder, etc.)
+- `constants/index.ts`: App-wide constants (API keys, map settings, file type colors, etc.)
+
+### Utilities
 - `src/utils/supabaseClient.ts`: Supabase client setup
+- `utils/fileManagement.ts`: File operation utilities (formatting, validation, etc.)
+- `utils/propertyCache.ts`: Property data caching service
+- `src/utils/formatting.ts`: Date and file formatting utilities (with compatibility imports)
+
+### Styles & Assets
 - `src/styles/globals.css`: Tailwind and custom styles
 - `public/logo.png`: App logo
+
+## Architecture Notes
+
+### Recent Refactoring (2024)
+The codebase has been significantly refactored to improve maintainability and separation of concerns:
+
+- **Extracted Components**: The massive `map.tsx` file (2357 lines) has been broken into focused, reusable components
+- **Centralized Types**: All TypeScript interfaces moved to `types/index.ts`
+- **Shared Constants**: Configuration values centralized in `constants/index.ts`
+- **Utility Services**: File management and caching logic extracted into dedicated utility modules
+- **Preserved Caching**: The property caching system is maintained and properly passed between components
+
+### Component Hierarchy
+```
+MapPage
+├── MapSearch (search bar with autocomplete)
+├── MapControls (satellite/roadmap toggle)
+├── PropertyInfoCard (bottom address card)
+└── PropertyDetailsModal (file management modal)
+    ├── SkeletonItem (loading states)
+    ├── FileIcon (file type icons)
+    └── MoveModal (file moving functionality)
+```
+
+### Key Design Decisions
+- **Cache Preservation**: All caching functionality is maintained and passed through component props
+- **Single Responsibility**: Each component has a clear, focused purpose
+- **Type Safety**: Comprehensive TypeScript types for all data structures
+- **Reusability**: Components are designed to be reusable and testable
 
 ---
 
 ## For AI Assistants: "Catch Up" Section
-- **Current Status:** File upload and property file management are implemented. "My Properties" dashboard is a planned next step.
+- **Current Status:** ✅ **MAJOR REFACTORING COMPLETE + SEARCH FIXED!** The monolithic `map.tsx` file (2357 lines) has been successfully broken into focused components and utilities while preserving all functionality. Search predictions API issue resolved.
 - **What We're Working On:**
-  - Integrate a "My Properties" dashboard for users to view/manage their saved properties and files.
-  - Enforce property/file limits in the UI.
+  - **IMMEDIATE**: Enhance PropertyDetailsModal with advanced file management features
+  - **NEXT**: Integrate a "My Properties" dashboard for users to view/manage their saved properties and files
+  - **FUTURE**: Add collaborative features and property sharing capabilities
+- **Recent Changes:**
+  - ✅ **COMPLETED REFACTORING**: Successfully extracted and integrated all components
+  - ✅ Extracted types to `types/index.ts` 
+  - ✅ Extracted constants to `constants/index.ts`
+  - ✅ Created utility services (`utils/fileManagement.ts`, `utils/propertyCache.ts`)
+  - ✅ Created focused components (MapSearch, MapControls, PropertyInfoCard, PropertyDetailsModal)
+  - ✅ **map.tsx now uses extracted components** - reduced from 2357 to ~1900 lines
+  - ✅ **Preserved all caching mechanisms** - performance optimizations maintained
+  - ✅ **Removed duplicate code** - utility functions centralized and imported properly
+  - ✅ **Fixed search predictions** - resolved API parameter mismatch causing "Failed to fetch predictions" errors
 - **Design/UX:** Modern, glassmorphic, blue-accented, mobile-first, premium feel.
 - **How to Help:**
+  - The refactoring preserves all existing functionality while improving code organization
+  - Focus on maintaining the caching system - it's critical for performance
+  - Each component should receive cache functions as props
   - Always check `PROJECT_OVERVIEW.md` for the latest goals and roadmap.
-  - Review the main files above for the current implementation.
-  - Use this README to quickly get up to speed on the project context and next steps.
 
 ---
 
@@ -257,3 +320,306 @@ Files can only be uploaded for properties that have been saved to the database a
 - Production build ready for deployment
 
 The project is now in a clean, production-ready state with proper code structure and no linting violations.
+
+---
+
+## 🚀 Complete Replication Guide
+
+This section contains **everything** needed to build an exact replica of DropPoint from scratch.
+
+### Dependencies & Versions (package.json)
+```json
+{
+  "name": "drop-point",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build", 
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@react-google-maps/api": "^2.20.6",
+    "@supabase/supabase-js": "^2.49.4",
+    "next": "15.3.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-virtualized-auto-sizer": "^1.0.20",
+    "react-window": "^1.8.10",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/react-window": "^1.8.8",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.1",
+    "jsdom": "^26.1.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.1.4"
+  }
+}
+```
+
+### Required Configuration Files
+
+#### TypeScript Config (tsconfig.json)
+```json
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": ["vitest/globals"]
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}
+```
+
+#### Next.js Config (next.config.ts)
+```typescript
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'bxfydeqjmfjeanapfhpr.supabase.co',
+        pathname: '/storage/v1/object/public/property-files/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'maps.googleapis.com',
+        pathname: '/**',
+      },
+    ],
+  },
+};
+
+export default nextConfig;
+```
+
+#### Tailwind Config (tailwind.config.js)
+```javascript
+module.exports = {
+  theme: {
+    extend: {
+      keyframes: {
+        shimmer: {
+          '0%': { backgroundPosition: '100% 0' },
+          '100%': { backgroundPosition: '-100% 0' },
+        },
+      },
+      animation: {
+        shimmer: 'shimmer 2s ease-in-out infinite',
+      },
+    },
+  },
+}
+```
+
+#### Test Config (vitest.config.ts)
+```typescript
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './vitest.setup.ts',
+    include: ['src/**/*.test.{ts,tsx}'],
+  },
+});
+```
+
+### Environment Variables (.env.local)
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+```
+
+### Database Schema (Supabase)
+
+#### properties table
+```sql
+CREATE TABLE properties (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  address text NOT NULL,
+  lat float8 NOT NULL,
+  lng float8 NOT NULL,
+  user_selected_lat float8,
+  user_selected_lng float8,
+  label text,
+  notes text,
+  thumbnail_url text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+```
+
+#### property_files table
+```sql
+CREATE TABLE property_files (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  property_id uuid REFERENCES properties(id) ON DELETE CASCADE,
+  folder_id uuid REFERENCES property_folders(id) ON DELETE SET NULL,
+  file_name text NOT NULL,
+  file_url text NOT NULL,
+  uploaded_at timestamptz DEFAULT now(),
+  modified_at timestamptz,
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  file_type text NOT NULL,
+  file_size int4 NOT NULL
+);
+```
+
+#### property_folders table
+```sql
+CREATE TABLE property_folders (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  property_id uuid REFERENCES properties(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  parent_id uuid REFERENCES property_folders(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  deleted_at timestamptz
+);
+```
+
+### Row Level Security (RLS) Policies
+```sql
+-- Properties RLS
+ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own properties" ON properties
+  FOR ALL USING (auth.uid() = user_id);
+
+-- Property Files RLS  
+ALTER TABLE property_files ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own files" ON property_files
+  FOR ALL USING (auth.uid() = user_id);
+
+-- Property Folders RLS
+ALTER TABLE property_folders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own folders" ON property_folders
+  FOR ALL USING (auth.uid() = user_id);
+```
+
+### Supabase Storage Configuration
+```sql
+-- Create property-files bucket
+INSERT INTO storage.buckets (id, name, public) VALUES ('property-files', 'property-files', true);
+
+-- Storage RLS policy
+CREATE POLICY "Users can manage their own files" ON storage.objects
+  FOR ALL USING (auth.uid()::text = (storage.foldername(name))[1]);
+```
+
+### Google Maps APIs Required
+- **Maps JavaScript API** (for map display)
+- **Places API** (for autocomplete search)
+- **Geocoding API** (for reverse geocoding)
+
+Enable these APIs in Google Cloud Console and add billing.
+
+### Build Error Resolution
+During development, we resolved these critical build issues:
+
+1. **Unused Variables**: Removed all unused state variables and imports in `map.tsx`
+2. **React Hook Dependencies**: Added proper `useCallback` wrappers and dependency arrays
+3. **TypeScript Interface Mismatches**: Made file/folder-specific props optional in `VirtualizedFileList`
+4. **Import Path Issues**: Updated all imports to use centralized `types/` and `constants/`
+5. **Missing Type Definitions**: Added `@types/react-window` package
+
+### Critical Implementation Details
+
+#### File Structure (Exact)
+```
+cursor-drop-point/
+├── src/
+│   ├── components/        # React components
+│   ├── pages/            # Next.js pages (uses pages router, not app router)
+│   ├── styles/           # Global CSS and Tailwind
+│   ├── types/            # Local type definitions (avoid conflicts with root types/)
+│   └── utils/            # Local utilities
+├── types/                # Global type definitions
+├── constants/            # Global constants
+├── utils/                # Global utilities  
+├── public/               # Static assets
+└── [config files]        # All the config files documented above
+```
+
+#### Key Architectural Decisions
+1. **Dual utils/ directories**: `src/utils/` for local utilities, root `utils/` for global ones
+2. **Dual types/ directories**: `src/types/` for local types, root `types/` for global ones  
+3. **Pages Router**: Uses Next.js pages router (not app router) - `src/pages/_app.tsx` and `src/pages/_document.tsx`
+4. **Component Props Pattern**: All components receive cache functions as props to maintain performance
+5. **API Parameter Fix**: `/api/autocomplete` expects `input` parameter (not `query`)
+
+#### Essential API Endpoints
+- `GET /api/autocomplete?input=search_term` - Google Places autocomplete
+- `GET /api/reverse-geocode?lat=X&lng=Y` - Reverse geocoding
+
+#### Supabase Client Configuration
+```typescript
+// src/utils/supabaseClient.ts
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+```
+
+#### Performance Critical: Caching System
+The app maintains two critical caches:
+1. **Address Cache**: Maps coordinates to addresses to avoid repeated reverse geocoding
+2. **Property Cache**: Stores property data for quick access
+
+These caches are passed between components as functions and MUST be preserved during any refactoring.
+
+### Build Commands
+```bash
+# Development
+npm run dev          # Starts on localhost:3000
+
+# Production  
+npm run build        # Creates optimized build
+npm run start        # Serves production build
+
+# Testing & Linting
+npm run test         # Runs Vitest tests
+npm run lint         # ESLint check
+```
+
+---

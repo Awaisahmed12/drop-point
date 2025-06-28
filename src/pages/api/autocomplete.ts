@@ -1,14 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { query } = req.query;
+  const { input } = req.query;
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-  if (!query || typeof query !== 'string') {
-    return res.status(400).json({ error: 'Missing query parameter' });
+  if (!input || typeof input !== 'string') {
+    return res.status(400).json({ error: 'Missing input parameter' });
   }
 
-  const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${apiKey}&components=country:us`;
+  const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${apiKey}&components=country:us`;
 
   try {
     const response = await fetch(url);

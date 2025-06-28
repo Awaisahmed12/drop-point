@@ -23,6 +23,7 @@ export type PropertyFile = {
   user_id: string;
   file_type: string;
   file_size: number;
+  modified_at?: string;
 };
 
 // Prediction type for Google Places API
@@ -62,5 +63,24 @@ export type PropertyFolder = {
   name: string;
   parent_id: string | null;
   created_at: string;
-  deleted_at?: string | null;
-}; 
+  updated_at: string;
+  deleted_at: string | null;
+};
+
+// PendingUpload interface for file upload tracking
+export interface PendingUpload {
+  id: string;
+  file: File;
+  name: string;
+  status: 'uploading' | 'success' | 'error';
+  progress: number;
+  error?: string;
+  folder_id: string | null;
+  property_id: string;
+  retry?: () => void;
+  cancel?: () => void;
+}
+
+// Sort field type
+export type SortField = 'name' | 'date' | 'size';
+export type SortDirection = 'asc' | 'desc'; 
