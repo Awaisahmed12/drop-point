@@ -127,6 +127,8 @@ MapPage
   - ✅ **UI Polish**: Fixed Size column alignment and modal corner styling for consistent design
   - ✅ **File Display**: Removed file extensions from displayed names for cleaner appearance
   - ✅ **Enhanced Modal**: Wider modal on large screens with better space utilization and enhanced address display (street + city/state)
+  - ✅ **Navigation UX**: Added back button for folders and refined empty state messaging (only shows "get started" in root folder)
+  - ✅ **Mobile Responsive**: Fixed mobile file list display with dedicated mobile-friendly layouts for files and folders
 - **Design/UX:** Modern, glassmorphic, blue-accented, mobile-first, premium feel.
 - **How to Help:**
   - The refactoring preserves all existing functionality while improving code organization

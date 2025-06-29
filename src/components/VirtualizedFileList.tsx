@@ -1,6 +1,5 @@
 import { FixedSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { createPortal } from 'react-dom';
 import { FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 import { FileIcon } from './FileIcon';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../utils/formatting';
