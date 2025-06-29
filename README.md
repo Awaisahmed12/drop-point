@@ -222,24 +222,36 @@ This is a private project, but the codebase follows modern React and TypeScript 
 
 **Built with ❤️ for real estate professionals who need better document organization tools.**
 
-## 🎯 Latest Update: Satellite Image Repositioning
+## 🎯 Latest Update: Scrolling Satellite Image Behavior
 
-**Change Made**: Moved the satellite image to appear immediately after the property address header in the PropertyDetailsModal.
+**Change Made**: Implemented scrolling satellite image that moves away when users browse files, while keeping all navigation elements sticky.
 
-**New Layout Order**: 
-1. Property Address Header
-2. Satellite Image (prominently displayed)
-3. Breadcrumb Navigation  
-4. Search Bar (sticky)
-5. Upload Section (sticky)
-6. File List with sticky column headers
+**New Scrolling Behavior**: 
+- **Satellite Image**: Now scrolls away naturally when browsing files, maximizing file viewing space
+- **Sticky Navigation**: Breadcrumbs, search bar, and column headers remain visible at all times
+- **Optimal File Browsing**: Users get full screen space for files when needed, but satellite image returns when scrolling to top
+
+**Layout Structure**: 
+1. Property Address Header (fixed)
+2. Sticky Breadcrumb Navigation 
+3. Sticky Search Bar
+4. Sticky Upload Section (when active)
+5. Scrollable Area:
+   - Satellite Image (scrolls away)
+   - File List with sticky column headers
 
 **Benefits**:
-- **Better Visual Hierarchy**: Satellite imagery is now prominently featured right after the property title
-- **Improved User Flow**: Users see the property image immediately, then access navigation tools
-- **Maintained Functionality**: All sticky behaviors and navigation elements work exactly as before
-- **Enhanced UX**: Satellite image provides immediate visual context for the property
+- **Maximum File Browsing Space**: Satellite image scrolls away to give full space for document management
+- **Always-Accessible Navigation**: Search, breadcrumbs, and headers always visible for efficient navigation
+- **Smart Visual Context**: Satellite image visible when at top, hidden when focusing on files
+- **Improved Workflow**: Users can see property context initially, then focus entirely on file management
 
-This change addresses the user request to prioritize the satellite image visibility while keeping all important navigation elements (breadcrumbs, search, upload) easily accessible.
+This addresses the user request for the satellite image to scroll away during file browsing while maintaining all essential navigation functionality.
+
+**Latest Fix: Universal Scroll Behavior**
+- **Fixed Nested Scroll Issue**: Removed nested scroll containers that prevented satellite image from scrolling when mouse was over files area
+- **Unified Scroll Experience**: Now the satellite image scrolls away regardless of where the user's cursor is positioned when they begin scrolling
+- **Natural User Interaction**: Users can start scrolling from anywhere in the files area and the satellite image will respond correctly
+- **Consistent Behavior**: Scrolling works identically whether mouse is over satellite image, files, folders, or any part of the modal content
 
 
