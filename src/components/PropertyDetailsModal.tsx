@@ -7,7 +7,7 @@ import { SkeletonItem } from './SkeletonItem';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
-import { parseAddress, formatStreetAddress, formatLocality } from '../../utils/addressParsing';
+import { getFileSignedUrl } from '../utils/supabaseClient';
 import { HomeIcon, FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 
 interface PropertyDetailsModalProps {
@@ -35,13 +35,12 @@ interface PropertyDetailsModalProps {
   
   // Pending uploads
   pendingUploads: PendingUpload[];
+  onDismiss: (uploadId: string) => void;
   
   // Cache functions - for future use
   getCachedPropertyData?: (address: string) => Promise<{ files: PropertyFile[]; folders: PropertyFolder[] } | null>;
   cachePropertyData?: (address: string, files: PropertyFile[], folders: PropertyFolder[]) => void;
 }
-
-
 
 export const PropertyDetailsModal = ({ 
   isOpen, 
@@ -59,7 +58,8 @@ export const PropertyDetailsModal = ({
   onFileRename,
   onFolderCreate,
   onFolderDelete,
-  pendingUploads
+  pendingUploads,
+  onDismiss
 }: PropertyDetailsModalProps) => {
   // State for UI interactions
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -74,6 +74,23 @@ export const PropertyDetailsModal = ({
   const [moveFileTarget, setMoveFileTarget] = useState<PropertyFile | null>(null);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Auto-dismiss successful uploads after 1.5 seconds
+  useEffect(() => {
+    const successfulUploads = pendingUploads.filter(p => p.status === 'success');
+    if (successfulUploads.length > 0) {
+      const timeouts = successfulUploads.map(upload => 
+        setTimeout(() => {
+          onDismiss(upload.id);
+        }, 1500) // 1.5 seconds
+      );
+      
+      return () => {
+        timeouts.forEach(timeout => clearTimeout(timeout));
+      };
+    }
+  }, [pendingUploads, onDismiss]);
 
   // Refs
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -95,9 +112,22 @@ export const PropertyDetailsModal = ({
 
   // Sorting logic
   const sortedFiles = useMemo(() => {
-    return [...files]
-      .filter(file => (selectedFolder === 'master' ? !file.folder_id : file.folder_id === selectedFolder))
-      .sort((a, b) => {
+    const filtered = [...files]
+      .filter(file => {
+        // If searching, show all files regardless of folder
+        if (searchQuery.trim()) {
+          return file.file_name.toLowerCase().includes(searchQuery.toLowerCase().trim());
+        }
+        // Otherwise, filter by current folder
+        return selectedFolder === 'master' ? !file.folder_id : file.folder_id === selectedFolder;
+      });
+    
+    console.log('📋 [MODAL] File filtering - Total files:', files.length, 'Selected folder:', selectedFolder, 'Filtered count:', filtered.length);
+    if (filtered.length > 0) {
+      console.log('📋 [MODAL] Filtered files:', filtered.slice(0, 5).map(f => ({ name: f.file_name, folder_id: f.folder_id })));
+    }
+    
+    return filtered.sort((a, b) => {
         let comparison = 0;
         switch (sortField) {
           case 'name':
@@ -112,11 +142,18 @@ export const PropertyDetailsModal = ({
         }
         return sortDirection === 'asc' ? comparison : -comparison;
       });
-  }, [files, selectedFolder, sortField, sortDirection]);
+  }, [files, selectedFolder, sortField, sortDirection, searchQuery]);
 
   const sortedFolders = useMemo(() => {
     return [...folders]
-      .filter(folder => (selectedFolder === 'master' ? folder.parent_id === null : folder.parent_id === selectedFolder))
+      .filter(folder => {
+        // If searching, show all folders regardless of parent
+        if (searchQuery.trim()) {
+          return folder.name.toLowerCase().includes(searchQuery.toLowerCase().trim());
+        }
+        // Otherwise, filter by current folder
+        return selectedFolder === 'master' ? folder.parent_id === null : folder.parent_id === selectedFolder;
+      })
       .sort((a, b) => {
         let comparison = 0;
         switch (sortField) {
@@ -131,7 +168,7 @@ export const PropertyDetailsModal = ({
         }
         return sortDirection === 'asc' ? comparison : -comparison;
       });
-  }, [folders, selectedFolder, sortField, sortDirection]);
+  }, [folders, selectedFolder, sortField, sortDirection, searchQuery]);
 
   // Toggle sort direction
   const toggleSort = (field: SortField) => {
@@ -190,6 +227,318 @@ export const PropertyDetailsModal = ({
     return () => document.removeEventListener('click', handleClick);
   }, []);
 
+  // Smart file opening function
+  const openFileInline = async (file: PropertyFile) => {
+    try {
+      const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, false);
+      const downloadUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
+      const fileExtension = file.file_name.split('.').pop()?.toLowerCase();
+      
+      // For PDFs, try to open inline with a viewer
+      if (fileExtension === 'pdf') {
+        // Try to open PDF inline by embedding it
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head>
+                <title>${file.file_name}</title>
+                <style>
+                  body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+                  .header { 
+                    background: #f8f9fa; 
+                    padding: 12px 20px; 
+                    border-bottom: 1px solid #e9ecef;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                  }
+                  .filename { font-weight: 600; color: #333; }
+                  .download-btn {
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                  }
+                  .download-btn:hover { background: #0056b3; }
+                  iframe { width: 100%; height: calc(100vh - 50px); border: none; }
+                </style>
+              </head>
+              <body>
+                <div class="header">
+                  <span class="filename">${file.file_name}</span>
+                  <button class="download-btn" onclick="window.open('${downloadUrl}', '_blank')">Download</button>
+                </div>
+                <iframe src="${fileUrl}" type="application/pdf"></iframe>
+              </body>
+            </html>
+          `);
+          newWindow.document.close();
+        }
+      } 
+      // For images, open directly (these usually work fine)
+      else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension || '')) {
+        window.open(fileUrl, '_blank');
+      }
+      // For other document types, try Google Docs Viewer
+      else if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(fileExtension || '')) {
+        const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head>
+                <title>${file.file_name}</title>
+                <style>
+                  body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+                  .header { 
+                    background: #f8f9fa; 
+                    padding: 12px 20px; 
+                    border-bottom: 1px solid #e9ecef;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                  }
+                  .filename { font-weight: 600; color: #333; }
+                  .download-btn {
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                  }
+                  .download-btn:hover { background: #0056b3; }
+                  iframe { width: 100%; height: calc(100vh - 50px); border: none; }
+                </style>
+              </head>
+              <body>
+                <div class="header">
+                  <span class="filename">${file.file_name}</span>
+                  <button class="download-btn" onclick="window.open('${downloadUrl}', '_blank')">Download</button>
+                </div>
+                <iframe src="${viewerUrl}"></iframe>
+              </body>
+            </html>
+          `);
+          newWindow.document.close();
+        }
+      }
+      // For CSV files, format as a proper table
+      else if (fileExtension === 'csv') {
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          // Fetch the content and display it as a table
+          fetch(fileUrl)
+            .then(response => response.text())
+            .then(content => {
+              // Parse CSV content
+              const lines = content.split('\n').filter(line => line.trim());
+              const headers = lines[0]?.split(',').map(h => h.trim().replace(/"/g, '')) || [];
+              const rows = lines.slice(1).map(line => 
+                line.split(',').map(cell => cell.trim().replace(/"/g, ''))
+              );
+
+              const tableHtml = `
+                <table>
+                  <thead>
+                    <tr>
+                      ${headers.map(header => `<th>${header}</th>`).join('')}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rows.map(row => `
+                      <tr>
+                        ${row.map(cell => `<td>${cell}</td>`).join('')}
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              `;
+
+              newWindow.document.write(`
+                <html>
+                  <head>
+                    <title>${file.file_name}</title>
+                    <style>
+                      body { 
+                        font-family: system-ui, -apple-system, sans-serif; 
+                        padding: 0; 
+                        margin: 0;
+                      }
+                      .header { 
+                        background: #f8f9fa; 
+                        padding: 12px 20px; 
+                        border-bottom: 1px solid #e9ecef;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        position: sticky;
+                        top: 0;
+                        z-index: 100;
+                      }
+                      .filename { font-weight: 600; color: #333; }
+                      .download-btn {
+                        background: #007bff;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 14px;
+                      }
+                      .download-btn:hover { background: #0056b3; }
+                      .table-container {
+                        padding: 20px;
+                        overflow: auto;
+                        margin-bottom: 40px;
+                      }
+                      table { 
+                        border-collapse: collapse; 
+                        width: 100%; 
+                        background: white;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                        font-size: 11px;
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                      }
+                      th, td { 
+                        border: 1px solid #d0d7de; 
+                        padding: 4px 8px; 
+                        text-align: left;
+                        vertical-align: top;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        max-width: 200px;
+                      }
+                      th { 
+                        background: #f6f8fa; 
+                        font-weight: 600;
+                        position: sticky;
+                        top: 0;
+                        z-index: 10;
+                        font-size: 11px;
+                        color: #24292f;
+                      }
+                      tr:nth-child(even) { background: #f6f8fa; }
+                      tr:hover { background: #dbeafe; }
+                      td:hover {
+                        white-space: normal;
+                        word-wrap: break-word;
+                        max-width: none;
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="header">
+                      <span class="filename">${file.file_name}</span>
+                      <button class="download-btn" onclick="window.open('${downloadUrl}', '_blank')">Download</button>
+                    </div>
+                    <div class="table-container">
+                      ${tableHtml}
+                    </div>
+                  </body>
+                </html>
+              `);
+              newWindow.document.close();
+            })
+            .catch(() => {
+              // If fetch fails, just open the URL directly
+              newWindow.location.href = fileUrl;
+            });
+        }
+      }
+      // For TXT files, display with proper formatting
+      else if (fileExtension === 'txt') {
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          // Fetch the content and display it
+          fetch(fileUrl)
+            .then(response => response.text())
+            .then(content => {
+              newWindow.document.write(`
+                <html>
+                  <head>
+                    <title>${file.file_name}</title>
+                    <style>
+                      body { 
+                        font-family: system-ui, -apple-system, sans-serif; 
+                        padding: 0; 
+                        margin: 0;
+                      }
+                      .header { 
+                        background: #f8f9fa; 
+                        padding: 12px 20px; 
+                        border-bottom: 1px solid #e9ecef;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                      }
+                      .filename { font-weight: 600; color: #333; }
+                      .download-btn {
+                        background: #007bff;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 14px;
+                      }
+                      .download-btn:hover { background: #0056b3; }
+                      .content { 
+                        padding: 20px; 
+                        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; 
+                        white-space: pre-wrap; 
+                        line-height: 1.5;
+                        background: #f8f9fa;
+                        margin: 0;
+                      }
+                    </style>
+                  </head>
+                  <body>
+                    <div class="header">
+                      <span class="filename">${file.file_name}</span>
+                      <button class="download-btn" onclick="window.open('${downloadUrl}', '_blank')">Download</button>
+                    </div>
+                    <pre class="content">${content}</pre>
+                  </body>
+                </html>
+              `);
+              newWindow.document.close();
+            })
+            .catch(() => {
+              // If fetch fails, just open the URL directly
+              newWindow.location.href = fileUrl;
+            });
+        }
+      }
+      // For everything else, try direct open
+      else {
+        window.open(fileUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Error getting file URL:', error);
+      alert('Unable to open file. Please try again.');
+    }
+  };
+
+  // Debug logging for files prop changes
+  useEffect(() => {
+    console.log('📋 [MODAL] Files prop updated, count:', files.length);
+    if (files.length > 0) {
+      console.log('📋 [MODAL] Latest files:', files.slice(0, 3).map(f => f.file_name));
+    }
+  }, [files]);
+
+  // Debug logging for modal state
+  useEffect(() => {
+    console.log('📋 [MODAL] Modal opened:', isOpen, 'Property:', property?.address);
+  }, [isOpen, property?.address]);
+
   if (!isOpen || !property) return null;
 
   // Breadcrumb path
@@ -201,19 +550,14 @@ export const PropertyDetailsModal = ({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative"
-           style={{ borderRadius: '1.5rem', minHeight: '620px', maxHeight: '96vh' }}>
+           style={{ borderRadius: '1.5rem', height: '90vh', maxHeight: '800px' }}>
         
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-2 bg-white border-b border-blue-100 rounded-t-3xl">
+        <div className="flex items-center justify-between px-4 pt-4 pb-2 bg-white border-b border-blue-100 rounded-t-3xl flex-shrink-0">
           <div className="flex flex-col gap-1 min-w-0 flex-1 mr-4">
             <span className="text-lg sm:text-xl font-extrabold text-gray-900 truncate" title={property.address}>
-              {formatStreetAddress(parseAddress(property.address).streetAddress)}
+              {property?.address}
             </span>
-            {parseAddress(property.address).locality && (
-              <span className="text-xs sm:text-sm text-gray-500 truncate">
-                {formatLocality(parseAddress(property.address).locality)}
-              </span>
-            )}
           </div>
           <button
             className="p-2 rounded-full hover:bg-gray-100 transition-colors cursor-pointer flex-shrink-0"
@@ -228,20 +572,8 @@ export const PropertyDetailsModal = ({
           </button>
         </div>
 
-        {/* Satellite Image */}
-        <div className="relative w-full h-48 sm:h-64 bg-gray-200 border-b border-blue-100">
-          <Image
-            src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=19&size=640x213&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
-            alt="Property satellite view"
-            layout="fill"
-            objectFit="cover"
-            priority
-            unoptimized
-          />
-        </div>
-
-        {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 mb-2 text-sm text-blue-700 font-semibold px-4 pt-2">
+        {/* Breadcrumb Navigation - Back to original position */}
+        <div className="flex items-center gap-2 mb-2 text-sm text-blue-700 font-semibold px-4 pt-2 flex-shrink-0">
           {selectedFolder !== 'master' && (
             <>
               {/* Back Button */}
@@ -281,19 +613,131 @@ export const PropertyDetailsModal = ({
           ])}
         </div>
 
-        {/* Search Bar (Disabled for now) */}
-        <div className="px-4 pb-2 bg-white">
+        {/* Search Bar - Back to original position */}
+        <div className="px-4 pb-2 bg-white flex-shrink-0 sticky top-0 z-30 border-b border-gray-100">
           <input
             type="text"
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
-            placeholder="Search files and folders (coming soon)"
-            disabled
+            className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-500"
+            placeholder="Search all files and folders..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        {/* File List Container */}
-        <div className="flex-1 overflow-y-auto min-h-[120px] file-list">
-          {/* Sort Header */}
+        {/* Compact Uploading Files - Back to original position */}
+        {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).length > 0 && (
+          <div className="px-4 pb-2 bg-white flex-shrink-0 sticky top-14 z-20 border-b border-gray-50">
+            <div className="space-y-1">
+              {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).map(pending => (
+                <div key={pending.id} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                  pending.status === 'error' ? 'border-red-200 bg-red-50' : 
+                  pending.status === 'success' ? 'border-green-200 bg-green-50' :
+                  'border-blue-200 bg-blue-50'
+                }`}>
+                  {/* Compact File Icon and Name */}
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <FileIcon
+                      type={pending.name.split('.').pop() || 'file'}
+                      size={20}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 truncate text-xs">
+                        {getFileNameWithoutExtension(pending.name)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Compact Progress/Status */}
+                  <div className="flex items-center gap-2">
+                    {pending.status === 'uploading' && (
+                      <div className="flex items-center gap-1">
+                        {/* Simple Spinning Circle */}
+                        <div className="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                    
+                    {pending.status === 'success' && (
+                      <div className="flex items-center gap-1">
+                        <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-xs text-green-600 font-medium">Done!</span>
+                      </div>
+                    )}
+                    
+                    {pending.status === 'error' && (
+                      <div className="flex items-center gap-1">
+                        <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </div>
+                        <span className="text-xs text-red-600 font-medium">Failed</span>
+                      </div>
+                    )}
+
+                    {/* Compact Action Buttons */}
+                    <div className="flex gap-1">
+                      {pending.status === 'error' && pending.retry && (
+                        <button
+                          onClick={pending.retry}
+                          className="p-1 rounded-full hover:bg-blue-100 text-blue-600 transition-colors"
+                          title="Retry upload"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        </button>
+                      )}
+                      
+                      {pending.status === 'error' && (
+                        <button
+                          onClick={() => onDismiss(pending.id)}
+                          className="p-1 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+                          title="Dismiss"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                      
+                      {pending.status === 'uploading' && pending.cancel && (
+                        <button
+                          onClick={pending.cancel}
+                          className="p-1 rounded-full hover:bg-red-100 text-red-600 transition-colors"
+                          title="Cancel upload"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* File List Container - Scrollable */}
+        <div className="flex-1 overflow-y-auto file-list" style={{ minHeight: '300px' }}>
+          {/* Satellite Image - MOVED HERE so it scrolls away */}
+          <div className="relative w-full h-56 bg-gray-200 border-b border-blue-100 flex-shrink-0">
+            <Image
+              src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
+              alt="Property satellite view"
+              layout="fill"
+              objectFit="cover"
+              priority
+              unoptimized
+            />
+          </div>
+
+          {/* Sort Header - Sticky at top of scroll area */}
           <div className="hidden sm:grid grid-cols-12 gap-4 px-3 py-2 text-sm border-b border-gray-200 mb-2 sticky top-0 bg-white z-10">
             <button
               className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
@@ -537,7 +981,7 @@ export const PropertyDetailsModal = ({
                       <div
                         className="hidden sm:grid grid-cols-12 gap-4 items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
                       style={{ cursor: 'pointer', minHeight: 40 }}
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
                           return;
                         }
@@ -549,7 +993,12 @@ export const PropertyDetailsModal = ({
                           return;
                         }
                         
-                        window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
+                        try {
+                          await openFileInline(file);
+                        } catch (error) {
+                          console.error('Error opening file:', error);
+                          alert('Unable to open file. Please try again.');
+                        }
                       }}
                     >
                       <div className="col-span-7 flex items-center min-w-0">
@@ -643,17 +1092,45 @@ export const PropertyDetailsModal = ({
                             >Move</button>
                             <button
                               className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
-                              onClick={e => {
-                                e.stopPropagation();
-                                window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
+                              onClick={async (e) => {
+                                if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
+                                  return;
+                                }
+                                
+                                // If any menu is open, close it instead of opening the file
+                                if (fileMenuId || folderMenuId) {
                                 setFileMenuId(null);
+                                  setFolderMenuId(null);
+                                  return;
+                                }
+                                
+                                try {
+                                  await openFileInline(file);
+                                } catch (error) {
+                                  console.error('Error opening file:', error);
+                                  alert('Unable to open file. Please try again.');
+                                }
                               }}
                             >Open</button>
+                            <button
+                              className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-green-600 hover:text-white font-medium cursor-pointer"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
+                                  window.open(fileUrl, '_blank');
+                                } catch (error) {
+                                  console.error('Error downloading file:', error);
+                                  alert('Unable to download file. Please try again.');
+                                }
+                              }}
+                            >Download</button>
                             <button
                               className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
                               onClick={e => {
                                 e.stopPropagation();
                                 onFileDelete(file);
+                                setFileMenuId(null);
                               }}
                             >Delete</button>
                           </div>
@@ -665,7 +1142,7 @@ export const PropertyDetailsModal = ({
                     <div
                       className="sm:hidden flex items-center justify-between px-3 py-3 hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-2"
                       style={{ cursor: 'pointer' }}
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
                           return;
                         }
@@ -677,7 +1154,12 @@ export const PropertyDetailsModal = ({
                           return;
                         }
                         
-                        window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
+                        try {
+                          await openFileInline(file);
+                        } catch (error) {
+                          console.error('Error opening file:', error);
+                          alert('Unable to open file. Please try again.');
+                        }
                       }}
                     >
                       <div className="flex items-center min-w-0 flex-1">
@@ -770,17 +1252,45 @@ export const PropertyDetailsModal = ({
                             >Move</button>
                             <button
                               className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
-                              onClick={e => {
-                                e.stopPropagation();
-                                window.open(`https://bxfydeqjmfjeanapfhpr.supabase.co/storage/v1/object/public/property-files/${file.property_id}/${encodeURIComponent(file.file_name)}`, '_blank');
+                              onClick={async (e) => {
+                                if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
+                                  return;
+                                }
+                                
+                                // If any menu is open, close it instead of opening the file
+                                if (fileMenuId || folderMenuId) {
                                 setFileMenuId(null);
+                                  setFolderMenuId(null);
+                                  return;
+                                }
+                                
+                                try {
+                                  await openFileInline(file);
+                                } catch (error) {
+                                  console.error('Error opening file:', error);
+                                  alert('Unable to open file. Please try again.');
+                                }
                               }}
                             >Open</button>
+                            <button
+                              className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-green-600 hover:text-white font-medium cursor-pointer"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
+                                  window.open(fileUrl, '_blank');
+                                } catch (error) {
+                                  console.error('Error downloading file:', error);
+                                  alert('Unable to download file. Please try again.');
+                                }
+                              }}
+                            >Download</button>
                             <button
                               className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
                               onClick={e => {
                                 e.stopPropagation();
                                 onFileDelete(file);
+                                setFileMenuId(null);
                               }}
                             >Delete</button>
                           </div>
@@ -793,34 +1303,6 @@ export const PropertyDetailsModal = ({
               </div>
             </>
           )}
-
-          {/* Pending Uploads */}
-          {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).length > 0 && (
-            <>
-              {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).map(pending => (
-                <div key={pending.id} className={`flex items-center justify-between p-2 rounded-lg border-2 ${pending.status === 'error' ? 'border-red-400 bg-white/95' : 'border-gray-100 opacity-80'} relative mb-2`}>
-                  <span className="font-semibold text-gray-900 truncate max-w-[120px] mr-2">{pending.name}</span>
-                  {pending.status === 'uploading' && (
-                    <span className="text-xs text-blue-600 font-medium">Uploading...</span>
-                  )}
-                  {pending.status === 'error' && (
-                    <div className="flex items-center flex-1 min-w-0">
-                      <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
-                        <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth="2.5">
-                          <circle cx="12" cy="12" r="10" stroke="currentColor" fill="none"/>
-                          <path d="M12 8v4m0 4h.01" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        {typeof pending.error === 'string' && pending.error.includes('Unauthorized') ? 'You don\'t have permission to upload.' : 'Upload failed'}
-                      </span>
-                    </div>
-                  )}
-                  {pending.status === 'success' && (
-                    <span className="text-xs text-green-600 font-medium">Uploaded!</span>
-                  )}
-                </div>
-              ))}
-            </>
-          )}
         </div>
 
         {/* Hidden file input for upload */}
@@ -829,21 +1311,21 @@ export const PropertyDetailsModal = ({
         }} multiple />
 
         {/* Action Buttons */}
-        <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden" style={{height:'112px'}}>
+        <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0" style={{height:'80px'}}>
           <button
-            className="w-1/2 h-full bg-gray-100 text-blue-700 text-xl font-bold flex items-center justify-center gap-3 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95"
+            className="w-1/2 h-full bg-gray-100 text-blue-700 text-lg font-bold flex items-center justify-center gap-3 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95"
             onClick={() => setCreatingFolder(true)}
           >
-            <svg className="w-9 h-9" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             Create
           </button>
           <button
-            className="w-1/2 h-full bg-blue-600 text-white text-xl font-bold flex items-center justify-center gap-3 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95"
+            className="w-1/2 h-full bg-blue-600 text-white text-lg font-bold flex items-center justify-center gap-3 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95"
             onClick={() => document.getElementById('file-upload-input')?.click()}
           >
-            <svg className="w-9 h-9" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" />
             </svg>
             Upload

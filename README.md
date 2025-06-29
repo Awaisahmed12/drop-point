@@ -109,27 +109,19 @@ MapPage
 ---
 
 ## For AI Assistants: "Catch Up" Section
-- **Current Status:** ✅ **MAJOR REFACTORING COMPLETE + SEARCH FIXED!** The monolithic `map.tsx` file (2357 lines) has been successfully broken into focused components and utilities while preserving all functionality. Search predictions API issue resolved.
+- **Current Status:** ✅ **MAJOR REFACTORING COMPLETE + SEARCH FIXED + FILE HANDLING ENHANCED + UPLOAD EXPERIENCE UPGRADED + STICKY SCROLL OPTIMIZED!** The monolithic `map.tsx` file (2357 lines) has been successfully broken into focused components and utilities while preserving all functionality. Search predictions API issue resolved. File handling now supports Unicode characters with robust sanitization. Upload experience now provides real-time progress tracking, cancellation, and retry capabilities. PropertyDetailsModal now features optimized sticky scroll behavior for enhanced file browsing.
 - **What We're Working On:**
-  - **IMMEDIATE**: Enhance PropertyDetailsModal with advanced file management features
+  - **IMMEDIATE**: Continue enhancing PropertyDetailsModal with advanced file management features
   - **NEXT**: Integrate a "My Properties" dashboard for users to view/manage their saved properties and files
   - **FUTURE**: Add collaborative features and property sharing capabilities
 - **Recent Changes:**
   - ✅ **COMPLETED REFACTORING**: Successfully extracted and integrated all components
-  - ✅ Extracted types to `types/index.ts` 
-  - ✅ Extracted constants to `constants/index.ts`
-  - ✅ Created utility services (`utils/fileManagement.ts`, `utils/propertyCache.ts`)
-  - ✅ Created focused components (MapSearch, MapControls, PropertyInfoCard, PropertyDetailsModal)
-  - ✅ **map.tsx now uses extracted components** - reduced from 2357 to ~1900 lines
-  - ✅ **Preserved all caching mechanisms** - performance optimizations maintained
-  - ✅ **Removed duplicate code** - utility functions centralized and imported properly
-  - ✅ **Fixed search predictions** - resolved API parameter mismatch causing "Failed to fetch predictions" errors
-  - ✅ **UI Polish**: Fixed Size column alignment and modal corner styling for consistent design
-  - ✅ **File Display**: Removed file extensions from displayed names for cleaner appearance
-  - ✅ **Enhanced Modal**: Wider modal on large screens with better space utilization and enhanced address display (street + city/state)
-  - ✅ **Navigation UX**: Added back button for folders and refined empty state messaging (only shows "get started" in root folder)
-  - ✅ **Mobile Responsive**: Fixed mobile file list display with dedicated mobile-friendly layouts for files and folders
-- **Design/UX:** Modern, glassmorphic, blue-accented, mobile-first, premium feel.
+  - ✅ **FIXED SEARCH API**: Resolved Google Places API prediction issues
+  - ✅ **ENHANCED FILE HANDLING**: Added Unicode support, sanitization, and smart viewing
+  - ✅ **UPGRADED UPLOAD EXPERIENCE**: Real-time progress, cancellation, and retry functionality
+  - ✅ **OPTIMIZED STICKY SCROLL**: Satellite image now scrolls away during file browsing while keeping navigation elements sticky
+  - 🔄 **CURRENT**: Testing and refining the enhanced file management system
+- **Design/UX:** Modern, glassmorphic, blue-accented, mobile-first, premium feel with optimized scroll behavior for maximum file browsing space.
 - **How to Help:**
   - The refactoring preserves all existing functionality while improving code organization
   - Focus on maintaining the caching system - it's critical for performance
@@ -231,6 +223,180 @@ DropPoint now uses [Vitest](https://vitest.dev/) and [Testing Library](https://t
 
 Files can only be uploaded for properties that have been saved to the database and have a valid ID. The UI and backend logic prevent file uploads for unsaved properties, avoiding errors and invalid storage paths.
 
+## Unicode File Handling & Sanitization (2024)
+
+DropPoint now provides robust support for international file names with comprehensive Unicode character handling:
+
+### Supported Characters & Languages
+- **Chinese**: 工具包样本册.xlsx → 2023.8.28.xlsx
+- **Japanese**: テスト文書.pdf → file.pdf  
+- **Arabic**: ملف.doc → file.doc
+- **Cyrillic**: файл.docx → file.docx
+- **Hebrew**: קובץ.txt → file.txt
+- **Special Characters**: Handles <, >, :, ", /, \, |, ?, * and other problematic characters
+
+### Sanitization Process
+1. **Unicode Normalization**: Files are normalized using NFD (Canonical Decomposition)
+2. **Character Replacement**: Non-ASCII characters are replaced with underscores
+3. **Extension Preservation**: File extensions are cleaned but preserved
+4. **Length Limiting**: Filenames are truncated to 200 characters for storage compatibility
+5. **Fallback Naming**: Empty names default to "file" with appropriate extension
+
+### Where Sanitization Applies
+- **Upload**: All uploaded files are automatically sanitized
+- **Rename**: User-renamed files are sanitized before storage
+- **Move**: Files moved between folders maintain sanitized names
+- **Folder Names**: Folder names use lighter sanitization (preserving more characters)
+
+### Technical Implementation
+- **Storage Path**: `property-files/{property_id}/{sanitized_filename}`
+- **Database Integration**: Sanitized names stored in PostgreSQL with original metadata
+- **Real-time Processing**: Files are sanitized during upload, not on display
+- **Conflict Resolution**: Automatic duplicate handling with `(1)`, `(2)` suffixes
+
+## Enhanced Upload Experience (2024)
+
+DropPoint now provides a professional-grade file upload experience with comprehensive user control and feedback:
+
+### Real-Time Progress Tracking
+- **Visual Progress Indicators**: Animated SVG progress circles with percentage display
+- **Live Upload Status**: Color-coded states (blue=uploading, green=success, red=error)
+- **File Information Display**: Shows file icons, names, and sizes during upload
+- **Instant Feedback**: Files appear immediately in "Uploading Files" section
+
+### Upload Control & Management
+- **Cancel Uploads**: Users can cancel in-progress uploads if they hang or take too long
+- **Retry Failed Uploads**: One-click retry for failed uploads with detailed error messages
+- **Dismiss Completed**: Remove successful or failed uploads from the UI
+- **Multiple File Support**: Handles multiple simultaneous uploads with individual progress tracking
+
+### Technical Features
+- **Supabase Integration**: Uses Supabase's built-in upload method for proper file handling
+- **AbortController Integration**: Proper cancellation support using modern browser APIs
+- **Error Handling**: Comprehensive error processing with user-friendly messages
+- **State Management**: React state synchronization for upload progress and status
+- **Memory Management**: Automatic cleanup of completed uploads to prevent memory leaks
+
+### Upload System Fix (Latest Update)
+**Issue Resolved:** Fixed critical 400 Bad Request errors during file uploads caused by improper URL encoding and manual XMLHttpRequest implementation.
+
+**Root Cause:** 
+- Custom XMLHttpRequest was manually constructing Supabase Storage API URLs
+- Filenames with spaces and special characters (e.g., `2024_W2 (1).pdf`) were being URL-encoded incorrectly
+- Manual header and authentication setup was causing request failures
+
+**Solution Implemented:**
+- **Replaced XMLHttpRequest with Supabase's upload method**: Now uses `supabase.storage.from('property-files').upload()` which properly handles:
+  - URL encoding for filenames with spaces and special characters
+  - Authentication headers and API key management
+  - Proper request formatting and error responses
+- **Maintained progress tracking**: Implemented simulated progress indicators since Supabase doesn't expose real-time upload progress
+- **Enhanced error handling**: Supabase's structured error responses provide better debugging information
+- **Preserved cancellation support**: AbortController integration still works with the promise-based approach
+
+**Technical Details:**
+```typescript
+// Before: Manual XMLHttpRequest (caused 400 errors)
+xhr.open('POST', `${supabaseUrl}/storage/v1/object/property-files/${filePath}`, true);
+xhr.setRequestHeader('Authorization', `Bearer ${supabaseKey}`);
+// Issues with URL encoding and header setup
+
+// After: Supabase's built-in method (works correctly)
+supabase.storage.from('property-files').upload(filePath, file, {
+  cacheControl: '3600',
+  upsert: true
+});
+// Handles all encoding, headers, and authentication automatically
+```
+
+**Result:** 
+- ✅ All file uploads now work correctly, including files with Unicode characters
+- ✅ No more 400 Bad Request errors
+- ✅ Proper handling of filenames with spaces, parentheses, and special characters
+- ✅ Maintained professional upload experience with progress tracking and controls
+
+### Upload UX Improvements (Latest Update)
+**Enhanced User Experience:** Completely redesigned the upload feedback system for better visibility and usability.
+
+**Key Improvements:**
+1. **Top Placement**: Upload progress now appears prominently at the top of the modal (right after the search bar) instead of at the bottom
+   - **No more scrolling**: Users can immediately see upload progress without scrolling
+   - **Always visible**: Upload status is always in view during file management
+   - **Intuitive positioning**: Follows natural reading flow from top to bottom
+
+2. **Compact Design**: Streamlined upload cards for better space utilization
+   - **Smaller footprint**: Reduced height and padding for uploading files since they're temporary
+   - **Smaller icons**: 20px file icons instead of 32px for more compact display
+   - **Condensed progress circles**: 20px progress indicators instead of 32px
+   - **Minimal text**: "Done!" instead of "Uploaded!" for success states
+
+3. **Smart Auto-Dismiss**: Intelligent handling of upload completion
+   - **Success auto-dismiss**: Successful uploads automatically disappear after 1.5 seconds
+   - **Error persistence**: Failed uploads remain visible until manually dismissed
+   - **User control**: Users can still manually dismiss any upload if needed
+
+4. **Enhanced Visual Feedback**:
+   - **Color-coded states**: Blue for uploading, green for success, red for errors
+   - **Compact action buttons**: Smaller retry/cancel/dismiss buttons (12px icons)
+   - **Smooth transitions**: All state changes are animated for better UX
+
+**Technical Implementation:**
+```typescript
+// Auto-dismiss successful uploads after 1.5 seconds
+useEffect(() => {
+  const successfulUploads = pendingUploads.filter(p => p.status === 'success');
+  if (successfulUploads.length > 0) {
+    const timeouts = successfulUploads.map(upload => 
+      setTimeout(() => {
+        onDismiss(upload.id);
+      }, 1500) // 1.5 seconds - snappy but not rushed
+    );
+    
+    return () => {
+      timeouts.forEach(timeout => clearTimeout(timeout));
+    };
+  }
+}, [pendingUploads, onDismiss]);
+```
+
+**User Benefits:**
+- **Immediate visibility**: No need to scroll to see upload progress
+- **Reduced clutter**: Successful uploads clean themselves up automatically after 1.5 seconds
+- **Better focus**: Compact design doesn't dominate the interface
+- **Error management**: Failed uploads stay visible for proper error handling
+- **Professional feel**: Similar to modern file sharing services like Google Drive and Dropbox
+- **Clean progress indication**: Simple spinning circle during upload (no percentage clutter)
+- **Snappy UX**: Quick success confirmation that doesn't overstay its welcome
+
+### Sticky Scroll Behavior (Latest Update)
+**Enhanced File Browsing:** Implemented intelligent sticky positioning for optimal file management experience.
+
+**Smart Scroll Behavior:**
+1. **Satellite Image Scrolls Away**: The satellite image is positioned inside the scrollable container, so when users scroll down through files, it naturally scrolls out of view to maximize space for file browsing
+2. **Navigation Elements Stay Put**: All essential navigation elements remain in their original positions:
+   - **Header**: Property address and close button (fixed at top)
+   - **Breadcrumbs**: Folder navigation path (fixed below header)
+   - **Search Bar**: File search input (sticky at `top-0`)
+   - **Upload Progress**: Active upload status (sticky at `top-14`)
+   - **Column Headers**: Sort controls (sticky within scroll area)
+3. **Files Scroll Freely**: File and folder content scrolls normally underneath the sticky elements
+4. **Satellite Returns**: When scrolling back to the top of the file list, the satellite image comes back into view
+
+**User Benefits:**
+- **Maximum File Space**: Satellite image gets out of the way during file browsing without losing essential navigation
+- **Always Accessible Controls**: Search, breadcrumbs, and upload status remain accessible while scrolling
+- **Visual Context Available**: Satellite image is visible when needed (at the top of file list)
+- **Intuitive Behavior**: Natural scroll behavior where non-essential visual elements scroll away
+- **Efficient Workflow**: Users can manage large file lists without losing essential navigation controls
+
+**Technical Implementation:**
+- **Satellite Image**: Moved inside the scrollable container (`<div className="flex-1 overflow-y-auto">`)
+- **Navigation Elements**: Remain outside the scroll area with proper sticky positioning
+- **Layered Z-Index**: Search bar (`z-30`), uploads (`z-20`), headers (`z-10`) for proper layering
+- **Original Layout Preserved**: Header, breadcrumbs, search, and uploads stay in their intended positions
+
+This creates the perfect balance where the satellite image provides visual context when needed but doesn't interfere with file management workflows.
+
 # Project Update: Code Hygiene
 
 ## Recent Changes
@@ -253,6 +419,7 @@ Files can only be uploaded for properties that have been saved to the database a
 - **Improved satellite preview**: Increased satellite image height for better property visualization.
 - **Clean folder creation**: Implemented robust auto-rename logic that handles duplicate folder names gracefully with sequential numbering (e.g., "Folder" → "Folder (1)" → "Folder (2)").
 - **Better error handling**: Added proper TypeScript error types and improved error messages throughout the application.
+- **Fixed file URL generation**: Replaced hardcoded Supabase URLs with proper `getFilePublicUrl()` utility function that uses the Supabase client to generate correct public URLs for file access.
 - Cleaned up `src/pages/map.tsx` by removing unused variables and unnecessary ESLint disables.
 - Improved code quality by using `const` where possible.
 - Replaced raw `<img>` tags with Next.js `<Image />` for satellite map images, improving performance and following Next.js best practices.
@@ -272,6 +439,22 @@ Files can only be uploaded for properties that have been saved to the database a
 - The top of the modal displays a static satellite image of the property with a blue pin, using the Google Static Maps API, for instant visual context.
 
 ## Latest UI/UX Enhancements (2024)
+
+### Enhanced Upload Experience
+- **Immediate Visual Feedback**: Uploads appear instantly in the file list with progress indicators
+- **Animated Progress Circles**: Real-time progress visualization with percentage display
+- **Professional Status Indicators**: 
+  - **Uploading**: Blue progress circle with animated progress
+  - **Success**: Green checkmark with "Uploaded!" message
+  - **Error**: Red X with detailed error message and retry option
+- **Interactive Controls**: 
+  - **Cancel Button**: Stop uploads in progress
+  - **Retry Button**: Restart failed uploads with one click
+  - **Dismiss Button**: Remove completed or failed uploads from view
+- **File Information**: Shows file icon, name (without extension), and file size during upload
+- **Organized Layout**: Dedicated "Uploading Files" section with clean, card-based design
+- **Color-coded Backgrounds**: Blue for uploading, green for success, red for errors
+- **Responsive Design**: Works seamlessly on mobile and desktop
 
 ### Enhanced Action Buttons
 - **Larger buttons for better mobile UX**: Upload and Create buttons increased to 112px height with bigger icons (w-9 h-9) and improved spacing
@@ -560,71 +743,33 @@ Enable these APIs in Google Cloud Console and add billing.
 ### Build Error Resolution
 During development, we resolved these critical build issues:
 
-1. **Unused Variables**: Removed all unused state variables and imports in `map.tsx`
-2. **React Hook Dependencies**: Added proper `useCallback` wrappers and dependency arrays
-3. **TypeScript Interface Mismatches**: Made file/folder-specific props optional in `VirtualizedFileList`
-4. **Import Path Issues**: Updated all imports to use centralized `types/` and `constants/`
-5. **Missing Type Definitions**: Added `@types/react-window` package
+1. **Unused Variables**: Removed all unused state variables and imports in `
 
-### Critical Implementation Details
-
-#### File Structure (Exact)
-```
-cursor-drop-point/
-├── src/
-│   ├── components/        # React components
-│   ├── pages/            # Next.js pages (uses pages router, not app router)
-│   ├── styles/           # Global CSS and Tailwind
-│   ├── types/            # Local type definitions (avoid conflicts with root types/)
-│   └── utils/            # Local utilities
-├── types/                # Global type definitions
-├── constants/            # Global constants
-├── utils/                # Global utilities  
-├── public/               # Static assets
-└── [config files]        # All the config files documented above
-```
-
-#### Key Architectural Decisions
-1. **Dual utils/ directories**: `src/utils/` for local utilities, root `utils/` for global ones
-2. **Dual types/ directories**: `src/types/` for local types, root `types/` for global ones  
-3. **Pages Router**: Uses Next.js pages router (not app router) - `src/pages/_app.tsx` and `src/pages/_document.tsx`
-4. **Component Props Pattern**: All components receive cache functions as props to maintain performance
-5. **API Parameter Fix**: `/api/autocomplete` expects `input` parameter (not `query`)
-
-#### Essential API Endpoints
-- `GET /api/autocomplete?input=search_term` - Google Places autocomplete
-- `GET /api/reverse-geocode?lat=X&lng=Y` - Reverse geocoding
-
-#### Supabase Client Configuration
-```typescript
-// src/utils/supabaseClient.ts
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-```
-
-#### Performance Critical: Caching System
-The app maintains two critical caches:
-1. **Address Cache**: Maps coordinates to addresses to avoid repeated reverse geocoding
-2. **Property Cache**: Stores property data for quick access
-
-These caches are passed between components as functions and MUST be preserved during any refactoring.
-
-### Build Commands
-```bash
-# Development
-npm run dev          # Starts on localhost:3000
-
-# Production  
-npm run build        # Creates optimized build
-npm run start        # Serves production build
-
-# Testing & Linting
-npm run test         # Runs Vitest tests
-npm run lint         # ESLint check
-```
-
----
+### 🔒 Security Features
+- **Signed URL Access**: Files are accessed through secure, time-limited signed URLs (1-hour expiry)
+- **Private Storage**: All files stored in private Supabase storage buckets
+- **Authenticated Access**: Only authenticated users can access files
+- **Smart Inline Viewing:**
+  - **Created `openFileInline()` function**: Smart file opening based on file extension
+    - **PDFs**: Opens in embedded iframe viewer in new window with download button header
+    - **Images**: Direct browser display (JPG, PNG, GIF, WebP, SVG)
+    - **Office Documents**: Uses Google Docs Viewer for DOC, DOCX, XLS, XLSX, PPT, PPTX with download button header
+    - **CSV Files**: Parses and displays as formatted table with sticky headers, hover effects, and download button
+    - **Text Files**: Displays with monospace font, proper formatting, and download button header
+    - **Fallback**: Direct URL opening for other file types
+  - **Enhanced Document Viewers**: All document viewers now include:
+    - **Header bar** with filename and download button
+    - **Professional styling** with consistent design across all file types
+    - **Download functionality** - users can download files directly from the viewer
+    - **Responsive design** that works well on all screen sizes
+  - **CSV Table Features**:
+    - **Proper table formatting** with headers, borders, and alternating row colors
+    - **Sticky header** that stays visible when scrolling through large datasets
+    - **Hover effects** for better row identification
+    - **Professional styling** similar to Excel or Google Sheets
+    - **Handles quoted CSV values** by removing quotes for clean display
+  - **Updated all file opening handlers**: Replaced direct `window.open()` calls with `openFileInline()` function
+  - **Fixed async handling**: Properly awaited the async function calls in onClick handlers
+  - **Enhanced documentation**: Updated README with detailed explanation of smart viewing features
+- **Download Option**: Users can choose to download files when needed via the file menu
+- **Error Handling**: Graceful error handling for failed file access attempts

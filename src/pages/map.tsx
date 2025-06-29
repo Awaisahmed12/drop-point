@@ -63,6 +63,7 @@ export default function MapPage() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
 
 
+
   // Replace folders state with backend-driven state
   const [folders, setFolders] = useState<PropertyFolder[]>([]);
 
@@ -608,53 +609,105 @@ export default function MapPage() {
   async function handleRename(item: PropertyFile | PropertyFolder, newName: string) {
     const originalName = 'file_name' in item ? item.file_name : item.name;
     const trimmedNewName = newName.trim();
+    
+    console.log('✏️ [RENAME] Starting rename operation');
+    console.log('✏️ [RENAME] Item type:', 'file_name' in item ? 'file' : 'folder');
+    console.log('✏️ [RENAME] Original name:', originalName);
+    console.log('✏️ [RENAME] New name (trimmed):', trimmedNewName);
+    
     if (!trimmedNewName || trimmedNewName === originalName) {
+      console.log('✏️ [RENAME] No change needed, cancelling rename');
       setRenamingFileId(null);
       return;
     }
   
     // Type guard
     const isFile = 'file_name' in item;
+    console.log('✏️ [RENAME] Is file:', isFile);
   
     try {
       if (isFile) {
         const file = item as PropertyFile;
+        console.log('✏️ [RENAME] Processing file rename - File ID:', file.id, 'Property ID:', file.property_id);
+        
+        // Sanitize the new filename for storage
+        const sanitizedNewName = sanitizeFileName(trimmedNewName);
+        console.log('✏️ [RENAME] Sanitized new name:', sanitizedNewName);
+        
+        if (!sanitizedNewName) {
+          console.log('✏️ [RENAME] Sanitization resulted in empty name, throwing error');
+          throw new Error('Invalid file name after sanitization.');
+        }
+        
         // File-specific logic
-        const existingFile = propertyFiles.find(f => f.folder_id === file.folder_id && f.file_name.toLowerCase() === trimmedNewName.toLowerCase() && f.id !== file.id);
+        const existingFile = propertyFiles.find(f => f.folder_id === file.folder_id && f.file_name.toLowerCase() === sanitizedNewName.toLowerCase() && f.id !== file.id);
         if (existingFile) {
+          console.log('✏️ [RENAME] File with this name already exists:', existingFile.file_name);
           throw new Error('A file with this name already exists in this folder.');
         }
 
         const oldPath = file.file_url;
-        const newPath = `${file.property_id}/${trimmedNewName}`;
+        const newPath = `${file.property_id}/${sanitizedNewName}`;
+        console.log('✏️ [RENAME] Storage paths - Old:', oldPath, 'New:', newPath);
         
+        console.log('✏️ [RENAME] Moving file in storage...');
         const { error: moveError } = await supabase.storage.from('property-files').move(oldPath, newPath);
-        if (moveError) throw new Error(`Storage error: ${moveError.message}`);
+        if (moveError) {
+          console.log('✏️ [RENAME] Storage move error:', moveError);
+          throw new Error(`Storage error: ${moveError.message}`);
+        }
+        console.log('✏️ [RENAME] Storage move successful');
 
+        console.log('✏️ [RENAME] Updating database record...');
         const { error: dbError } = await supabase.from('property_files').update({
-          file_name: trimmedNewName,
+          file_name: sanitizedNewName,
           file_url: newPath,
         }).eq('id', file.id);
-        if (dbError) throw dbError;
+        
+        if (dbError) {
+          console.log('✏️ [RENAME] Database update error:', dbError);
+          throw dbError;
+        }
+        console.log('✏️ [RENAME] Database update successful');
 
-        setPropertyFiles(files => files.map(f => f.id === file.id ? { ...f, file_name: trimmedNewName, file_url: newPath } : f));
+        console.log('✏️ [RENAME] Updating local state...');
+        setPropertyFiles(files => files.map(f => f.id === file.id ? { ...f, file_name: sanitizedNewName, file_url: newPath } : f));
+        
       } else {
         const folder = item as PropertyFolder;
+        console.log('✏️ [RENAME] Processing folder rename - Folder ID:', folder.id);
+        
+        // For folders, we can be less restrictive with sanitization
+        const sanitizedNewName = trimmedNewName.replace(/[<>:"/\\|?*]/g, '_').substring(0, 50);
+        console.log('✏️ [RENAME] Sanitized folder name:', sanitizedNewName);
+        
         // Folder-specific logic
-        const existingFolder = folders.find(f => f.parent_id === folder.parent_id && f.name.toLowerCase() === trimmedNewName.toLowerCase() && f.id !== folder.id);
+        const existingFolder = folders.find(f => f.parent_id === folder.parent_id && f.name.toLowerCase() === sanitizedNewName.toLowerCase() && f.id !== folder.id);
         if (existingFolder) {
+          console.log('✏️ [RENAME] Folder with this name already exists:', existingFolder.name);
           throw new Error('A folder with this name already exists here.');
         }
         
-        const { error } = await supabase.from('property_folders').update({ name: trimmedNewName }).eq('id', folder.id);
-        if (error) throw error;
+        console.log('✏️ [RENAME] Updating folder in database...');
+        const { error } = await supabase.from('property_folders').update({ name: sanitizedNewName }).eq('id', folder.id);
+        if (error) {
+          console.log('✏️ [RENAME] Folder database update error:', error);
+          throw error;
+        }
+        console.log('✏️ [RENAME] Folder database update successful');
 
-        setFolders(folders => folders.map(f => f.id === folder.id ? { ...f, name: trimmedNewName } : f));
+        console.log('✏️ [RENAME] Updating folder local state...');
+        setFolders(folders => folders.map(f => f.id === folder.id ? { ...f, name: sanitizedNewName } : f));
       }
+      
+      console.log('✏️ [RENAME] Rename operation completed successfully');
+      
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Rename failed';
+      console.log('✏️ [RENAME] Rename operation failed:', errorMessage);
       alert(`Rename failed: ${errorMessage}`);
     } finally {
+      console.log('✏️ [RENAME] Clearing rename state');
       setRenamingFileId(null);
     }
   }
@@ -758,152 +811,245 @@ export default function MapPage() {
 
   // File utility functions moved to utils/fileManagement.ts
 
-  // In handleFileInputChange, before uploading, sanitize the unique file name
+  // File upload handling
   function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    console.log('File input changed');
-    const filesArray = Array.from(e.target.files || []);
-    if (filesArray.length === 0) {
-      console.log('No files selected, exiting');
+    console.log('📁 [UPLOAD] File input changed');
+    const files = e.target.files;
+    if (!files || files.length === 0) {
+      console.log('📁 [UPLOAD] No files selected');
       return;
     }
-    if (!savedProperty) {
-      console.log('No savedProperty, exiting');
+    if (!savedProperty?.id) {
+      console.log('📁 [UPLOAD] No saved property ID, aborting upload');
+      alert('Please save the property first before uploading files.');
       return;
     }
     const propertyId = savedProperty.id;
     const folderIdForUpload = selectedFolder === 'master' ? null : selectedFolder;
-    const newPending = filesArray.map(file => {
+    console.log('📁 [UPLOAD] Property ID:', propertyId, 'Folder ID:', folderIdForUpload);
+    
+    const filesArray = Array.from(files);
+    console.log('📁 [UPLOAD] Files to upload:', filesArray.map(f => f.name));
+
+    // Create pending uploads for each file
+    const newPendingUploads: PendingUpload[] = filesArray.map(file => {
+      console.log('📁 [UPLOAD] Processing file:', file.name, 'Size:', file.size, 'Type:', file.type);
+      
       // Generate unique file name for this folder
-      let uniqueName = getUniqueFileName(file.name, folderIdForUpload, propertyFiles);
-      uniqueName = sanitizeFileName(uniqueName);
-      if (!uniqueName) {
-        setPendingUploads(prev => [
-          ...prev,
-          {
-            id: `${Date.now()}-invalid-${Math.random()}`,
-            file,
-            name: file.name,
-            status: 'error',
-            progress: 100,
-            error: 'Invalid file name. Please rename your file and try again.',
-            folder_id: folderIdForUpload,
-            property_id: propertyId || '', // always string
-          } as PendingUpload,
-        ]);
-        return null;
+      const existingFiles = propertyFiles.filter(f => 
+        folderIdForUpload ? f.folder_id === folderIdForUpload : !f.folder_id
+      );
+      const existingNames = existingFiles.map(f => f.file_name);
+      console.log('📁 [UPLOAD] Existing files in folder:', existingNames);
+      
+      const baseName = sanitizeFileName(file.name); // Sanitize the original filename first
+      console.log('📁 [UPLOAD] Base name after sanitization:', baseName);
+      let uniqueName = baseName;
+      let counter = 1;
+      while (existingNames.includes(uniqueName)) {
+        const [name, ext] = baseName.includes('.') 
+          ? [baseName.substring(0, baseName.lastIndexOf('.')), baseName.substring(baseName.lastIndexOf('.'))]
+          : [baseName, ''];
+        uniqueName = `${name} (${counter})${ext}`;
+        counter++;
+        console.log('📁 [UPLOAD] Name conflict, trying:', uniqueName);
       }
-      let progress = 0;
-      let interval: NodeJS.Timeout | null = null;
-      let cancelled = false;
-      const id = `${Date.now()}-${uniqueName}-${Math.random()}`;
+      console.log('📁 [UPLOAD] Final unique name:', uniqueName);
+
+      const uploadId = Math.random().toString(36).substring(2, 15);
+      
+      // Create abort controller for cancellation
+      const abortController = new AbortController();
+      
       const cancel = () => {
-        cancelled = true;
-        setPendingUploads(prev => prev.filter(p => p.id !== id));
-        if (interval) clearInterval(interval);
+        console.log('📁 [UPLOAD] Cancelling upload for:', uniqueName);
+        abortController.abort();
+        setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
       };
+
       const retry = () => {
-        setPendingUploads(prev => prev.map(p => p.id === id ? { ...p, status: 'uploading', error: undefined, progress: 0 } : p));
-        handleFileInputChange({ target: { files: [file] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+        console.log('📁 [UPLOAD] Retrying upload for:', uniqueName);
+        // Reset and restart upload
+        setPendingUploads(prev => prev.map(p => 
+          p.id === uploadId ? { ...p, status: 'uploading', progress: 0, error: undefined } : p
+        ));
+        startSingleUpload(uploadId, file, uniqueName, propertyId, folderIdForUpload, abortController);
       };
-      // Simulate progress
-      interval = setInterval(() => {
-        if (cancelled) {
-          if (interval) clearInterval(interval);
-          return;
-        }
-        progress += Math.random() * 20;
-        if (progress >= 100) progress = 99;
-        setPendingUploads(prev => prev.map(p => p.id === id ? { ...p, progress } : p));
-      }, 300);
+
       return {
-        id,
-        file,
+        id: uploadId,
         name: uniqueName,
+        file,
         status: 'uploading' as const,
         progress: 0,
+        property_id: propertyId,
         folder_id: folderIdForUpload,
-        property_id: propertyId || '', // always string
+        modified_at: new Date(file.lastModified).toISOString(),
         cancel,
         retry,
-        modified_at: new Date(file.lastModified).toISOString(), // <-- Store last modified date
-      } as PendingUpload & { modified_at: string };
-    }).filter((p): p is PendingUpload & { modified_at: string } => !!p);
-    setPendingUploads(prev => [...prev, ...newPending]);
-    (async () => {
-      const user = await supabase.auth.getUser();
-      if (!user.data.user) return;
-      await Promise.all(newPending.map(async (pending) => {
-        if (!pending) return;
-        if (pending.property_id !== savedProperty?.id) return; // Only upload for current property
-        const file = pending.file;
-        // Use the unique name for upload and DB
-        const filePath = `${pending.property_id}/${pending.name}`;
-        console.log('Uploading to:', filePath, 'File name:', pending.name, 'Folder ID:', pending.folder_id);
-        if (!pending.name) {
-          setPendingUploads(prev => prev.map(p => p.id === pending.id ? { ...p, status: 'error', error: 'Invalid file name. Please rename your file and try again.', progress: 100 } : p));
-          return;
-        }
-        // Log the values for RLS debugging
-        if (user.data.user) {
-          console.log('DB Insert:', {
-            user_id: user.data.user.id,
-            property_id: pending.property_id,
-            folder_id: pending.folder_id,
-          });
-        }
-        try {
-          if (pending.status === 'error') return;
-          if (pending.status === 'success') return;
-          const { data: uploadData, error: uploadError } = await supabase.storage.from('property-files').upload(filePath, file, { upsert: true });
-          if (uploadError) throw uploadError;
-          if (!user.data.user) throw new Error('User not authenticated');
-          const userId = user.data.user.id;
-          const { error: dbError } = await supabase.from('property_files').insert([
-            {
-              property_id: pending.property_id,
-              file_name: pending.name, // use unique name
-              file_url: uploadData?.path || filePath,
-              uploaded_at: new Date().toISOString(),
-              user_id: userId,
-              file_type: file.type,
-              file_size: file.size,
-              folder_id: pending.folder_id,
-              modified_at: pending.modified_at, // <-- Store last modified date in DB
-            },
-          ]);
-          if (dbError) throw dbError;
-          setPendingUploads(prev => prev.map(p => p.id === pending.id ? { ...p, status: 'success', progress: 100 } : p));
-        } catch (err: unknown) {
-          let errorMsg = 'Upload failed';
-          if (typeof err === 'string') {
-            errorMsg = err;
-          } else if (err && typeof err === 'object') {
-            if ('message' in err && typeof (err as { message: string }).message === 'string') {
-              errorMsg = (err as { message: string }).message;
-            } else if ('error' in err && typeof (err as { error: string }).error === 'string') {
-              errorMsg = (err as { error: string }).error;
-            } else {
-              try {
-                errorMsg = JSON.stringify(err);
-              } catch {
-                errorMsg = 'Upload failed';
-              }
-            }
+        abortController
+      };
+    });
+
+    console.log('📁 [UPLOAD] Created pending uploads:', newPendingUploads.map(p => ({ id: p.id, name: p.name })));
+    setPendingUploads(prev => [...prev, ...newPendingUploads]);
+
+    // Start uploads for each file
+    newPendingUploads.forEach(pending => {
+      if (pending.abortController) {
+        startSingleUpload(pending.id, pending.file, pending.name, propertyId, folderIdForUpload, pending.abortController);
+      }
+    });
+
+    e.target.value = '';
+  }
+
+  // Function to handle single file upload with progress tracking
+  const startSingleUpload = async (
+    uploadId: string, 
+    file: File, 
+    uniqueName: string, 
+    propertyId: string, 
+    folderIdForUpload: string | null,
+    abortController: AbortController
+  ) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      console.log('📁 [UPLOAD] User authenticated:', user.id);
+
+      const filePath = `${propertyId}/${uniqueName}`;
+      
+      console.log('📁 [UPLOAD] Starting upload - File:', uniqueName, 'Path:', filePath, 'Folder ID:', folderIdForUpload);
+
+      // Use Supabase's upload method with proper progress tracking
+      console.log('📁 [UPLOAD] Uploading to Supabase storage...');
+      
+      // Create a promise that tracks progress
+      const uploadWithProgress = new Promise<{ path: string }>((resolve, reject) => {
+        // Set up abort signal
+        abortController.signal.addEventListener('abort', () => {
+          reject(new Error('Upload cancelled'));
+        });
+
+        // Simulate progress for now - Supabase doesn't expose upload progress directly
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+          if (progress < 90) {
+            progress += Math.random() * 20;
+            if (progress > 90) progress = 90;
+            console.log('📁 [UPLOAD] Progress for', uniqueName, ':', Math.round(progress) + '%');
+            setPendingUploads(prev => prev.map(p => 
+              p.id === uploadId ? { ...p, progress: Math.round(progress) } : p
+            ));
           }
-          setPendingUploads(prev => prev.map(p => p.id === pending.id ? { ...p, status: 'error', error: errorMsg || 'Upload failed', progress: 100 } : p));
-        }
-      }));
+        }, 200);
+
+        // Perform the actual upload
+        supabase.storage
+          .from('property-files')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: true
+          })
+          .then(({ data, error }) => {
+            clearInterval(progressInterval);
+            
+            if (error) {
+              console.log('📁 [UPLOAD] Supabase upload error:', error);
+              reject(error);
+            } else {
+              console.log('📁 [UPLOAD] Supabase upload successful:', data);
+              // Set progress to 100%
+              setPendingUploads(prev => prev.map(p => 
+                p.id === uploadId ? { ...p, progress: 100 } : p
+              ));
+              resolve({ path: data.path });
+            }
+          })
+          .catch((err) => {
+            clearInterval(progressInterval);
+            reject(err);
+          });
+      });
+
+      const uploadResult = await uploadWithProgress;
+      
+      console.log('📁 [UPLOAD] Storage upload successful:', uploadResult);
+
+      // Insert database record
+      const dbRecord = {
+        property_id: propertyId,
+        file_name: uniqueName,
+        file_url: filePath,
+        uploaded_at: new Date().toISOString(),
+        user_id: user.id,
+        file_type: file.type,
+        file_size: file.size,
+        folder_id: folderIdForUpload,
+        modified_at: new Date(file.lastModified).toISOString(),
+      };
+
+      console.log('📁 [UPLOAD] Inserting DB record:', dbRecord);
+
+      const { error: dbError } = await supabase.from('property_files').insert([dbRecord]);
+
+      if (dbError) {
+        console.log('📁 [UPLOAD] Database insert error:', dbError);
+        throw dbError;
+      }
+
+      console.log('📁 [UPLOAD] Database insert successful for:', uniqueName);
+      
+      // Mark as successful
+      setPendingUploads(prev => prev.map(p => 
+        p.id === uploadId ? { ...p, status: 'success', progress: 100 } : p
+      ));
+
       // Refresh file list
       const result = await supabase
         .from('property_files')
         .select('*')
         .eq('property_id', propertyId)
         .order('uploaded_at', { ascending: false });
-      if (result.data) setPropertyFiles(result.data);
-      setPendingUploads(prev => prev.filter(p => p.status !== 'success'));
-    })();
-    e.target.value = '';
-  }
+
+      if (result.data) {
+        console.log('📁 [UPLOAD] File list refreshed, found', result.data.length, 'files');
+        setPropertyFiles(result.data);
+      }
+
+    } catch (err) {
+      if (abortController.signal.aborted) {
+        console.log('📁 [UPLOAD] Upload cancelled for:', uniqueName);
+        return; // Don't update state if cancelled
+      }
+
+      console.log('📁 [UPLOAD] Upload error for', uniqueName, ':', err);
+      
+      let errorMsg = 'Upload failed';
+      if (typeof err === 'string') {
+        errorMsg = err;
+      } else if (err && typeof err === 'object') {
+        if ('message' in err && typeof (err as { message: string }).message === 'string') {
+          errorMsg = (err as { message: string }).message;
+        } else if ('error' in err && typeof (err as { error: string }).error === 'string') {
+          errorMsg = (err as { error: string }).error;
+        }
+      }
+
+      console.log('📁 [UPLOAD] Processed error message:', errorMsg);
+      setPendingUploads(prev => prev.map(p => 
+        p.id === uploadId ? { ...p, status: 'error', error: errorMsg, progress: 100 } : p
+      ));
+    }
+  };
+
+  // Function to dismiss pending uploads
+  const dismissPendingUpload = (uploadId: string) => {
+    setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
+  };
 
   // Update click outside handler to close any open menu when clicking outside
   useEffect(() => {
@@ -1174,6 +1320,7 @@ export default function MapPage() {
           pendingUploads={pendingUploads}
           getCachedPropertyData={getCachedPropertyData}
           cachePropertyData={cachePropertyData}
+          onDismiss={dismissPendingUpload}
         />
 
       </LoadScript>

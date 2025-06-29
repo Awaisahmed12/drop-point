@@ -1,0 +1,127 @@
+# TODO: All Changes Requested During Chat Session
+# Created from comprehensive chat analysis
+# Each item represents a specific change request with implementation details
+
+## STICKY SCROLL BEHAVIOR IMPLEMENTATION
+### Primary Request: Make satellite image scrollable while keeping navigation sticky
+
+**Main Goal:**
+- Satellite image should scroll away when browsing files to maximize file browsing space
+- Keep search bar, upload section, breadcrumbs, and column headers sticky/accessible
+- When scrolling back to top, satellite image should come back into view
+
+**Specific Requirements:**
+- [ ] Move ONLY the satellite image into the scrollable container
+- [ ] Keep breadcrumbs in their original position (NOT moved above satellite)
+- [ ] Keep search bar sticky at top (original position)
+- [ ] Keep upload progress section sticky below search
+- [ ] Keep column headers sticky within scroll area
+- [ ] Preserve original header layout and styling
+- [ ] Satellite image should be first item in scrollable file list container
+- [ ] All navigation elements should remain outside the scroll area
+- [ ] No changes to positioning of breadcrumbs, search, or uploads from original layout
+
+**Technical Implementation Details:**
+- [ ] Satellite image: Move from fixed position to inside `<div className="flex-1 overflow-y-auto file-list">`
+- [ ] Search bar: `sticky top-0 z-30`
+- [ ] Upload section: `sticky top-14 z-20` 
+- [ ] Column headers: `sticky top-0 z-10` within scroll container
+- [ ] Preserve original header structure with property address formatting
+- [ ] Maintain breadcrumb navigation in original position after header
+- [ ] Keep upload progress in original position after search bar
+
+**User Experience Goals:**
+- [ ] Maximum space for file browsing when scrolling through files
+- [ ] Essential navigation always accessible (search, breadcrumbs, uploads)
+- [ ] Satellite image provides context when needed but doesn't interfere with file management
+- [ ] Natural scroll behavior where non-essential visual elements scroll away
+- [ ] When scrolling to top of files, satellite image returns to view
+
+**What NOT to do:**
+- [ ] Do NOT move breadcrumbs above satellite image
+- [ ] Do NOT change search bar position from original
+- [ ] Do NOT move upload section from original position
+- [ ] Do NOT alter header structure or styling
+- [ ] Do NOT make breadcrumbs scrollable
+- [ ] Do NOT change the order: Header → Breadcrumbs → Search → Uploads → Scrollable Area
+
+## CLARIFICATIONS AND CORRECTIONS MADE
+
+**Correction 1: Layout Structure**
+- [ ] User clarified that breadcrumbs, search, and uploads should stay in ORIGINAL positions
+- [ ] Only the satellite image should be moved to be scrollable
+- [ ] Restore original header styling with proper property address formatting
+- [ ] Keep all navigation elements exactly where they were before
+
+**Correction 2: Satellite Image Placement**
+- [ ] Satellite image should be the first item inside the scrollable container
+- [ ] Should scroll away naturally when user scrolls down through files
+- [ ] Should return when user scrolls back to top of file list
+- [ ] Should not interfere with file management workflow
+
+## IMPLEMENTATION CHECKLIST
+
+**Step 1: Restore Original Layout Structure**
+- [ ] Header: Original styling with property address and close button
+- [ ] Breadcrumbs: Original position below header, outside scroll area
+- [ ] Search bar: Original position, sticky behavior
+- [ ] Upload section: Original position, sticky behavior
+
+**Step 2: Move Satellite Image**
+- [ ] Remove satellite image from fixed position between header and breadcrumbs
+- [ ] Place satellite image as first child inside scrollable file list container
+- [ ] Maintain satellite image styling and dimensions
+- [ ] Ensure proper border styling between satellite and file list
+
+**Step 3: Verify Sticky Behavior**
+- [ ] Search bar stays accessible while scrolling
+- [ ] Upload progress stays visible when active
+- [ ] Column headers remain sticky within scroll area
+- [ ] Breadcrumbs remain fixed for navigation
+
+**Step 4: Test Scroll Behavior**
+- [ ] Satellite image scrolls out of view when scrolling down
+- [ ] Satellite image returns when scrolling back to top
+- [ ] File browsing has maximum space when satellite is scrolled away
+- [ ] All navigation remains accessible during scrolling
+
+## FINAL VALIDATION
+
+**User Experience Validation:**
+- [ ] Satellite image scrolls away during file browsing ✓
+- [ ] Search bar remains sticky and accessible ✓
+- [ ] Breadcrumbs stay in original position for navigation ✓
+- [ ] Upload progress visible when active ✓
+- [ ] Maximum space available for file management ✓
+- [ ] Satellite image returns when scrolling to top ✓
+
+**Technical Validation:**
+- [ ] Build passes without errors ✓
+- [ ] No layout shifts or visual glitches ✓
+- [ ] Proper z-index layering maintained ✓
+- [ ] Responsive behavior on mobile and desktop ✓
+- [ ] Original component structure preserved ✓
+
+## NOTES FOR IMPLEMENTATION
+
+**Key Files to Modify:**
+- `src/components/PropertyDetailsModal.tsx` - Main component with layout structure
+
+**Key CSS Classes:**
+- `.file-list` - Scrollable container
+- `sticky top-0 z-30` - Search bar
+- `sticky top-14 z-20` - Upload section  
+- `sticky top-0 z-10` - Column headers within scroll area
+
+**Important Considerations:**
+- The user specifically emphasized keeping breadcrumbs, search, and uploads in their ORIGINAL positions
+- Only the satellite image should be moved to achieve scrollable behavior
+- This is about optimizing file browsing space without losing navigation functionality
+- The satellite image is not essential for file management, so it can scroll away
+
+**Testing Priorities:**
+1. Verify satellite image scrolls away when browsing files
+2. Confirm all navigation elements remain accessible
+3. Check that satellite image returns when scrolling to top
+4. Ensure maximum file browsing space is achieved
+5. Validate responsive behavior on different screen sizes 
