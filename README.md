@@ -107,7 +107,17 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: Modal Layout Optimization & Satellite Image Repositioning**
+### **Latest Update: Navigation Section Optimization & Dynamic Layout**
+- **Eliminated Empty Gaps**: Optimized the navigation section to conditionally render breadcrumbs only when needed:
+  - **At root folder**: Clean, minimal search bar without unnecessary spacing
+  - **In nested folders**: Full breadcrumb navigation with back/home buttons
+  - **Dynamic sticky positioning**: All elements (upload section, column headers) automatically adjust their position based on navigation height
+
+- **Enhanced Sticky Behavior**: All navigation elements (breadcrumbs, search, upload status, column headers) now stick properly to the top of the scrollable area while maintaining perfect alignment
+  - **Column Header Transparency Fixed**: Resolved z-index and margin issues that caused the "Size" column to appear see-through
+  - **Consistent Background Coverage**: All sticky elements now have solid white backgrounds with no content bleeding through
+
+### **Previous Update: Modal Layout Optimization & Satellite Image Repositioning**
 - **Improved Visual Hierarchy**: Completely restructured the PropertyDetailsModal layout to follow a more logical flow:
   - Property title header (always visible)
   - Satellite image (scrolls away when browsing files)
@@ -116,20 +126,6 @@ DropPoint is a sophisticated real estate document management application that co
   - Upload progress section (sticky within scroll area)
   - Column headers (sticky within scroll area)
   - File and folder listing (scrollable content)
-
-- **Enhanced Sticky Behavior**: All navigation elements (breadcrumbs, search, upload status, column headers) now stick properly to the top of the scrollable area after the satellite image scrolls away, providing consistent access to key functionality while browsing through long file lists
-
-- **Better User Experience**: 
-  - Satellite imagery is prominently displayed at the top of the modal content
-  - Navigation elements remain accessible without blocking content
-  - Smooth scroll behavior with proper z-index layering
-  - Maintains mobile-responsive design across all breakpoints
-
-- **Technical Implementation**: 
-  - Moved satellite image, breadcrumbs, and search bar into the scrollable container
-  - Applied sticky positioning (`sticky top-0`, `sticky top-12`, etc.) within the scroll context
-  - Dynamic sticky positioning based on upload status visibility
-  - Proper background colors and borders for sticky elements
 
 ### **Advanced Sticky Scroll System**
 - **Sticky Search Bar**: Remains at top of scroll area (after image scrolls away) for constant access

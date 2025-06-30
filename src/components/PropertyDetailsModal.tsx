@@ -586,10 +586,11 @@ export const PropertyDetailsModal = ({
             />
           </div>
 
-          {/* Breadcrumb Navigation - STICKY within scroll container */}
-          <div className="flex items-center gap-2 mb-2 text-sm text-blue-700 font-semibold px-4 pt-2 pb-2 flex-shrink-0 sticky top-0 z-30 bg-white border-b border-gray-100">
+          {/* Consolidated Navigation Section - STICKY within scroll container */}
+          <div className="bg-white flex-shrink-0 sticky top-0 z-30">
+            {/* Breadcrumb Navigation - Only show when not at root */}
             {selectedFolder !== 'master' && (
-              <>
+              <div className="flex items-center gap-2 px-4 pt-2 pb-1 text-sm text-blue-700 font-semibold">
                 {/* Back Button */}
                 <button
                   className="cursor-pointer hover:bg-blue-50 rounded-full p-1 flex items-center transition-colors"
@@ -613,34 +614,57 @@ export const PropertyDetailsModal = ({
                 >
                   <HomeIcon style={{ width: 20, height: 20, color: '#1a73e8' }} />
                 </button>
-              </>
+                
+                {breadcrumbPath.map((folder) => [
+                  <span key={`sep-${folder.id}`}>/</span>,
+                  <button
+                    key={folder.id}
+                    className="cursor-pointer hover:underline"
+                    onClick={() => onFolderChange(folder.id)}
+                  >
+                    {folder.name}
+                  </button>
+                ])}
+              </div>
             )}
-            {breadcrumbPath.map((folder) => [
-              <span key={`sep-${folder.id}`}>/</span>,
-              <button
-                key={folder.id}
-                className="cursor-pointer hover:underline"
-                onClick={() => onFolderChange(folder.id)}
-              >
-                {folder.name}
-              </button>
-            ])}
-          </div>
 
-          {/* Search Bar - STICKY within scroll container */}
-          <div className="px-4 pb-2 bg-white flex-shrink-0 sticky top-12 z-20 border-b border-gray-100">
-            <input
-              type="text"
-              className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-500"
-              placeholder="Search all files and folders..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+            {/* Search Bar */}
+            <div className="px-4 pb-2" style={{ paddingTop: selectedFolder === 'master' ? '8px' : '0px' }}>
+              <input
+                type="text"
+                className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-500"
+                placeholder="Search all files and folders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* Column Headers - Integrated into navigation section to eliminate gaps */}
+            <div className="hidden sm:grid grid-cols-12 gap-4 px-3 py-2 text-sm border-b border-gray-200 bg-white">
+              <button
+                className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+                onClick={() => toggleSort('name')}
+              >
+                Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+              </button>
+              <button
+                className="col-span-3 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+                onClick={() => toggleSort('date')}
+              >
+                Modified {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+              </button>
+              <button
+                className="col-span-2 flex items-center justify-end gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+                onClick={() => toggleSort('size')}
+              >
+                Size {sortField === 'size' && (sortDirection === 'asc' ? '↑' : '↓')}
+              </button>
+            </div>
           </div>
 
           {/* Compact Uploading Files - STICKY within scroll container */}
           {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).length > 0 && (
-            <div className="px-4 pb-2 bg-white flex-shrink-0 sticky top-24 z-10 border-b border-gray-50">
+            <div className="px-4 pb-2 bg-white flex-shrink-0 sticky z-10 border-b border-gray-50" style={{ top: `${selectedFolder === 'master' ? 96 : 120}px` }}>
               <div className="space-y-1">
                 {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).map(pending => (
                   <div key={pending.id} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
@@ -736,28 +760,6 @@ export const PropertyDetailsModal = ({
               </div>
             </div>
           )}
-
-          {/* Sort Header - Sticky within scroll container, positioned after other sticky elements */}
-          <div className="hidden sm:grid grid-cols-12 gap-4 px-3 py-2 text-sm border-b border-gray-200 mb-2 sticky bg-white z-0" style={{ top: pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).length > 0 ? '144px' : '96px' }}>
-            <button
-              className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
-              onClick={() => toggleSort('name')}
-            >
-              Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
-            </button>
-            <button
-              className="col-span-3 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
-              onClick={() => toggleSort('date')}
-            >
-              Modified {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
-            </button>
-            <button
-              className="col-span-2 flex items-center justify-end gap-1 text-sm font-medium text-gray-500 hover:text-gray-700 mr-2"
-              onClick={() => toggleSort('size')}
-            >
-              Size {sortField === 'size' && (sortDirection === 'asc' ? '↑' : '↓')}
-            </button>
-          </div>
 
           {/* Loading States */}
           {(foldersLoading || filesLoading) && (
