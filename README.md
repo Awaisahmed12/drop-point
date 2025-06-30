@@ -213,6 +213,12 @@ npm run dev
 - **Mobile App**: React Native version for iOS/Android
 - **Integration APIs**: Connect with MLS systems and other real estate tools
 - **Bulk Operations**: Mass file operations and property imports
+- **Authentication Flow Improvements**: 
+  - **Smart Routing**: Redirect signed-in users from localhost to /map automatically (dashboard/home page)
+  - **Sign-in Guard**: Redirect unsigned users to sign-in page from any protected route
+  - **Account Management Page**: Full user account page with sign-out, storage usage, account switching
+  - **Route Protection**: Fix /map route to properly handle authentication state
+  - **Consistent Auth Flow**: Ensure all routes respect authentication status consistently
 
 ## 🤝 Contributing
 
