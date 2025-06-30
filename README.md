@@ -239,11 +239,11 @@ This is a private project, but the codebase follows modern React and TypeScript 
 
 **Layout Structure**: 
 1. Property Address Header (fixed)
-2. Sticky Breadcrumb Navigation 
-3. Sticky Search Bar
-4. Sticky Upload Section (when active)
-5. Scrollable Area:
+2. Scrollable Area:
    - Satellite Image (scrolls away)
+   - Sticky Breadcrumb Navigation 
+   - Sticky Search Bar
+   - Sticky Upload Section (when active)
    - File List with sticky column headers
 
 **Benefits**:
@@ -259,5 +259,12 @@ This addresses the user request for the satellite image to scroll away during fi
 - **Unified Scroll Experience**: Now the satellite image scrolls away regardless of where the user's cursor is positioned when they begin scrolling
 - **Natural User Interaction**: Users can start scrolling from anywhere in the files area and the satellite image will respond correctly
 - **Consistent Behavior**: Scrolling works identically whether mouse is over satellite image, files, folders, or any part of the modal content
+
+**Latest Fix: Clean Sticky Positioning**
+- **Eliminated Overlap Issues**: Removed sticky behavior from breadcrumbs, search bar, and upload section to prevent overlap with column headers
+- **Simplified Sticky Logic**: Only column headers remain sticky for optimal file browsing experience
+- **Clean Scrolling Flow**: Satellite image → Breadcrumbs → Search bar all scroll away together, leaving only column headers visible
+- **Focused File Management**: Once scrolled, users get maximum space for file browsing with essential column headers always visible
+- **No More Visual Conflicts**: Eliminated jarring overlap behavior where navigation elements would cover column headers
 
 
