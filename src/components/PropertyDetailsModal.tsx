@@ -572,160 +572,9 @@ export const PropertyDetailsModal = ({
           </button>
         </div>
 
-        {/* Breadcrumb Navigation - STICKY */}
-        <div className="flex items-center gap-2 mb-2 text-sm text-blue-700 font-semibold px-4 pt-2 flex-shrink-0 sticky top-0 z-30 bg-white border-b border-gray-100">
-          {selectedFolder !== 'master' && (
-            <>
-              {/* Back Button */}
-              <button
-                className="cursor-pointer hover:bg-blue-50 rounded-full p-1 flex items-center transition-colors"
-                onClick={() => {
-                  const currentFolder = folders.find(f => f.id === selectedFolder);
-                  const parentId = currentFolder?.parent_id || 'master';
-                  onFolderChange(parentId);
-                }}
-                title="Go back"
-              >
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              
-              {/* Home Button */}
-              <button
-                className="cursor-pointer hover:underline flex items-center"
-                onClick={() => onFolderChange('master')}
-                title="Go to root"
-              >
-                <HomeIcon style={{ width: 20, height: 20, color: '#1a73e8' }} />
-              </button>
-            </>
-          )}
-          {breadcrumbPath.map((folder) => [
-            <span key={`sep-${folder.id}`}>/</span>,
-            <button
-              key={folder.id}
-              className="cursor-pointer hover:underline"
-              onClick={() => onFolderChange(folder.id)}
-            >
-              {folder.name}
-            </button>
-          ])}
-        </div>
-
-        {/* Search Bar - STICKY */}
-        <div className="px-4 pb-2 bg-white flex-shrink-0 sticky top-14 z-20 border-b border-gray-100">
-          <input
-            type="text"
-            className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-500"
-            placeholder="Search all files and folders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        {/* Compact Uploading Files - STICKY */}
-        {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).length > 0 && (
-          <div className="px-4 pb-2 bg-white flex-shrink-0 sticky top-28 z-10 border-b border-gray-50">
-            <div className="space-y-1">
-              {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).map(pending => (
-                <div key={pending.id} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
-                  pending.status === 'error' ? 'border-red-200 bg-red-50' : 
-                  pending.status === 'success' ? 'border-green-200 bg-green-50' :
-                  'border-blue-200 bg-blue-50'
-                }`}>
-                  {/* Compact File Icon and Name */}
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <FileIcon
-                      type={pending.name.split('.').pop() || 'file'}
-                      size={20}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-900 truncate text-xs">
-                        {getFileNameWithoutExtension(pending.name)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Compact Progress/Status */}
-                  <div className="flex items-center gap-2">
-                    {pending.status === 'uploading' && (
-                      <div className="flex items-center gap-1">
-                        {/* Simple Spinning Circle */}
-                        <div className="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                      </div>
-                    )}
-                    
-                    {pending.status === 'success' && (
-                      <div className="flex items-center gap-1">
-                        <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
-                          <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <span className="text-xs text-green-600 font-medium">Done!</span>
-                      </div>
-                    )}
-                    
-                    {pending.status === 'error' && (
-                      <div className="flex items-center gap-1">
-                        <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center">
-                          <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </div>
-                        <span className="text-xs text-red-600 font-medium">Failed</span>
-                      </div>
-                    )}
-
-                    {/* Compact Action Buttons */}
-                    <div className="flex gap-1">
-                      {pending.status === 'error' && pending.retry && (
-                        <button
-                          onClick={pending.retry}
-                          className="p-1 rounded-full hover:bg-blue-100 text-blue-600 transition-colors"
-                          title="Retry upload"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                        </button>
-                      )}
-                      
-                      {pending.status === 'error' && (
-                        <button
-                          onClick={() => onDismiss(pending.id)}
-                          className="p-1 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
-                          title="Dismiss"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
-                      
-                      {pending.status === 'uploading' && pending.cancel && (
-                        <button
-                          onClick={pending.cancel}
-                          className="p-1 rounded-full hover:bg-red-100 text-red-600 transition-colors"
-                          title="Cancel upload"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* File List Container - Scrollable */}
         <div className="flex-1 overflow-y-auto file-list" style={{ minHeight: '300px' }}>
-          {/* Satellite Image - BACK IN scrollable area so it scrolls away */}
+          {/* Satellite Image - First in scrollable area */}
           <div className="relative w-full h-56 bg-gray-200 border-b border-blue-100 flex-shrink-0">
             <Image
               src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
@@ -737,8 +586,159 @@ export const PropertyDetailsModal = ({
             />
           </div>
 
-          {/* Sort Header - Sticky at top of scroll area */}
-          <div className="hidden sm:grid grid-cols-12 gap-4 px-3 py-2 text-sm border-b border-gray-200 mb-2 sticky top-0 bg-white z-10">
+          {/* Breadcrumb Navigation - STICKY within scroll container */}
+          <div className="flex items-center gap-2 mb-2 text-sm text-blue-700 font-semibold px-4 pt-2 pb-2 flex-shrink-0 sticky top-0 z-30 bg-white border-b border-gray-100">
+            {selectedFolder !== 'master' && (
+              <>
+                {/* Back Button */}
+                <button
+                  className="cursor-pointer hover:bg-blue-50 rounded-full p-1 flex items-center transition-colors"
+                  onClick={() => {
+                    const currentFolder = folders.find(f => f.id === selectedFolder);
+                    const parentId = currentFolder?.parent_id || 'master';
+                    onFolderChange(parentId);
+                  }}
+                  title="Go back"
+                >
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                {/* Home Button */}
+                <button
+                  className="cursor-pointer hover:underline flex items-center"
+                  onClick={() => onFolderChange('master')}
+                  title="Go to root"
+                >
+                  <HomeIcon style={{ width: 20, height: 20, color: '#1a73e8' }} />
+                </button>
+              </>
+            )}
+            {breadcrumbPath.map((folder) => [
+              <span key={`sep-${folder.id}`}>/</span>,
+              <button
+                key={folder.id}
+                className="cursor-pointer hover:underline"
+                onClick={() => onFolderChange(folder.id)}
+              >
+                {folder.name}
+              </button>
+            ])}
+          </div>
+
+          {/* Search Bar - STICKY within scroll container */}
+          <div className="px-4 pb-2 bg-white flex-shrink-0 sticky top-12 z-20 border-b border-gray-100">
+            <input
+              type="text"
+              className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-500"
+              placeholder="Search all files and folders..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {/* Compact Uploading Files - STICKY within scroll container */}
+          {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).length > 0 && (
+            <div className="px-4 pb-2 bg-white flex-shrink-0 sticky top-24 z-10 border-b border-gray-50">
+              <div className="space-y-1">
+                {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).map(pending => (
+                  <div key={pending.id} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                    pending.status === 'error' ? 'border-red-200 bg-red-50' : 
+                    pending.status === 'success' ? 'border-green-200 bg-green-50' :
+                    'border-blue-200 bg-blue-50'
+                  }`}>
+                    {/* Compact File Icon and Name */}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <FileIcon
+                        type={pending.name.split('.').pop() || 'file'}
+                        size={20}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate text-xs">
+                          {getFileNameWithoutExtension(pending.name)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Compact Progress/Status */}
+                    <div className="flex items-center gap-2">
+                      {pending.status === 'uploading' && (
+                        <div className="flex items-center gap-1">
+                          {/* Simple Spinning Circle */}
+                          <div className="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                      
+                      {pending.status === 'success' && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
+                            <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <span className="text-xs text-green-600 font-medium">Done!</span>
+                        </div>
+                      )}
+                      
+                      {pending.status === 'error' && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center">
+                            <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </div>
+                          <span className="text-xs text-red-600 font-medium">Failed</span>
+                        </div>
+                      )}
+
+                      {/* Compact Action Buttons */}
+                      <div className="flex gap-1">
+                        {pending.status === 'error' && pending.retry && (
+                          <button
+                            onClick={pending.retry}
+                            className="p-1 rounded-full hover:bg-blue-100 text-blue-600 transition-colors"
+                            title="Retry upload"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                          </button>
+                        )}
+                        
+                        {pending.status === 'error' && (
+                          <button
+                            onClick={() => onDismiss(pending.id)}
+                            className="p-1 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+                            title="Dismiss"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                        
+                        {pending.status === 'uploading' && pending.cancel && (
+                          <button
+                            onClick={pending.cancel}
+                            className="p-1 rounded-full hover:bg-red-100 text-red-600 transition-colors"
+                            title="Cancel upload"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sort Header - Sticky within scroll container, positioned after other sticky elements */}
+          <div className="hidden sm:grid grid-cols-12 gap-4 px-3 py-2 text-sm border-b border-gray-200 mb-2 sticky bg-white z-0" style={{ top: pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).length > 0 ? '144px' : '96px' }}>
             <button
               className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
               onClick={() => toggleSort('name')}

@@ -107,17 +107,35 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: Satellite Image Repositioning**
-- **Improved Layout Hierarchy**: Satellite image now appears immediately after the property address header
-- **Better Visual Flow**: Property title → Satellite image → Navigation (breadcrumbs, search, upload) → File list
-- **Enhanced User Experience**: Satellite imagery is prominently featured while maintaining all navigation functionality
-- **Maintained Sticky Behavior**: Search bar, upload section, and column headers remain sticky for optimal file browsing
+### **Latest Update: Modal Layout Optimization & Satellite Image Repositioning**
+- **Improved Visual Hierarchy**: Completely restructured the PropertyDetailsModal layout to follow a more logical flow:
+  - Property title header (always visible)
+  - Satellite image (scrolls away when browsing files)
+  - Breadcrumb navigation (sticky within scroll area)
+  - Search bar (sticky within scroll area) 
+  - Upload progress section (sticky within scroll area)
+  - Column headers (sticky within scroll area)
+  - File and folder listing (scrollable content)
 
-### **Sticky Scroll Behavior**
-- **Sticky Search Bar**: Remains at top during scrolling for constant access
-- **Sticky Upload Section**: Always visible below search bar for easy file uploads
-- **Sticky Column Headers**: File list headers remain visible during long file lists
-- **Optimized Z-Index Layering**: Proper stacking order for all sticky elements
+- **Enhanced Sticky Behavior**: All navigation elements (breadcrumbs, search, upload status, column headers) now stick properly to the top of the scrollable area after the satellite image scrolls away, providing consistent access to key functionality while browsing through long file lists
+
+- **Better User Experience**: 
+  - Satellite imagery is prominently displayed at the top of the modal content
+  - Navigation elements remain accessible without blocking content
+  - Smooth scroll behavior with proper z-index layering
+  - Maintains mobile-responsive design across all breakpoints
+
+- **Technical Implementation**: 
+  - Moved satellite image, breadcrumbs, and search bar into the scrollable container
+  - Applied sticky positioning (`sticky top-0`, `sticky top-12`, etc.) within the scroll context
+  - Dynamic sticky positioning based on upload status visibility
+  - Proper background colors and borders for sticky elements
+
+### **Advanced Sticky Scroll System**
+- **Sticky Search Bar**: Remains at top of scroll area (after image scrolls away) for constant access
+- **Sticky Upload Section**: Always visible below search bar during active uploads
+- **Sticky Column Headers**: File list headers remain visible during long file lists with dynamic positioning
+- **Intelligent Z-Index Management**: Proper layering ensures all sticky elements stack correctly
 
 ### **Advanced Upload System**
 - **Real-time Progress Tracking**: Visual progress bars for each upload
@@ -213,6 +231,10 @@ npm run dev
 - **Mobile App**: React Native version for iOS/Android
 - **Integration APIs**: Connect with MLS systems and other real estate tools
 - **Bulk Operations**: Mass file operations and property imports
+- **Pending Upload UX Improvements**: 
+  - **Scrollable Upload Section**: Make pending uploads (including failures) scroll away instead of staying sticky
+  - **Compact Upload States**: Minimize visual interference when uploads are in progress or failed
+  - **Upload History**: Option to view/dismiss completed uploads without them blocking file browsing
 - **Authentication Flow Improvements**: 
   - **Smart Routing**: Redirect signed-in users from localhost to /map automatically (dashboard/home page)
   - **Sign-in Guard**: Redirect unsigned users to sign-in page from any protected route
