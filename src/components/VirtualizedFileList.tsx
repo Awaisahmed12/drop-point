@@ -130,7 +130,7 @@ const Row = ({ index, style, data }: RowProps) => {
 
   // File row
   const file = item as PropertyFile;
-  const [base, ext] = splitFileNameAndExt(file.file_name);
+  const [baseFileName, ext] = splitFileNameAndExt(file.file_name);
   return (
     <div style={style}>
       <div
@@ -166,7 +166,7 @@ const Row = ({ index, style, data }: RowProps) => {
                   onClick={e => e.stopPropagation()}
                   onFocus={e => {
                     const input = e.target as HTMLInputElement;
-                    input.setSelectionRange(0, base.length);
+                    input.setSelectionRange(0, baseFileName.length);
                   }}
                   onChange={e => data.setRenamingFileName(e.target.value)}
                   onBlur={async () => {

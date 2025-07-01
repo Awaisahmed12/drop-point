@@ -530,7 +530,7 @@ export const PropertyDetailsModal = ({
 
                 {/* Files */}
                 {sortedFiles.map(file => {
-                  const [base, ext] = splitFileNameAndExt(file.file_name);
+                  const [baseFileName, ext] = splitFileNameAndExt(file.file_name);
                   return (
                     <div key={file.id}>
                       {/* Desktop File Layout */}
@@ -567,7 +567,7 @@ export const PropertyDetailsModal = ({
                                 onClick={e => e.stopPropagation()}
                                 onFocus={e => {
                                   const input = e.target as HTMLInputElement;
-                                  input.setSelectionRange(0, base.length);
+                                  input.setSelectionRange(0, baseFileName.length);
                                 }}
                                 onChange={e => setRenamingFileName(e.target.value)}
                                 onBlur={async () => {
@@ -694,7 +694,7 @@ export const PropertyDetailsModal = ({
                               onClick={e => e.stopPropagation()}
                               onFocus={e => {
                                 const input = e.target as HTMLInputElement;
-                                input.setSelectionRange(0, base.length);
+                                input.setSelectionRange(0, baseFileName.length);
                               }}
                               onChange={e => setRenamingFileName(e.target.value)}
                               onBlur={async () => {
