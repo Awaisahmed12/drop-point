@@ -985,7 +985,7 @@ export const PropertyDetailsModal = ({
 
                 {/* Files */}
                 {sortedFiles.map(file => {
-                  const [baseFileName, ext] = splitFileNameAndExt(file.file_name);
+                  const [, ext] = splitFileNameAndExt(file.file_name);
                   return (
                     <div key={file.id}>
                       {/* Desktop File Layout */}
