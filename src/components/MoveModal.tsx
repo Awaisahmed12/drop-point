@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { HomeIcon, FolderIcon, ChevronRightIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 import type { PropertyFolder } from '../../types';
 
 interface MoveModalProps {
@@ -54,6 +55,7 @@ export const MoveModal: React.FC<MoveModalProps> = ({
 }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(currentFolderId ?? null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   // Find the folder being moved (if moving a folder)
   const currentFolder = useMemo(() =>
@@ -71,43 +73,109 @@ export const MoveModal: React.FC<MoveModalProps> = ({
 
   const tree = useMemo(() => buildFolderTree(folders), [folders]);
 
+  const toggleExpanded = (nodeId: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
+  };
+
   function renderTree(nodes: FolderWithChildren[], depth = 0) {
     return nodes.map(node => {
       const isExpanded = expanded.has(node.id);
+      const isSelected = selected === node.id;
+      const isHovered = hoveredId === node.id;
       const isInvalid = invalidTargetIds.has(node.id);
+      const hasChildren = node.children.length > 0;
+
       return (
-        <div key={node.id} style={{ marginLeft: depth * 18 }} className="flex items-center gap-1 py-1">
-          {node.children.length > 0 && (
-            <button
-              className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-blue-600 focus:outline-none"
-              onClick={() => {
-                setExpanded(prev => {
-                  const next = new Set(prev);
-                  if (next.has(node.id)) next.delete(node.id); else next.add(node.id);
-                  return next;
-                });
-              }}
-              tabIndex={-1}
-              aria-label={isExpanded ? 'Collapse' : 'Expand'}
-              type="button"
-            >
-              {isExpanded ? (
-                <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path d="M4 10l4-4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              ) : (
-                <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              )}
-            </button>
-          )}
-          <button
-            className={`flex-1 text-left px-2 py-1 rounded transition-all ${selected === node.id ? 'bg-blue-600 text-white font-bold' : isInvalid ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-blue-100 text-gray-900'}`}
-            disabled={isInvalid}
-            onClick={() => setSelected(node.id)}
-            type="button"
+        <div key={node.id} className="select-none">
+          <div 
+            className={`flex items-center group transition-all duration-200 rounded-lg mx-1 my-0.5 ${
+              isInvalid 
+                ? 'opacity-40 cursor-not-allowed' 
+                : 'cursor-pointer hover:shadow-sm'
+            } ${
+              isSelected 
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md' 
+                : isHovered 
+                  ? 'bg-blue-50 border border-blue-200' 
+                  : 'hover:bg-gray-50'
+            }`}
+            style={{ paddingLeft: `${12 + depth * 20}px` }}
+            onClick={() => !isInvalid && setSelected(node.id)}
+            onMouseEnter={() => !isInvalid && setHoveredId(node.id)}
+            onMouseLeave={() => setHoveredId(null)}
           >
-            {node.name}
-          </button>
-          {isExpanded && node.children.length > 0 && (
-            <div className="w-full">{renderTree(node.children, depth + 1)}</div>
+            {/* Expand/Collapse Button */}
+            <div className="w-6 h-6 flex items-center justify-center mr-1">
+              {hasChildren ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleExpanded(node.id);
+                  }}
+                  className={`w-5 h-5 flex items-center justify-center rounded transition-all duration-200 ${
+                    isSelected 
+                      ? 'text-white hover:bg-white/20' 
+                      : 'text-gray-400 hover:text-blue-600 hover:bg-blue-100'
+                  }`}
+                >
+                  {isExpanded ? (
+                    <ChevronDownIcon className="w-4 h-4" />
+                  ) : (
+                    <ChevronRightIcon className="w-4 h-4" />
+                  )}
+                </button>
+              ) : (
+                <div className="w-5 h-5" />
+              )}
+            </div>
+
+            {/* Folder Icon */}
+            <div className="w-6 h-6 flex items-center justify-center mr-3">
+              <FolderIcon 
+                className={`w-5 h-5 transition-colors duration-200 ${
+                  isSelected 
+                    ? 'text-white' 
+                    : isInvalid 
+                      ? 'text-gray-300'
+                      : 'text-amber-500'
+                }`} 
+              />
+            </div>
+
+            {/* Folder Name */}
+            <div className={`flex-1 py-3 pr-3 font-medium transition-colors duration-200 ${
+              isSelected 
+                ? 'text-white' 
+                : isInvalid 
+                  ? 'text-gray-400'
+                  : 'text-gray-700'
+            }`}>
+              {node.name}
+            </div>
+
+            {/* Selection Indicator */}
+            {isSelected && (
+              <div className="w-6 h-6 flex items-center justify-center mr-2">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+              </div>
+            )}
+          </div>
+
+          {/* Children */}
+          {isExpanded && hasChildren && (
+            <div className="overflow-hidden">
+              <div className="transform transition-all duration-300 ease-out">
+                {renderTree(node.children, depth + 1)}
+              </div>
+            </div>
           )}
         </div>
       );
@@ -120,43 +188,101 @@ export const MoveModal: React.FC<MoveModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in" onClick={onCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onCancel}>
       <div
-        className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl p-6 w-11/12 max-w-xs flex flex-col gap-4 border border-blue-100 relative"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col border border-gray-200 overflow-hidden transform transition-all duration-300 animate-scale-in"
         onClick={e => e.stopPropagation()}
+        style={{ maxHeight: '80vh' }}
       >
-        <div className="text-lg font-bold text-gray-900 mb-2">Move to...</div>
-        <div className="max-h-64 overflow-y-auto rounded bg-white/60 border border-blue-50 p-2">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+          <h2 className="text-xl font-bold text-gray-800 flex items-center">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+            </div>
+            Choose Destination
+          </h2>
+          <p className="text-sm text-gray-500 mt-1 ml-11">
+            Select where to move your {currentItemType}
+          </p>
+        </div>
+
+        {/* Folder Tree Container */}
+        <div className="flex-1 overflow-hidden">
+          <div className="h-full overflow-y-auto px-4 py-4" style={{ maxHeight: '400px' }}>
+            {/* Root Option */}
+            <div 
+              className={`flex items-center group transition-all duration-200 rounded-lg mx-1 mb-2 cursor-pointer hover:shadow-sm ${
+                selected === null 
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md' 
+                  : hoveredId === 'root'
+                    ? 'bg-blue-50 border border-blue-200' 
+                    : 'hover:bg-gray-50'
+              }`}
+              onClick={() => setSelected(null)}
+              onMouseEnter={() => setHoveredId('root')}
+              onMouseLeave={() => setHoveredId(null)}
+            >
+              <div className="w-6 h-6 ml-3 mr-4">
+                <HomeIcon 
+                  className={`w-5 h-5 transition-colors duration-200 ${
+                    selected === null ? 'text-white' : 'text-blue-600'
+                  }`} 
+                />
+              </div>
+              <div className={`flex-1 py-3 pr-3 font-semibold transition-colors duration-200 ${
+                selected === null ? 'text-white' : 'text-gray-700'
+              }`}>
+                Root Folder
+              </div>
+              {selected === null && (
+                <div className="w-6 h-6 flex items-center justify-center mr-2">
+                  <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                </div>
+              )}
+            </div>
+
+            {/* Folder Tree */}
+            {tree.length > 0 ? (
+              <div className="space-y-0.5">
+                {renderTree(tree)}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <FolderIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p className="font-medium">No folders created yet</p>
+                <p className="text-sm">Create a folder to organize your files</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
           <button
-            className={`w-full text-left px-2 py-1 rounded mb-1 transition-all ${selected === null ? 'bg-blue-600 text-white font-bold' : 'hover:bg-blue-100 text-gray-900'}`}
-            onClick={() => setSelected(null)}
-            disabled={currentFolderId === null}
+            className="flex-1 bg-gray-200 text-gray-700 rounded-xl px-4 py-3 font-semibold text-base transition-all duration-200 hover:bg-gray-300 hover:shadow-sm active:scale-95"
+            onClick={onCancel}
             type="button"
           >
-            <span className="flex items-center">
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9" />
-              </svg>
-              Root
-            </span>
+            Cancel
           </button>
-          {renderTree(tree)}
-        </div>
-        <div className="flex gap-2 mt-2">
           <button
-            className={`flex-1 bg-blue-600 text-white rounded-lg px-3 py-2 font-semibold text-base transition-all ${moveDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+            className={`flex-1 rounded-xl px-4 py-3 font-semibold text-base transition-all duration-200 active:scale-95 ${
+              moveDisabled 
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl'
+            }`}
             onClick={() => {
               if (moveDisabled) return;
               onMove(selected);
             }}
             type="button"
             disabled={!!moveDisabled}
-          >Move Here</button>
-          <button
-            className="flex-1 bg-gray-100 text-gray-700 rounded-lg px-3 py-2 font-semibold text-base hover:bg-gray-200"
-            onClick={onCancel}
-            type="button"
-          >Cancel</button>
+          >
+            Move Here
+          </button>
         </div>
       </div>
     </div>
