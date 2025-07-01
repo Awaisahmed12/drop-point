@@ -549,7 +549,7 @@ export const PropertyDetailsModal = ({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative"
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative overflow-visible"
            style={{ borderRadius: '1.5rem', height: '90vh', maxHeight: '800px' }}>
         
         {/* Header */}
@@ -573,7 +573,7 @@ export const PropertyDetailsModal = ({
         </div>
 
         {/* File List Container - Scrollable */}
-        <div className="flex-1 overflow-y-auto file-list" style={{ minHeight: '300px' }}>
+        <div className="flex-1 overflow-y-auto file-list overflow-x-visible" style={{ minHeight: '300px' }}>
           {/* Satellite Image - First in scrollable area */}
           <div className="relative w-full h-56 bg-gray-200 border-b border-blue-100 flex-shrink-0">
             <Image
@@ -863,7 +863,7 @@ export const PropertyDetailsModal = ({
                           </svg>
                         </button>
                         {folderMenuId === folder.id && (
-                          <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-xl" style={{ zIndex: '9999 !important' }}>
+                          <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
                             <button
                               className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                               onClick={e => {
@@ -951,7 +951,7 @@ export const PropertyDetailsModal = ({
                         </svg>
                       </button>
                       {folderMenuId === folder.id && (
-                        <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-xl" style={{ zIndex: '9999 !important' }}>
+                        <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
                           <button
                             className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                             onClick={e => {
@@ -1070,7 +1070,7 @@ export const PropertyDetailsModal = ({
                           </svg>
                         </button>
                         {fileMenuId === file.id && (
-                          <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-xl" style={{ zIndex: '9999 !important' }}>
+                          <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
                             <button
                               className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                               onClick={e => {
@@ -1095,17 +1095,8 @@ export const PropertyDetailsModal = ({
                             <button
                               className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                               onClick={async (e) => {
-                                if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
-                                  return;
-                                }
-                                
-                                // If any menu is open, close it instead of opening the file
-                                if (fileMenuId || folderMenuId) {
+                                e.stopPropagation();
                                 setFileMenuId(null);
-                                  setFolderMenuId(null);
-                                  return;
-                                }
-                                
                                 try {
                                   await openFileInline(file);
                                 } catch (error) {
@@ -1230,7 +1221,7 @@ export const PropertyDetailsModal = ({
                           </svg>
                         </button>
                         {fileMenuId === file.id && (
-                          <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-xl" style={{ zIndex: '9999 !important' }}>
+                          <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
                             <button
                               className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                               onClick={e => {
@@ -1255,17 +1246,8 @@ export const PropertyDetailsModal = ({
                             <button
                               className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
                               onClick={async (e) => {
-                                if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
-                                  return;
-                                }
-                                
-                                // If any menu is open, close it instead of opening the file
-                                if (fileMenuId || folderMenuId) {
+                                e.stopPropagation();
                                 setFileMenuId(null);
-                                  setFolderMenuId(null);
-                                  return;
-                                }
-                                
                                 try {
                                   await openFileInline(file);
                                 } catch (error) {
