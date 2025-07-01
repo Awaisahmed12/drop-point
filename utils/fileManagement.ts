@@ -71,15 +71,68 @@ export function getUniqueFileName(baseName: string, folderId: string | null, pro
 }
 
 /**
- * Sanitizes a filename by removing/replacing invalid characters
+ * Sanitizes a filename by removing/replacing invalid characters and making it URL-safe
  */
 export function sanitizeFileName(name: string): string {
-  // Remove or replace invalid characters for file storage
-  return name
-    .replace(/[<>:"/\\|?*]/g, '_') // Replace invalid chars with underscore
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-    .trim() // Remove leading/trailing spaces
-    .substring(0, 255); // Limit length to 255 characters
+  console.log('🧹 [SANITIZE] Starting sanitization for:', name);
+  
+  if (!name) {
+    console.log('🧹 [SANITIZE] Empty name, returning default:', 'unnamed_file');
+    return 'unnamed_file';
+  }
+  
+  // First, normalize Unicode characters
+  const normalized = name.normalize('NFD');
+  console.log('🧹 [SANITIZE] After normalization:', normalized);
+  
+  // Split into name and extension
+  const lastDot = normalized.lastIndexOf('.');
+  const nameWithoutExt = lastDot === -1 ? normalized : normalized.substring(0, lastDot);
+  const ext = lastDot === -1 ? '' : normalized.substring(lastDot);
+  console.log('🧹 [SANITIZE] Split - name:', nameWithoutExt, 'ext:', ext);
+  
+  // Clean the name part
+  let cleanName = nameWithoutExt
+    // Replace common problematic characters
+    .replace(/[<>:"/\\|?*]/g, '_')
+    // Replace Chinese/Unicode characters with transliteration or underscore
+    .replace(/[\u4e00-\u9fff]/g, '_') // Chinese characters
+    .replace(/[\u3040-\u309f]/g, '_') // Hiragana
+    .replace(/[\u30a0-\u30ff]/g, '_') // Katakana
+    .replace(/[\u0400-\u04ff]/g, '_') // Cyrillic
+    .replace(/[\u0590-\u05ff]/g, '_') // Hebrew
+    .replace(/[\u0600-\u06ff]/g, '_') // Arabic
+    // Replace any remaining non-ASCII characters
+    .replace(/[^\x00-\x7F]/g, '_')
+    // Replace multiple underscores/spaces with single underscore
+    .replace(/[_\s]+/g, '_')
+    // Remove leading/trailing underscores
+    .replace(/^_+|_+$/g, '')
+    .trim();
+  
+  console.log('🧹 [SANITIZE] After character replacement:', cleanName);
+  
+  // If name is empty after cleaning, use a default
+  if (!cleanName) {
+    cleanName = 'file';
+    console.log('🧹 [SANITIZE] Name was empty after cleaning, using default:', cleanName);
+  }
+  
+  // Clean the extension
+  const cleanExt = ext
+    .replace(/[^\w.-]/g, '')
+    .toLowerCase();
+  
+  console.log('🧹 [SANITIZE] Cleaned extension:', cleanExt);
+  
+  // Combine and limit length
+  const result = (cleanName + cleanExt).substring(0, 200);
+  
+  // Ensure it doesn't start with a dot
+  const finalResult = result.startsWith('.') ? 'file' + result : result;
+  
+  console.log('🧹 [SANITIZE] Final result:', finalResult);
+  return finalResult;
 }
 
 /**

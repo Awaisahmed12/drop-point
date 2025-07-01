@@ -79,6 +79,7 @@ export interface PendingUpload {
   property_id: string;
   retry?: () => void;
   cancel?: () => void;
+  abortController?: AbortController;
 }
 
 // Sort field type
