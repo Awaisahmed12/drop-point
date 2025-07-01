@@ -227,6 +227,7 @@ npm run dev
 - **Mobile App**: React Native version for iOS/Android
 - **Integration APIs**: Connect with MLS systems and other real estate tools
 - **Bulk Operations**: Mass file operations and property imports
+- **Fix Supabase Rename Errors**: Improve error handling and retry logic for file/folder rename operations that fail at the database level
 - **Pending Upload UX Improvements**: 
   - **Scrollable Upload Section**: Make pending uploads (including failures) scroll away instead of staying sticky
   - **Compact Upload States**: Minimize visual interference when uploads are in progress or failed

@@ -200,7 +200,16 @@ export const PropertyDetailsModal = ({
   // Handle rename
   const handleRename = async (item: PropertyFile | PropertyFolder, newName: string) => {
     try {
-      await onFileRename(item, newName);
+      // For files, append the original extension back to the new name
+      let finalName = newName;
+      if ('file_name' in item) {
+        const [, originalExt] = splitFileNameAndExt(item.file_name);
+        if (originalExt && !newName.includes('.')) {
+          finalName = `${newName}.${originalExt}`;
+        }
+      }
+      
+      await onFileRename(item, finalName);
       setRenamingFileId(null);
       setRenamingFileName('');
     } catch (error) {
@@ -1010,28 +1019,25 @@ export const PropertyDetailsModal = ({
                         />
                         <div className="ml-3 flex-1 min-w-0 text-gray-900 font-medium truncate">
                           {renamingFileId === file.id ? (
-                            <span className="flex items-center">
+                            <div className="flex items-center w-full">
                               <input
-                                className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-40"
+                                className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-base flex-1"
                                 value={renamingFileName}
                                 autoFocus
                                 onClick={e => e.stopPropagation()}
                                 onFocus={e => {
                                   const input = e.target as HTMLInputElement;
-                                  input.setSelectionRange(0, base.length);
+                                  input.setSelectionRange(0, renamingFileName.length);
                                 }}
                                 onChange={e => setRenamingFileName(e.target.value)}
                                 onBlur={async () => {
                                   const trimmed = renamingFileName.trim();
-                                  const [, newExt] = splitFileNameAndExt(trimmed);
-                                  const [, oldExt] = splitFileNameAndExt(file.file_name);
-                                  if (!newExt && oldExt) {
-                                    alert('File extension cannot be removed. Aborting rename.');
+                                  if (trimmed) {
+                                    await handleRename(file, trimmed);
+                                  } else {
                                     setRenamingFileId(null);
                                     setRenamingFileName('');
-                                    return;
                                   }
-                                  await handleRename(file, trimmed);
                                 }}
                                 onKeyDown={e => {
                                   if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -1041,8 +1047,8 @@ export const PropertyDetailsModal = ({
                                   }
                                 }}
                               />
-                              <span className="text-gray-400 text-xs ml-1">{ext}</span>
-                            </span>
+                              <span className="text-gray-400 text-sm ml-2">{ext}</span>
+                            </div>
                           ) : (
                             <span className="text-gray-900 font-medium truncate">
                               {getFileNameWithoutExtension(file.file_name)}
@@ -1076,7 +1082,7 @@ export const PropertyDetailsModal = ({
                               onClick={e => {
                                 e.stopPropagation();
                                 setRenamingFileId(file.id);
-                                setRenamingFileName(file.file_name);
+                                setRenamingFileName(getFileNameWithoutExtension(file.file_name));
                                 setTimeout(() => {
                                   setFileMenuId(null);
                                   setFolderMenuId(null);
@@ -1162,36 +1168,36 @@ export const PropertyDetailsModal = ({
                         />
                         <div className="ml-3 flex-1 min-w-0">
                           {renamingFileId === file.id ? (
-                            <input
-                              className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-base w-full"
-                              value={renamingFileName}
-                              autoFocus
-                              onClick={e => e.stopPropagation()}
-                              onFocus={e => {
-                                const input = e.target as HTMLInputElement;
-                                input.setSelectionRange(0, base.length);
-                              }}
-                              onChange={e => setRenamingFileName(e.target.value)}
-                              onBlur={async () => {
-                                const trimmed = renamingFileName.trim();
-                                const [, newExt] = splitFileNameAndExt(trimmed);
-                                const [, oldExt] = splitFileNameAndExt(file.file_name);
-                                if (!newExt && oldExt) {
-                                  alert('File extension cannot be removed. Aborting rename.');
-                                  setRenamingFileId(null);
-                                  setRenamingFileName('');
-                                  return;
-                                }
-                                await handleRename(file, trimmed);
-                              }}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                if (e.key === 'Escape') {
-                                  setRenamingFileId(null);
-                                  setRenamingFileName('');
-                                }
-                              }}
-                            />
+                            <div className="flex items-center w-full">
+                              <input
+                                className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-base flex-1"
+                                value={renamingFileName}
+                                autoFocus
+                                onClick={e => e.stopPropagation()}
+                                onFocus={e => {
+                                  const input = e.target as HTMLInputElement;
+                                  input.setSelectionRange(0, renamingFileName.length);
+                                }}
+                                onChange={e => setRenamingFileName(e.target.value)}
+                                onBlur={async () => {
+                                  const trimmed = renamingFileName.trim();
+                                  if (trimmed) {
+                                    await handleRename(file, trimmed);
+                                  } else {
+                                    setRenamingFileId(null);
+                                    setRenamingFileName('');
+                                  }
+                                }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                  if (e.key === 'Escape') {
+                                    setRenamingFileId(null);
+                                    setRenamingFileName('');
+                                  }
+                                }}
+                              />
+                              <span className="text-gray-400 text-sm ml-2">{ext}</span>
+                            </div>
                           ) : (
                             <>
                               <div className="text-gray-900 font-semibold truncate text-base">
@@ -1227,7 +1233,7 @@ export const PropertyDetailsModal = ({
                               onClick={e => {
                                 e.stopPropagation();
                                 setRenamingFileId(file.id);
-                                setRenamingFileName(file.file_name);
+                                setRenamingFileName(getFileNameWithoutExtension(file.file_name));
                                 setTimeout(() => {
                                   setFileMenuId(null);
                                   setFolderMenuId(null);
