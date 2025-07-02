@@ -107,7 +107,14 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: Mobile Viewport Optimization & Browser Bar Handling**
+### **Latest Update: Mobile Loading Race Condition Fix**
+- **Critical Mobile Bug Resolution**: Fixed a race condition that prevented files from loading on mobile devices on first property open:
+  - **Root Cause**: Two competing `useEffect` hooks were both trying to fetch property data simultaneously
+  - **Mobile Impact**: Different timing on mobile browsers caused the second hook to overwrite data and never clear loading states
+  - **Solution**: Removed duplicate folder fetching logic since `fetchFiles()` already handles both files and folders
+  - **Result**: Mobile users now see property files immediately on first open, matching desktop behavior
+
+### **Previous Update: Mobile Viewport Optimization & Browser Bar Handling**
 - **Dynamic Viewport Height Detection**: Implemented advanced mobile browser bar handling to prevent UI elements from being hidden:
   - **Visual Viewport API Integration**: Uses modern browser APIs to detect real-time viewport changes
   - **Dynamic Height Calculation**: Modal heights automatically adjust when mobile browser bars appear/disappear
@@ -233,14 +240,23 @@ npm run dev
 - **Optimized Re-rendering**: Efficient React state management
 - **Compressed Assets**: Next.js automatic optimization
 
-## 🔮 Future Enhancements
+## 🛣️ Roadmap & Future Enhancements
 
+### **Immediate Priority**
+- **Instant Loading with Smart Caching**: Implement optimistic UI updates where properties open instantly with cached data, then seamlessly update with any new changes from the server
+  - Show cached content immediately while fetching updates in background
+  - Highlight any new/changed files with subtle animations
+  - Provide ultra-fast user experience while maintaining data accuracy
+
+### **Upcoming Features**
 - **Property Notes**: Rich text editing for property descriptions
 - **File Sharing**: Share specific files or folders with other users
 - **Advanced Search**: Full-text search across file contents
 - **Mobile App**: React Native version for iOS/Android
 - **Integration APIs**: Connect with MLS systems and other real estate tools
 - **Bulk Operations**: Mass file operations and property imports
+
+### **Technical Improvements**
 - **Fix Supabase Rename Errors**: Improve error handling and retry logic for file/folder rename operations that fail at the database level
 - **Pending Upload UX Improvements**: 
   - **Scrollable Upload Section**: Make pending uploads (including failures) scroll away instead of staying sticky

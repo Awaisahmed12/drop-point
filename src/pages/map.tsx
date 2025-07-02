@@ -583,24 +583,6 @@ export default function MapPage() {
     }
   }, [showDetailsModal, savedProperty, fetchFiles, getCachedPropertyData]);
 
-  // Load folders from Supabase when opening property details modal
-  useEffect(() => {
-    async function fetchFolders() {
-      if (!showDetailsModal || !savedProperty?.id) return;
-      const user = await supabase.auth.getUser();
-      if (!user.data.user) return;
-      const { data } = await supabase
-        .from('property_folders')
-        .select('*')
-        .eq('property_id', savedProperty.id)
-        .eq('user_id', user.data.user.id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true });
-      if (data) setFolders(data);
-    }
-    fetchFolders();
-  }, [showDetailsModal, savedProperty]);
-
   // shortAddress function moved to PropertyDetailsModal
 
   // Folder creation moved to PropertyDetailsModal
