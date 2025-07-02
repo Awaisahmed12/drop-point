@@ -31,6 +31,10 @@ body {
     height: 100dvh;
     max-height: 100dvh;
   }
+  
+  .mobile-full-height {
+    min-height: 100dvh;
+  }
 }
 
 @supports not (height: 100dvh) {
@@ -38,25 +42,18 @@ body {
     height: 100vh;
     max-height: 100vh;
   }
+  
+  .mobile-full-height {
+    min-height: 100vh;
+  }
 }
 
 /* Safe area insets for devices with notches/dynamic islands */
-@supports (padding: env(safe-area-inset-bottom)) {
-  .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  
-  .safe-area-top {
-    padding-top: env(safe-area-inset-top);
-  }
-  
-  .safe-area-left {
-    padding-left: env(safe-area-inset-left);
-  }
-  
-  .safe-area-right {
-    padding-right: env(safe-area-inset-right);
-  }
+.mobile-safe-area {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* Prevent zoom on mobile inputs */
@@ -145,5 +142,52 @@ body {
     -ms-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
+  }
+  
+  /* Better touch targets */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Smooth scrolling for mobile */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Prevent zoom on input focus */
+  input[type="text"],
+  input[type="search"],
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Z-index hierarchy for proper layering */
+.z-modal-backdrop { z-index: 40; }
+.z-modal-content { z-index: 45; }
+.z-modal-navigation { z-index: 50; }
+.z-modal-uploads { z-index: 45; }
+.z-modal-headers { z-index: 40; }
+.z-mobile-viewer { z-index: 60; }
+
+/* Improved modal positioning */
+.modal-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+
+@media (max-width: 768px) {
+  .modal-container {
+    align-items: flex-start;
+    padding: 0;
   }
 }

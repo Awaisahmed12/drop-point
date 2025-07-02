@@ -145,21 +145,22 @@ export const PropertyDetailsModal = ({
     
     // For mobile, use the dynamic viewport height if available
     if (viewportHeight > 0) {
-      return `${Math.min(viewportHeight * 0.95, viewportHeight - 20)}px`;
+      // Use 95% of available viewport height, but ensure minimum space for browser chrome
+      return `${Math.min(viewportHeight * 0.95, viewportHeight - 40)}px`;
     }
     
     // Fallback to CSS viewport units for mobile
-    return '100dvh'; // dvh = dynamic viewport height (modern browsers)
+    return '95dvh'; // dvh = dynamic viewport height (modern browsers)
   };
 
-  // Calculate modal max height
+  // Add function to get modal max height for better mobile handling
   const getModalMaxHeight = () => {
     if (!isMobileDevice()) {
-      return '800px'; // Desktop remains the same
+      return '90vh';
     }
     
     if (viewportHeight > 0) {
-      return `${Math.min(viewportHeight * 0.95, viewportHeight - 20)}px`;
+      return `${viewportHeight - 20}px`; // Leave 20px margin
     }
     
     return '100dvh';
@@ -918,10 +919,10 @@ export const PropertyDetailsModal = ({
           </div>
 
           {/* Consolidated Navigation Section - STICKY within scroll container */}
-          <div className="bg-white flex-shrink-0 sticky top-0 z-30">
+          <div className="bg-white flex-shrink-0 sticky top-0 z-50">
             {/* Breadcrumbs - only show if not at root level */}
             {breadcrumbPath.length > 0 && (
-              <div className="px-4 py-2 border-b border-gray-100">
+              <div className="px-4 py-2 border-b border-gray-100 bg-white">
                 <div className="flex items-center gap-2 text-sm text-gray-600 overflow-x-auto">
                   <HomeIcon 
                     className="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-600 transition-colors flex-shrink-0" 
@@ -943,7 +944,7 @@ export const PropertyDetailsModal = ({
             )}
             
             {/* Search Bar */}
-            <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-3' : 'py-2'} bg-white`}>
+            <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-3' : 'py-2'} bg-white border-b border-gray-100`}>
               <div className="relative">
                 <input
                   type="text"
@@ -962,7 +963,9 @@ export const PropertyDetailsModal = ({
 
           {/* Upload Progress Section - STICKY */}
           {pendingUploads.length > 0 && (
-            <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-[calc(theme(spacing.14)+theme(spacing.14))] z-20">
+            <div className="bg-white border-b border-gray-200 px-4 py-3 sticky z-40" style={{
+              top: breadcrumbPath.length > 0 ? '140px' : '80px' // Adjust based on navigation height
+            }}>
               <div className="space-y-3">
                 {pendingUploads.map(upload => (
                   <div key={upload.id} className="flex items-center gap-3">
@@ -1006,11 +1009,15 @@ export const PropertyDetailsModal = ({
           )}
 
           {/* Column Headers - STICKY, positioned after upload section */}
-          <div className={`hidden sm:grid grid-cols-12 gap-4 px-3 ${isMobileDevice() ? 'py-3' : 'py-2'} text-sm border-b border-gray-200 bg-white sticky z-10`}
+          <div className={`hidden sm:grid grid-cols-12 gap-4 px-3 ${isMobileDevice() ? 'py-3' : 'py-2'} text-sm border-b border-gray-200 bg-white sticky z-30`}
                style={{ 
-                 top: pendingUploads.length > 0 
-                   ? `calc(${breadcrumbPath.length > 0 ? '80px' : '56px'} + ${pendingUploads.length * 60 + 24}px)`
-                   : breadcrumbPath.length > 0 ? '80px' : '56px'
+                 top: (() => {
+                   let baseHeight = breadcrumbPath.length > 0 ? 140 : 80; // Navigation height
+                   if (pendingUploads.length > 0) {
+                     baseHeight += (pendingUploads.length * 60 + 24); // Upload section height
+                   }
+                   return `${baseHeight}px`;
+                 })()
                }}>
             <button
               className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
@@ -1025,7 +1032,7 @@ export const PropertyDetailsModal = ({
               Modified {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
             </button>
             <button
-              className="col-span-2 flex items-center justify-end gap-1 text-sm font-medium text-gray-500 hover:text-gray-700 z-10"
+              className="col-span-2 flex items-center justify-end gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
               onClick={() => toggleSort('size')}
             >
               Size {sortField === 'size' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -1674,13 +1681,13 @@ export const PropertyDetailsModal = ({
 
         {/* Action Buttons */}
         <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0" style={{
-          height: '80px',
+          height: isMobileDevice() ? 'auto' : '80px',
+          minHeight: isMobileDevice() ? '80px' : '80px',
           // Ensure buttons are always above mobile browser chrome
-          paddingBottom: isMobileDevice() ? 'env(safe-area-inset-bottom, 0px)' : '0',
-          minHeight: isMobileDevice() ? 'calc(80px + env(safe-area-inset-bottom, 0px))' : '80px'
+          paddingBottom: isMobileDevice() ? 'max(env(safe-area-inset-bottom, 0px), 20px)' : '0',
         }}>
           <button
-            className="w-1/2 h-full bg-gray-100 text-blue-700 text-lg font-bold flex items-center justify-center gap-3 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95"
+            className={`w-1/2 ${isMobileDevice() ? 'py-4 px-4' : 'h-full'} bg-gray-100 text-blue-700 ${isMobileDevice() ? 'text-lg' : 'text-lg'} font-bold flex items-center justify-center gap-3 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95`}
             onClick={() => setCreatingFolder(true)}
           >
             <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1689,7 +1696,7 @@ export const PropertyDetailsModal = ({
             Create
           </button>
           <button
-            className="w-1/2 h-full bg-blue-600 text-white text-lg font-bold flex items-center justify-center gap-3 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95"
+            className={`w-1/2 ${isMobileDevice() ? 'py-4 px-4' : 'h-full'} bg-blue-600 text-white ${isMobileDevice() ? 'text-lg' : 'text-lg'} font-bold flex items-center justify-center gap-3 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95`}
             onClick={() => document.getElementById('file-upload-input')?.click()}
           >
             <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
