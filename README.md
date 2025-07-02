@@ -107,7 +107,25 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: Navigation Section Optimization & Dynamic Layout**
+### **Latest Update: Mobile Viewport Optimization & Browser Bar Handling**
+- **Dynamic Viewport Height Detection**: Implemented advanced mobile browser bar handling to prevent UI elements from being hidden:
+  - **Visual Viewport API Integration**: Uses modern browser APIs to detect real-time viewport changes
+  - **Dynamic Height Calculation**: Modal heights automatically adjust when mobile browser bars appear/disappear
+  - **Fallback Support**: Graceful degradation for older browsers using CSS viewport units (dvh)
+  - **Safe Area Insets**: Proper handling of device notches and dynamic islands on modern smartphones
+
+- **Enhanced Mobile File Viewer**: Mobile file preview overlay now properly handles viewport changes:
+  - **Full-Screen Optimization**: Takes advantage of entire available screen space
+  - **Browser Chrome Awareness**: Content automatically adjusts when address bars hide/show
+  - **Touch-Optimized Interface**: Larger touch targets and better spacing for mobile interaction
+
+- **CSS Viewport Unit Support**: Added comprehensive CSS support for modern viewport handling:
+  - **Dynamic Viewport Heights (dvh)**: Uses latest CSS viewport units for better mobile support
+  - **Safe Area CSS**: Proper padding for devices with notches, dynamic islands, and rounded corners
+  - **Input Zoom Prevention**: Prevents unwanted zoom on mobile form inputs
+  - **Overscroll Behavior**: Optimized scrolling behavior to prevent bounce effects on iOS
+
+### **Previous Update: Navigation Section Optimization & Dynamic Layout**
 - **Eliminated Empty Gaps**: Optimized the navigation section to conditionally render breadcrumbs only when needed:
   - **At root folder**: Clean, minimal search bar without unnecessary spacing
   - **In nested folders**: Full breadcrumb navigation with back/home buttons
@@ -117,21 +135,17 @@ DropPoint is a sophisticated real estate document management application that co
   - **Column Header Transparency Fixed**: Resolved z-index and margin issues that caused the "Size" column to appear see-through
   - **Consistent Background Coverage**: All sticky elements now have solid white backgrounds with no content bleeding through
 
-### **Previous Update: Modal Layout Optimization & Satellite Image Repositioning**
-- **Improved Visual Hierarchy**: Completely restructured the PropertyDetailsModal layout to follow a more logical flow:
-  - Property title header (always visible)
-  - Satellite image (scrolls away when browsing files)
-  - Breadcrumb navigation (sticky within scroll area)
-  - Search bar (sticky within scroll area) 
-  - Upload progress section (sticky within scroll area)
-  - Column headers (sticky within scroll area)
-  - File and folder listing (scrollable content)
+### **Mobile-First File Opening System**
+- **Pop-up Blocker Solution**: Completely eliminated mobile pop-up dependencies:
+  - **In-App File Viewer**: Custom mobile overlay for images, PDFs, text, and CSV files
+  - **Context Preservation**: Users never leave the app, maintaining their exact location in the file system
+  - **Professional Interface**: Full-screen file viewer with download and close actions
+  - **Responsive Design**: Adapts perfectly to different screen sizes and orientations
 
-### **Advanced Sticky Scroll System**
-- **Sticky Search Bar**: Remains at top of scroll area (after image scrolls away) for constant access
-- **Sticky Upload Section**: Always visible below search bar during active uploads
-- **Sticky Column Headers**: File list headers remain visible during long file lists with dynamic positioning
-- **Intelligent Z-Index Management**: Proper layering ensures all sticky elements stack correctly
+- **Dual Behavior System**: Smart detection provides optimal experience for each platform:
+  - **Mobile**: Custom in-app viewers with touch-optimized controls
+  - **Desktop**: Traditional pop-up windows with embedded viewers and download options
+  - **Universal Fallbacks**: Graceful degradation for unsupported file types
 
 ### **Advanced Upload System**
 - **Real-time Progress Tracking**: Visual progress bars for each upload

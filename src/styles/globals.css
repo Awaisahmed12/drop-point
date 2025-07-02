@@ -25,6 +25,58 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Mobile viewport handling for browser bars */
+@supports (height: 100dvh) {
+  .mobile-modal {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+}
+
+@supports not (height: 100dvh) {
+  .mobile-modal {
+    height: 100vh;
+    max-height: 100vh;
+  }
+}
+
+/* Safe area insets for devices with notches/dynamic islands */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Prevent zoom on mobile inputs */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Prevent overscroll bounce on iOS */
+body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Optimize scrolling performance */
 .file-list {
   will-change: transform;
@@ -33,6 +85,9 @@ body {
   perspective: 1000px;
   content-visibility: auto;
   contain: content;
+  /* Better mobile scrolling */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .file-list-item {
@@ -65,4 +120,30 @@ body {
   background: linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 50%, #f3f4f6 100%);
   background-size: 200% 100%;
   will-change: background-position;
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 768px) {
+  /* Prevent horizontal scrolling */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Better touch targets */
+  button, 
+  [role="button"],
+  input[type="button"],
+  input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent text selection on touch */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
 }

@@ -75,6 +75,95 @@ export const PropertyDetailsModal = ({
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Mobile viewport height state
+  const [viewportHeight, setViewportHeight] = useState(0);
+  
+  // Mobile file viewer state
+  const [mobileFileViewer, setMobileFileViewer] = useState<{
+    isOpen: boolean;
+    file: PropertyFile | null;
+    fileUrl: string;
+    downloadUrl: string;
+    content?: string;
+  }>({
+    isOpen: false,
+    file: null,
+    fileUrl: '',
+    downloadUrl: '',
+  });
+
+  // Mobile detection utility
+  const isMobileDevice = () => {
+    if (typeof window === 'undefined') return false;
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+           window.innerWidth <= 768;
+  };
+
+  // Dynamic viewport height handling for mobile browsers
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateViewportHeight = () => {
+      // Use the visual viewport API if available (modern browsers)
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+      } else {
+        // Fallback to window.innerHeight
+        setViewportHeight(window.innerHeight);
+      }
+    };
+
+    // Set initial height
+    updateViewportHeight();
+
+    // Listen for viewport changes
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportHeight);
+      window.visualViewport.addEventListener('scroll', updateViewportHeight);
+    } else {
+      window.addEventListener('resize', updateViewportHeight);
+      window.addEventListener('orientationchange', updateViewportHeight);
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewportHeight);
+        window.visualViewport.removeEventListener('scroll', updateViewportHeight);
+      } else {
+        window.removeEventListener('resize', updateViewportHeight);
+        window.removeEventListener('orientationchange', updateViewportHeight);
+      }
+    };
+  }, []);
+
+  // Calculate modal height based on device and viewport
+  const getModalHeight = () => {
+    if (!isMobileDevice()) {
+      return '90vh'; // Desktop remains the same
+    }
+    
+    // For mobile, use the dynamic viewport height if available
+    if (viewportHeight > 0) {
+      return `${Math.min(viewportHeight * 0.95, viewportHeight - 20)}px`;
+    }
+    
+    // Fallback to CSS viewport units for mobile
+    return '100dvh'; // dvh = dynamic viewport height (modern browsers)
+  };
+
+  // Calculate modal max height
+  const getModalMaxHeight = () => {
+    if (!isMobileDevice()) {
+      return '800px'; // Desktop remains the same
+    }
+    
+    if (viewportHeight > 0) {
+      return `${Math.min(viewportHeight * 0.95, viewportHeight - 20)}px`;
+    }
+    
+    return '100dvh';
+  };
 
   // Auto-dismiss successful uploads after 1.5 seconds
   useEffect(() => {
@@ -236,13 +325,78 @@ export const PropertyDetailsModal = ({
     return () => document.removeEventListener('click', handleClick);
   }, []);
 
-  // Smart file opening function
+  // Enhanced mobile-first file opening function
   const openFileInline = async (file: PropertyFile) => {
     try {
       const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, false);
       const downloadUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
       const fileExtension = file.file_name.split('.').pop()?.toLowerCase();
       
+      // Mobile-first approach
+      if (isMobileDevice()) {
+        // For mobile, open in modal overlay
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension || '')) {
+          // Images - show directly in mobile viewer
+          setMobileFileViewer({
+            isOpen: true,
+            file,
+            fileUrl,
+            downloadUrl,
+          });
+        } else if (fileExtension === 'pdf') {
+          // PDFs - try to show in mobile viewer, fallback to direct navigation
+          setMobileFileViewer({
+            isOpen: true,
+            file,
+            fileUrl,
+            downloadUrl,
+          });
+        } else if (fileExtension === 'txt') {
+          // Text files - fetch content and show in mobile viewer
+          try {
+            const response = await fetch(fileUrl);
+            const content = await response.text();
+            setMobileFileViewer({
+              isOpen: true,
+              file,
+              fileUrl,
+              downloadUrl,
+              content,
+            });
+          } catch {
+            // Fallback to direct download
+            window.location.href = downloadUrl;
+          }
+        } else if (fileExtension === 'csv') {
+          // CSV files - fetch and parse for mobile viewer
+          try {
+            const response = await fetch(fileUrl);
+            const content = await response.text();
+            setMobileFileViewer({
+              isOpen: true,
+              file,
+              fileUrl,
+              downloadUrl,
+              content,
+            });
+          } catch {
+            // Fallback to direct download
+            window.location.href = downloadUrl;
+          }
+        } else {
+          // For other file types on mobile, direct download or attempt to open
+          try {
+            // Try to open in same window first
+            window.location.href = fileUrl;
+          } catch {
+            // Fallback to download
+            window.location.href = downloadUrl;
+          }
+        }
+        return;
+      }
+
+      // Desktop behavior (existing logic)
       // For PDFs, try to open inline with a viewer
       if (fileExtension === 'pdf') {
         // Try to open PDF inline by embedding it
@@ -535,6 +689,165 @@ export const PropertyDetailsModal = ({
     }
   };
 
+  // Mobile file viewer component
+  const renderMobileFileViewer = () => {
+    if (!mobileFileViewer.isOpen || !mobileFileViewer.file) return null;
+
+    const file = mobileFileViewer.file;
+    const fileExtension = file.file_name.split('.').pop()?.toLowerCase();
+
+    const closeMobileViewer = () => {
+      setMobileFileViewer({
+        isOpen: false,
+        file: null,
+        fileUrl: '',
+        downloadUrl: '',
+      });
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 bg-black/90 flex flex-col" style={{
+        height: viewportHeight > 0 ? `${viewportHeight}px` : '100dvh',
+        maxHeight: viewportHeight > 0 ? `${viewportHeight}px` : '100dvh'
+      }}>
+        {/* Header */}
+        <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center min-w-0 flex-1">
+            <FileIcon
+              type={fileExtension || 'file'}
+              size={24}
+            />
+            <div className="ml-3 min-w-0 flex-1">
+              <h3 className="font-semibold text-gray-900 truncate text-sm">
+                {getFileNameWithoutExtension(file.file_name)}
+              </h3>
+              <p className="text-xs text-gray-500">
+                {formatFileSize(file.file_size)} • {formatDate(file.modified_at || file.uploaded_at)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 ml-4">
+            <button
+              onClick={() => window.open(mobileFileViewer.downloadUrl, '_blank')}
+              className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+              title="Download"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5 5V3" />
+              </svg>
+            </button>
+            <button
+              onClick={closeMobileViewer}
+              className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+              title="Close"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto bg-gray-100" style={{
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}>
+          {['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension || '') ? (
+            // Image viewer
+            <div className="flex items-center justify-center min-h-full p-4">
+              <img
+                src={mobileFileViewer.fileUrl}
+                alt={file.file_name}
+                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                style={{ 
+                  maxHeight: viewportHeight > 0 
+                    ? `${viewportHeight - 120}px` 
+                    : 'calc(100dvh - 120px)' 
+                }}
+              />
+            </div>
+          ) : fileExtension === 'pdf' ? (
+            // PDF viewer
+            <div className="h-full">
+              <iframe
+                src={mobileFileViewer.fileUrl}
+                className="w-full h-full border-none"
+                title={file.file_name}
+              />
+            </div>
+          ) : fileExtension === 'txt' && mobileFileViewer.content ? (
+            // Text viewer
+            <div className="p-4">
+              <pre className="bg-white rounded-lg p-4 text-sm font-mono whitespace-pre-wrap break-words shadow-sm border">
+                {mobileFileViewer.content}
+              </pre>
+            </div>
+          ) : fileExtension === 'csv' && mobileFileViewer.content ? (
+            // CSV viewer
+            <div className="p-4">
+              <div className="bg-white rounded-lg shadow-sm border overflow-auto">
+                {(() => {
+                  const lines = mobileFileViewer.content.split('\n').filter(line => line.trim());
+                  const headers = lines[0]?.split(',').map(h => h.trim().replace(/"/g, '')) || [];
+                  const rows = lines.slice(1).map(line => 
+                    line.split(',').map(cell => cell.trim().replace(/"/g, ''))
+                  );
+
+                  return (
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          {headers.map((header, i) => (
+                            <th key={i} className="px-3 py-2 text-left font-semibold text-gray-700 border-b">
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((row, i) => (
+                          <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            {row.map((cell, j) => (
+                              <td key={j} className="px-3 py-2 border-b border-gray-200">
+                                {cell}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
+              </div>
+            </div>
+          ) : (
+            // Fallback for unsupported types
+            <div className="flex items-center justify-center min-h-full p-4">
+              <div className="text-center">
+                <FileIcon
+                  type={fileExtension || 'file'}
+                  size={64}
+                />
+                <h3 className="mt-4 text-lg font-semibold text-white">
+                  {file.file_name}
+                </h3>
+                <p className="mt-2 text-gray-300">
+                  Preview not available for this file type
+                </p>
+                <button
+                  onClick={() => window.open(mobileFileViewer.downloadUrl, '_blank')}
+                  className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Download File
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Debug logging for files prop changes
   useEffect(() => {
     console.log('📋 [MODAL] Files prop updated, count:', files.length);
@@ -559,32 +872,41 @@ export const PropertyDetailsModal = ({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative overflow-visible"
-           style={{ borderRadius: '1.5rem', height: '90vh', maxHeight: '800px' }}>
+           style={{ 
+             borderRadius: '1.5rem', 
+             height: getModalHeight(),
+             maxHeight: getModalMaxHeight(),
+             margin: isMobileDevice() ? '10px' : '0'
+           }}>
         
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2 bg-white border-b border-blue-100 rounded-t-3xl flex-shrink-0">
           <div className="flex flex-col gap-1 min-w-0 flex-1 mr-4">
-            <span className="text-lg sm:text-xl font-extrabold text-gray-900 truncate" title={property.address}>
+            <span className={`${isMobileDevice() ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'} font-extrabold text-gray-900 truncate`} title={property.address}>
               {property?.address}
             </span>
           </div>
           <button
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors cursor-pointer flex-shrink-0"
+            className={`${isMobileDevice() ? 'p-3' : 'p-2'} rounded-full hover:bg-gray-100 transition-colors cursor-pointer flex-shrink-0`}
             onClick={() => {
               onClose();
               setCreatingFolder(false);
             }}
           >
-            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className={`${isMobileDevice() ? 'w-7 h-7' : 'w-6 h-6'} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* File List Container - Scrollable */}
-        <div className="flex-1 overflow-y-auto file-list overflow-x-visible" style={{ minHeight: '300px' }}>
+        {/* File List Container - Scrollable with safe area handling */}
+        <div className="flex-1 overflow-y-auto file-list overflow-x-visible" style={{ 
+          minHeight: '300px',
+          // Add safe area padding for mobile devices with notches/dynamic islands
+          paddingBottom: isMobileDevice() ? 'env(safe-area-inset-bottom, 0px)' : '0'
+        }}>
           {/* Satellite Image - First in scrollable area */}
-          <div className="relative w-full h-56 bg-gray-200 border-b border-blue-100 flex-shrink-0">
+          <div className={`relative w-full ${isMobileDevice() ? 'h-48' : 'h-56'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
             <Image
               src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
               alt="Property satellite view"
@@ -597,78 +919,117 @@ export const PropertyDetailsModal = ({
 
           {/* Consolidated Navigation Section - STICKY within scroll container */}
           <div className="bg-white flex-shrink-0 sticky top-0 z-30">
-            {/* Breadcrumb Navigation - Only show when not at root */}
-            {selectedFolder !== 'master' && (
-              <div className="flex items-center gap-2 px-4 pt-2 pb-1 text-sm text-blue-700 font-semibold">
-                {/* Back Button */}
-                <button
-                  className="cursor-pointer hover:bg-blue-50 rounded-full p-1 flex items-center transition-colors"
-                  onClick={() => {
-                    const currentFolder = folders.find(f => f.id === selectedFolder);
-                    const parentId = currentFolder?.parent_id || 'master';
-                    onFolderChange(parentId);
-                  }}
-                  title="Go back"
-                >
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                
-                {/* Home Button */}
-                <button
-                  className="cursor-pointer hover:underline flex items-center"
-                  onClick={() => onFolderChange('master')}
-                  title="Go to root"
-                >
-                  <HomeIcon style={{ width: 20, height: 20, color: '#1a73e8' }} />
-                </button>
-                
-                {breadcrumbPath.map((folder) => [
-                  <span key={`sep-${folder.id}`}>/</span>,
-                  <button
-                    key={folder.id}
-                    className="cursor-pointer hover:underline"
-                    onClick={() => onFolderChange(folder.id)}
-                  >
-                    {folder.name}
-                  </button>
-                ])}
+            {/* Breadcrumbs - only show if not at root level */}
+            {breadcrumbPath.length > 0 && (
+              <div className="px-4 py-2 border-b border-gray-100">
+                <div className="flex items-center gap-2 text-sm text-gray-600 overflow-x-auto">
+                  <HomeIcon 
+                    className="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-600 transition-colors flex-shrink-0" 
+                    onClick={() => onFolderChange('')}
+                  />
+                  {breadcrumbPath.map((folder) => (
+                    <div key={folder.id} className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-gray-400">/</span>
+                      <button
+                        className="text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
+                        onClick={() => onFolderChange(folder.id)}
+                      >
+                        {folder.name}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-
+            
             {/* Search Bar */}
-            <div className="px-4 pb-2" style={{ paddingTop: selectedFolder === 'master' ? '8px' : '0px' }}>
-              <input
-                type="text"
-                className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-500"
-                placeholder="Search all files and folders..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-3' : 'py-2'} bg-white`}>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search files and folders..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`w-full ${isMobileDevice() ? 'px-4 py-3 text-base' : 'px-4 py-2 text-sm'} bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-10`}
+                />
+                <svg className={`absolute left-3 ${isMobileDevice() ? 'top-3.5 w-5 h-5' : 'top-2.5 w-4 h-4'} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
+              </div>
             </div>
+          </div>
 
-            {/* Column Headers - Integrated into navigation section to eliminate gaps */}
-            <div className="hidden sm:grid grid-cols-12 gap-4 px-3 py-2 text-sm border-b border-gray-200 bg-white">
-              <button
-                className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
-                onClick={() => toggleSort('name')}
-              >
-                Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
-              </button>
-              <button
-                className="col-span-3 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
-                onClick={() => toggleSort('date')}
-              >
-                Modified {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
-              </button>
-              <button
-                className="col-span-2 flex items-center justify-end gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
-                onClick={() => toggleSort('size')}
-              >
-                Size {sortField === 'size' && (sortDirection === 'asc' ? '↑' : '↓')}
-              </button>
+          {/* Upload Progress Section - STICKY */}
+          {pendingUploads.length > 0 && (
+            <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-[calc(theme(spacing.14)+theme(spacing.14))] z-20">
+              <div className="space-y-3">
+                {pendingUploads.map(upload => (
+                  <div key={upload.id} className="flex items-center gap-3">
+                    <FileIcon type={upload.file.name.split('.').pop() || 'file'} size={24} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-gray-900 truncate">
+                        {upload.file.name}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              upload.status === 'uploading' ? 'bg-blue-500' :
+                              upload.status === 'success' ? 'bg-green-500' :
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${upload.progress}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                          {upload.status === 'uploading' ? `${upload.progress}%` :
+                           upload.status === 'success' ? 'Done' :
+                           'Failed'}
+                        </span>
+                      </div>
+                    </div>
+                    {(upload.status === 'success' || upload.status === 'error') && (
+                      <button
+                        onClick={() => onDismiss(upload.id)}
+                        className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
+          )}
+
+          {/* Column Headers - STICKY, positioned after upload section */}
+          <div className={`hidden sm:grid grid-cols-12 gap-4 px-3 ${isMobileDevice() ? 'py-3' : 'py-2'} text-sm border-b border-gray-200 bg-white sticky z-10`}
+               style={{ 
+                 top: pendingUploads.length > 0 
+                   ? `calc(${breadcrumbPath.length > 0 ? '80px' : '56px'} + ${pendingUploads.length * 60 + 24}px)`
+                   : breadcrumbPath.length > 0 ? '80px' : '56px'
+               }}>
+            <button
+              className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+              onClick={() => toggleSort('name')}
+            >
+              Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+            </button>
+            <button
+              className="col-span-3 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+              onClick={() => toggleSort('date')}
+            >
+              Modified {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+            </button>
+            <button
+              className="col-span-2 flex items-center justify-end gap-1 text-sm font-medium text-gray-500 hover:text-gray-700 z-10"
+              onClick={() => toggleSort('size')}
+            >
+              Size {sortField === 'size' && (sortDirection === 'asc' ? '↑' : '↓')}
+            </button>
           </div>
 
           {/* Compact Uploading Files - STICKY within scroll container */}
@@ -896,8 +1257,8 @@ export const PropertyDetailsModal = ({
 
                     {/* Mobile Folder Layout */}
                     <div
-                      className="sm:hidden flex items-center justify-between px-3 py-3 hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-2"
-                      style={{ cursor: 'pointer' }}
+                      className={`sm:hidden flex items-center justify-between ${isMobileDevice() ? 'px-4 py-4' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-2`}
+                      style={{ cursor: 'pointer', minHeight: isMobileDevice() ? '64px' : '56px' }}
                       onClick={() => {
                         // If any menu is open, close it instead of navigating to folder
                         if (fileMenuId || folderMenuId) {
@@ -911,74 +1272,85 @@ export const PropertyDetailsModal = ({
                     >
                       <div className="flex items-center min-w-0 flex-1">
                         <HeroFolderIcon style={{ width: 32, height: 32, color: '#fbbf24' }} />
-                        <div className="ml-3 flex-1 min-w-0">
+                        <div className={`${isMobileDevice() ? 'ml-4' : 'ml-3'} flex-1 min-w-0`}>
                           {renamingFileId === folder.id ? (
-                            <input
-                              className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-base w-full"
-                              value={renamingFileName}
-                              autoFocus
-                              onClick={e => e.stopPropagation()}
-                              onFocus={e => {
-                                const input = e.target as HTMLInputElement;
-                                input.setSelectionRange(0, folder.name.length);
-                              }}
-                              onChange={e => setRenamingFileName(e.target.value)}
-                              onBlur={async () => {
-                                await handleRename(folder, renamingFileName);
-                              }}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                if (e.key === 'Escape') {
-                                  setRenamingFileId(null);
-                                  setRenamingFileName('');
-                                }
-                              }}
-                            />
+                            <div className="flex items-center w-full">
+                              <input
+                                className={`font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 ${isMobileDevice() ? 'text-lg' : 'text-base'} flex-1`}
+                                value={renamingFileName}
+                                autoFocus
+                                onClick={e => e.stopPropagation()}
+                                onFocus={e => {
+                                  const input = e.target as HTMLInputElement;
+                                  input.setSelectionRange(0, renamingFileName.length);
+                                }}
+                                onChange={e => setRenamingFileName(e.target.value)}
+                                onBlur={async () => {
+                                  const trimmed = renamingFileName.trim();
+                                  if (trimmed) {
+                                    await handleRename(folder, trimmed);
+                                  } else {
+                                    setRenamingFileId(null);
+                                    setRenamingFileName('');
+                                  }
+                                }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                  if (e.key === 'Escape') {
+                                    setRenamingFileId(null);
+                                    setRenamingFileName('');
+                                  }
+                                }}
+                              />
+                              <span className={`text-gray-400 ${isMobileDevice() ? 'text-base ml-3' : 'text-sm ml-2'}`}>{folder.name}</span>
+                            </div>
                           ) : (
                             <>
-                              <div className="text-gray-900 font-semibold truncate text-base">
+                              <div className={`text-gray-900 font-semibold truncate ${isMobileDevice() ? 'text-lg' : 'text-base'}`}>
                                 {folder.name}
                               </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                {formatDate(folder.created_at)}
+                              <div className={`${isMobileDevice() ? 'text-sm' : 'text-xs'} text-gray-500 mt-1 flex items-center gap-2`}>
+                                <span>{formatDate(folder.created_at)}</span>
                               </div>
                             </>
                           )}
                         </div>
                       </div>
-                      <button
-                        className="p-2 rounded hover:bg-gray-200 ml-2 flex-shrink-0"
-                        onClick={e => {
-                          e.stopPropagation();
-                          setFileMenuId(null);
-                          setFolderMenuId(folderMenuId === folder.id ? null : folder.id);
-                        }}
-                        title="Folder actions"
-                      >
-                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
-                        </svg>
-                      </button>
-                      {folderMenuId === folder.id && (
-                        <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
-                          <button
-                            className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
-                            onClick={e => {
-                              e.stopPropagation();
-                              setRenamingFileId(folder.id);
-                              setRenamingFileName(folder.name);
-                              setFolderMenuId(null);
-                            }}
-                          >Rename</button>
-                          <button
-                            className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
-                            onClick={e => {
-                              e.stopPropagation();
-                              onFolderDelete(folder);
-                            }}
-                          >Delete</button>
-                        </div>
-                      )}
+                      <div className="relative">
+                        <button
+                          className={`${isMobileDevice() ? 'p-3' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
+                          onClick={e => {
+                            e.stopPropagation();
+                            setFolderMenuId(null);
+                            setFileMenuId(folderMenuId === folder.id ? null : folder.id);
+                          }}
+                          title="Folder actions"
+                        >
+                          <svg className={`${isMobileDevice() ? 'w-6 h-6' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                          </svg>
+                        </button>
+                        {folderMenuId === folder.id && (
+                          <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                            <button
+                              className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setRenamingFileId(folder.id);
+                                setRenamingFileName(folder.name);
+                                setFolderMenuId(null);
+                              }}
+                            >Rename</button>
+                            <button
+                              className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                              onClick={e => {
+                                e.stopPropagation();
+                                onFolderDelete(folder);
+                              }}
+                            >Delete</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1139,8 +1511,8 @@ export const PropertyDetailsModal = ({
 
                     {/* Mobile File Layout */}
                     <div
-                      className="sm:hidden flex items-center justify-between px-3 py-3 hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-2"
-                      style={{ cursor: 'pointer' }}
+                      className={`sm:hidden flex items-center justify-between ${isMobileDevice() ? 'px-4 py-4' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-2`}
+                      style={{ cursor: 'pointer', minHeight: isMobileDevice() ? '64px' : '56px' }}
                       onClick={async (e) => {
                         if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
                           return;
@@ -1164,13 +1536,13 @@ export const PropertyDetailsModal = ({
                       <div className="flex items-center min-w-0 flex-1">
                         <FileIcon
                           type={file.file_name.split('.').pop() || 'file'}
-                          size={32}
+                          size={isMobileDevice() ? 36 : 32}
                         />
-                        <div className="ml-3 flex-1 min-w-0">
+                        <div className={`${isMobileDevice() ? 'ml-4' : 'ml-3'} flex-1 min-w-0`}>
                           {renamingFileId === file.id ? (
                             <div className="flex items-center w-full">
                               <input
-                                className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-base flex-1"
+                                className={`font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 ${isMobileDevice() ? 'text-lg' : 'text-base'} flex-1`}
                                 value={renamingFileName}
                                 autoFocus
                                 onClick={e => e.stopPropagation()}
@@ -1196,14 +1568,14 @@ export const PropertyDetailsModal = ({
                                   }
                                 }}
                               />
-                              <span className="text-gray-400 text-sm ml-2">{ext}</span>
+                              <span className={`text-gray-400 ${isMobileDevice() ? 'text-base ml-3' : 'text-sm ml-2'}`}>{ext}</span>
                             </div>
                           ) : (
                             <>
-                              <div className="text-gray-900 font-semibold truncate text-base">
+                              <div className={`text-gray-900 font-semibold truncate ${isMobileDevice() ? 'text-lg' : 'text-base'}`}>
                                 {getFileNameWithoutExtension(file.file_name)}
                               </div>
-                              <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                              <div className={`${isMobileDevice() ? 'text-sm' : 'text-xs'} text-gray-500 mt-1 flex items-center gap-2`}>
                                 <span>{formatDate(file.modified_at || file.uploaded_at)}</span>
                                 <span>•</span>
                                 <span>{formatFileSize(file.file_size)}</span>
@@ -1214,7 +1586,7 @@ export const PropertyDetailsModal = ({
                       </div>
                       <div className="relative">
                         <button
-                          className="p-2 rounded hover:bg-gray-200 ml-2 flex-shrink-0"
+                          className={`${isMobileDevice() ? 'p-3' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
                           onClick={e => {
                             e.stopPropagation();
                             setFolderMenuId(null);
@@ -1222,7 +1594,7 @@ export const PropertyDetailsModal = ({
                           }}
                           title="File actions"
                         >
-                          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <svg className={`${isMobileDevice() ? 'w-6 h-6' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                           </svg>
                         </button>
@@ -1301,7 +1673,12 @@ export const PropertyDetailsModal = ({
         }} multiple />
 
         {/* Action Buttons */}
-        <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0" style={{height:'80px'}}>
+        <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0" style={{
+          height: '80px',
+          // Ensure buttons are always above mobile browser chrome
+          paddingBottom: isMobileDevice() ? 'env(safe-area-inset-bottom, 0px)' : '0',
+          minHeight: isMobileDevice() ? 'calc(80px + env(safe-area-inset-bottom, 0px))' : '80px'
+        }}>
           <button
             className="w-1/2 h-full bg-gray-100 text-blue-700 text-lg font-bold flex items-center justify-center gap-3 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95"
             onClick={() => setCreatingFolder(true)}
@@ -1316,7 +1693,7 @@ export const PropertyDetailsModal = ({
             onClick={() => document.getElementById('file-upload-input')?.click()}
           >
             <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5 5V3" />
             </svg>
             Upload
           </button>
@@ -1390,6 +1767,9 @@ export const PropertyDetailsModal = ({
           }}
         />
       )}
+
+      {/* Mobile file viewer */}
+      {renderMobileFileViewer()}
     </div>
   );
 }; 
