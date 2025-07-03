@@ -107,7 +107,27 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: Simplified Upload Progress Indicators**
+### **Latest Update: Enhanced Map Controls & Clean POI-Free Experience**
+- **Improved Mobile Map Toggle**: Refined the mobile satellite/map toggle for better user experience:
+  - **Hidden During Search**: Toggle automatically hides when user starts typing in search bar to reduce visual clutter
+  - **Cleaner Design**: Removed emoji icons and simplified to clean text-only buttons ("Map" / "Satellite")
+  - **Better Sizing**: Increased button padding and text size for improved touch targets and readability
+  - **Smart Auto-Hide**: Toggle reappears when search is cleared, maintaining clean interface during address lookup
+
+- **POI-Free Map Experience**: Completely removed Google's clickable location details and points of interest:
+  - **No Clickable Pins**: Disabled all Google POI interactions (businesses, landmarks, etc.) that showed popup cards
+  - **Clean Map View**: Removed visual clutter from business markers, transit stops, and tourist attractions
+  - **Focus on Properties**: Map now focuses purely on property selection without distracting commercial POIs
+  - **Consistent Experience**: Both satellite and roadmap views now show clean, distraction-free maps
+  - **Professional Interface**: Eliminates unwanted "Go to Google Maps" prompts and business advertisements
+
+- **Enhanced Map Configuration**: Added comprehensive map styling and interaction controls:
+  - **Custom Map Styles**: Applied CSS styling to hide POI features (`poi`, `poi.business`, `transit`)
+  - **Disabled Default UI**: Removed all Google Maps default UI elements for cleaner appearance
+  - **No Clickable Icons**: Prevented accidental clicks on Google's default map markers and icons
+  - **Preserved Core Functionality**: Maintained essential map interaction (pan, zoom, type switching) while removing distractions
+
+### **Previous Update: Simplified Upload Progress Indicators**
 - **Streamlined Upload Feedback**: Removed redundant 0-100% sliding progress bar to create cleaner, less cluttered upload experience:
   - **Single Progress Indicator**: Now shows only the circular spinning indicator for active uploads
   - **Cleaner Visual Design**: Eliminated duplicate progress feedback that was overwhelming the interface

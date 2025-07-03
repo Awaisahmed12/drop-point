@@ -1194,6 +1194,22 @@ export default function MapPage() {
             mapTypeControl: false,
             fullscreenControl: false,
             streetViewControl: false,
+            clickableIcons: false,
+            disableDefaultUI: true,
+            styles: [
+              {
+                featureType: 'poi',
+                stylers: [{ visibility: 'off' }]
+              },
+              {
+                featureType: 'poi.business',
+                stylers: [{ visibility: 'off' }]
+              },
+              {
+                featureType: 'transit',
+                stylers: [{ visibility: 'off' }]
+              }
+            ]
           }}
         >
           {/* Central cursor overlay */}
@@ -1223,6 +1239,7 @@ export default function MapPage() {
         <MapControls 
           mapType={mapType}
           onMapTypeChange={setMapType}
+          isSearching={inputValue.length > 0}
         />
         {hasInteracted && address && (
           <PropertyInfoCard
