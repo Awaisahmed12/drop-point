@@ -4,13 +4,10 @@ interface MapControlsProps {
   isMobile?: boolean;
 }
 
-export const MapControls = ({ mapType, onMapTypeChange, isMobile = false }: MapControlsProps) => {
-  const containerClasses = isMobile 
-    ? "flex gap-2 mt-2 sm:hidden"
-    : "hidden sm:flex absolute top-6 left-6 z-30 gap-2 bg-white rounded-lg shadow-lg p-2";
-
-  return (
-    <div className={containerClasses}>
+export const MapControls = ({ mapType, onMapTypeChange }: MapControlsProps) => {
+  // Desktop controls (left side, larger)
+  const desktopControls = (
+    <div className="hidden sm:flex absolute top-6 left-6 z-30 gap-2 bg-white rounded-lg shadow-lg p-2">
       <button
         className={`px-3 py-1 rounded font-semibold text-sm ${
           mapType === 'roadmap' 
@@ -32,5 +29,28 @@ export const MapControls = ({ mapType, onMapTypeChange, isMobile = false }: MapC
         Satellite
       </button>
     </div>
+  );
+
+  // Mobile controls (top left, compact, under search bar)
+  const mobileControls = (
+    <div className="absolute top-20 left-4 z-40 sm:hidden">
+      <button
+        className={`px-2 py-1 rounded-md text-xs font-medium shadow-md border ${
+          mapType === 'satellite' 
+            ? 'bg-blue-600 text-white border-blue-600' 
+            : 'bg-white text-gray-700 border-gray-300'
+        } cursor-pointer transition-all duration-200 hover:shadow-lg`}
+        onClick={() => onMapTypeChange(mapType === 'satellite' ? 'roadmap' : 'satellite')}
+      >
+        {mapType === 'satellite' ? '🗺️ Map' : '🛰️ Satellite'}
+      </button>
+    </div>
+  );
+
+  return (
+    <>
+      {desktopControls}
+      {mobileControls}
+    </>
   );
 }; 
