@@ -107,28 +107,25 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: Refined Global Address Formatting & Enhanced Visual Design**
-- **Polished Address Display**: Completely redesigned property details modal header with refined typography and visual hierarchy:
-  - **Enhanced Typography**: Professional letter-spacing, improved line heights, and refined font weights
-  - **Subtle Gradient Effects**: Elegant background gradients and text gradients for premium appearance
-  - **Better Visual Hierarchy**: Clear distinction between street address (primary) and location info (secondary)
-  - **Improved Spacing**: Optimized padding, margins, and element positioning for better visual balance
-  - **Refined Close Button**: Glassmorphic design with subtle shadows and smooth hover animations
+### **Latest Update: Compact Header Design & File-Focused Layout**
+- **Streamlined Header**: Redesigned property details modal with a more compact, refined header that prioritizes file browsing:
+  - **Reduced Header Size**: Smaller padding (py-4 vs py-6) and more compact typography for less visual weight
+  - **Optimized Text Sizing**: Smaller but still readable font sizes (text-lg/xl vs text-2xl/3xl) with refined spacing
+  - **Subtle Visual Effects**: More understated gradients and shadows that don't compete with file content
+  - **Compact Close Button**: Smaller, more refined close button with subtle glassmorphic effects
 
-- **Advanced Address Parsing**: Enhanced global address parsing with improved logic:
-  - **US Address Detection**: Better recognition of state + ZIP patterns (e.g., "TX 77407", "Texas 77407")
-  - **International Format Handling**: Smart detection of country names and regional formatting
-  - **Edge Case Handling**: Improved parsing for various address formats and empty components
-  - **Consistent Formatting**: More reliable address component separation and display
+- **File-Focused Layout**: Prioritized file browsing experience with reduced visual distractions:
+  - **Smaller Satellite Image**: Reduced from h-48/56 to h-32/40 to give more space to file management
+  - **Enhanced File Visibility**: More screen real estate dedicated to the primary file browsing functionality
+  - **Balanced Visual Hierarchy**: Header provides context without overwhelming the main content area
 
-- **Enhanced Visual Design**:
-  - **Gradient Backgrounds**: Subtle linear gradients for depth and sophistication
-  - **Text Shadows**: Refined text shadows for better readability and visual appeal
-  - **Glassmorphism Effects**: Backdrop blur and transparency for modern design language
-  - **Smooth Animations**: Cubic-bezier transitions for premium feel
-  - **Better Typography**: Improved letter-spacing and line-height for optimal readability
+- **Refined Typography & Styling**:
+  - **Subtle Text Gradients**: Softer gradient effects that enhance readability without being distracting  
+  - **Optimized Letter Spacing**: Fine-tuned spacing for better readability at smaller sizes
+  - **Reduced Shadow Effects**: More subtle shadows that add depth without visual noise
+  - **Improved Line Heights**: Tighter spacing (leading-tight, leading-snug) for more compact presentation
 
-### **Previous Update: Global Address Formatting in Property Details**
+### **Previous Update: Refined Global Address Formatting & Enhanced Visual Design**
 - **Enhanced Address Display**: Redesigned property details modal header to show addresses in a more readable, hierarchical format:
   - **Street Address**: Prominently displayed as the main header (larger, bold text)
   - **Location Info**: City, state/province, ZIP/postal code, and country shown below in smaller text
