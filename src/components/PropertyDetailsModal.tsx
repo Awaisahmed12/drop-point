@@ -965,17 +965,17 @@ export const PropertyDetailsModal = ({
            }}>
         
         {/* Header */}
-        <div className="modal-header-refined flex items-center justify-between px-5 py-4 rounded-t-3xl flex-shrink-0">
+        <div className="modal-header-refined flex items-center justify-between px-5 py-3 rounded-t-3xl flex-shrink-0">
           <div className="flex flex-col min-w-0 flex-1 mr-4">
             {/* Street Address - Primary */}
-            <h1 className={`property-title ${isMobileDevice() ? 'text-lg' : 'text-xl'} font-semibold leading-tight mb-0.5`} 
+            <h1 className={`property-title ${isMobileDevice() ? 'text-base' : 'text-xl'} font-semibold leading-tight mb-0.5`} 
                 style={{ letterSpacing: '-0.02em' }}
                 title={streetAddress}>
               {streetAddress || property?.address}
             </h1>
             {/* Location Info - Secondary */}
             {locationInfo && (
-              <p className={`property-location ${isMobileDevice() ? 'text-sm' : 'text-base'} font-medium leading-snug`} 
+              <p className={`property-location ${isMobileDevice() ? 'text-xs' : 'text-base'} font-medium leading-snug`} 
                  style={{ letterSpacing: '-0.005em' }}
                  title={locationInfo}>
                 {locationInfo}
@@ -983,13 +983,13 @@ export const PropertyDetailsModal = ({
             )}
           </div>
           <button
-            className={`close-button ${isMobileDevice() ? 'p-2.5' : 'p-2'} rounded-full cursor-pointer flex-shrink-0`}
+            className={`close-button ${isMobileDevice() ? 'p-2' : 'p-2'} rounded-full cursor-pointer flex-shrink-0`}
             onClick={() => {
               onClose();
               setCreatingFolder(false);
             }}
           >
-            <svg className={`${isMobileDevice() ? 'w-5 h-5' : 'w-4 h-4'} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className={`${isMobileDevice() ? 'w-4 h-4' : 'w-4 h-4'} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -1008,7 +1008,7 @@ export const PropertyDetailsModal = ({
           // marginBottom: isMobileDevice() ? '20px' : '0',
         }}>
           {/* Satellite Image - First in scrollable area */}
-          <div className={`relative w-full ${isMobileDevice() ? 'h-32' : 'h-40'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
+          <div className={`relative w-full ${isMobileDevice() ? 'h-28' : 'h-32'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
             <Image
               src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
               alt="Property satellite view"
@@ -1376,8 +1376,8 @@ export const PropertyDetailsModal = ({
 
                     {/* Mobile Folder Layout */}
                     <div
-                      className={`sm:hidden flex items-center justify-between ${isMobileDevice() ? 'px-4 py-4' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-2`}
-                      style={{ cursor: 'pointer', minHeight: isMobileDevice() ? '64px' : '56px' }}
+                      className={`sm:hidden flex items-center justify-between ${isMobileDevice() ? 'px-4 py-2.5' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
+                      style={{ cursor: 'pointer', minHeight: isMobileDevice() ? '56px' : '56px' }}
                       onClick={() => {
                         // If any menu is open, close it instead of navigating to folder
                         if (fileMenuId || folderMenuId) {
@@ -1391,11 +1391,11 @@ export const PropertyDetailsModal = ({
                     >
                       <div className="flex items-center min-w-0 flex-1">
                         <HeroFolderIcon style={{ width: 32, height: 32, color: '#fbbf24' }} />
-                        <div className={`${isMobileDevice() ? 'ml-4' : 'ml-3'} flex-1 min-w-0`}>
+                        <div className={`${isMobileDevice() ? 'ml-3' : 'ml-3'} flex-1 min-w-0`}>
                           {renamingFileId === folder.id ? (
                             <div className="flex items-center w-full">
                               <input
-                                className={`font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 ${isMobileDevice() ? 'text-lg' : 'text-base'} flex-1`}
+                                className={`font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 ${isMobileDevice() ? 'text-base' : 'text-base'} flex-1`}
                                 value={renamingFileName}
                                 autoFocus
                                 onClick={e => e.stopPropagation()}
@@ -1421,14 +1421,14 @@ export const PropertyDetailsModal = ({
                                   }
                                 }}
                               />
-                              <span className={`text-gray-400 ${isMobileDevice() ? 'text-base ml-3' : 'text-sm ml-2'}`}>{folder.name}</span>
+                              <span className={`text-gray-400 ${isMobileDevice() ? 'text-sm ml-2' : 'text-sm ml-2'}`}>{folder.name}</span>
                             </div>
                           ) : (
                             <>
-                              <div className={`text-gray-900 font-semibold truncate ${isMobileDevice() ? 'text-lg' : 'text-base'}`}>
+                              <div className={`text-gray-900 font-semibold truncate ${isMobileDevice() ? 'text-base' : 'text-base'}`}>
                                 {folder.name}
                               </div>
-                              <div className={`${isMobileDevice() ? 'text-sm' : 'text-xs'} text-gray-500 mt-1 flex items-center gap-2`}>
+                              <div className={`${isMobileDevice() ? 'text-xs' : 'text-xs'} text-gray-500 mt-0.5 flex items-center gap-2`}>
                                 <span>{formatDate(folder.created_at)}</span>
                               </div>
                             </>
@@ -1437,7 +1437,7 @@ export const PropertyDetailsModal = ({
                       </div>
                       <div className="relative">
                         <button
-                          className={`${isMobileDevice() ? 'p-3' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
+                          className={`${isMobileDevice() ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
                           onClick={e => {
                             e.stopPropagation();
                             setFolderMenuId(null);
@@ -1445,7 +1445,7 @@ export const PropertyDetailsModal = ({
                           }}
                           title="Folder actions"
                         >
-                          <svg className={`${isMobileDevice() ? 'w-6 h-6' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <svg className={`${isMobileDevice() ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                           </svg>
                         </button>
@@ -1630,8 +1630,8 @@ export const PropertyDetailsModal = ({
 
                     {/* Mobile File Layout */}
                     <div
-                      className={`sm:hidden flex items-center justify-between ${isMobileDevice() ? 'px-4 py-4' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-2`}
-                      style={{ cursor: 'pointer', minHeight: isMobileDevice() ? '64px' : '56px' }}
+                      className={`sm:hidden flex items-center justify-between ${isMobileDevice() ? 'px-4 py-2.5' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
+                      style={{ cursor: 'pointer', minHeight: isMobileDevice() ? '56px' : '56px' }}
                       onClick={async (e) => {
                         if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
                           return;
@@ -1655,13 +1655,13 @@ export const PropertyDetailsModal = ({
                       <div className="flex items-center min-w-0 flex-1">
                         <FileIcon
                           type={file.file_name.split('.').pop() || 'file'}
-                          size={isMobileDevice() ? 36 : 32}
+                          size={isMobileDevice() ? 32 : 32}
                         />
-                        <div className={`${isMobileDevice() ? 'ml-4' : 'ml-3'} flex-1 min-w-0`}>
+                        <div className={`${isMobileDevice() ? 'ml-3' : 'ml-3'} flex-1 min-w-0`}>
                           {renamingFileId === file.id ? (
                             <div className="flex items-center w-full">
                               <input
-                                className={`font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 ${isMobileDevice() ? 'text-lg' : 'text-base'} flex-1`}
+                                className={`font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 ${isMobileDevice() ? 'text-base' : 'text-base'} flex-1`}
                                 value={renamingFileName}
                                 autoFocus
                                 onClick={e => e.stopPropagation()}
@@ -1687,14 +1687,14 @@ export const PropertyDetailsModal = ({
                                   }
                                 }}
                               />
-                              <span className={`text-gray-400 ${isMobileDevice() ? 'text-base ml-3' : 'text-sm ml-2'}`}>{ext}</span>
+                              <span className={`text-gray-400 ${isMobileDevice() ? 'text-sm ml-2' : 'text-sm ml-2'}`}>{ext}</span>
                             </div>
                           ) : (
                             <>
-                              <div className={`text-gray-900 font-semibold truncate ${isMobileDevice() ? 'text-lg' : 'text-base'}`}>
+                              <div className={`text-gray-900 font-semibold truncate ${isMobileDevice() ? 'text-base' : 'text-base'}`}>
                                 {getFileNameWithoutExtension(file.file_name)}
                               </div>
-                              <div className={`${isMobileDevice() ? 'text-sm' : 'text-xs'} text-gray-500 mt-1 flex items-center gap-2`}>
+                              <div className={`${isMobileDevice() ? 'text-xs' : 'text-xs'} text-gray-500 mt-0.5 flex items-center gap-2`}>
                                 <span>{formatDate(file.modified_at || file.uploaded_at)}</span>
                                 <span>•</span>
                                 <span>{formatFileSize(file.file_size)}</span>
@@ -1705,7 +1705,7 @@ export const PropertyDetailsModal = ({
                       </div>
                       <div className="relative">
                         <button
-                          className={`${isMobileDevice() ? 'p-3' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
+                          className={`${isMobileDevice() ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
                           onClick={e => {
                             e.stopPropagation();
                             setFolderMenuId(null);
@@ -1713,7 +1713,7 @@ export const PropertyDetailsModal = ({
                           }}
                           title="File actions"
                         >
-                          <svg className={`${isMobileDevice() ? 'w-6 h-6' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <svg className={`${isMobileDevice() ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                           </svg>
                         </button>
@@ -1793,25 +1793,23 @@ export const PropertyDetailsModal = ({
 
         {/* Action Buttons */}
         <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0" style={{
-          height: isMobileDevice() ? '70px' : '80px', // Fixed height instead of auto
-          minHeight: isMobileDevice() ? '70px' : '80px',
-          // Remove complex safe area calculations that can cause overflow
-          // paddingBottom: isMobileDevice() ? 'max(env(safe-area-inset-bottom, 0px), 20px)' : '0',
+          height: isMobileDevice() ? '56px' : '70px', // Reduced height for mobile
+          minHeight: isMobileDevice() ? '56px' : '70px',
         }}>
           <button
-            className={`w-1/2 ${isMobileDevice() ? 'py-3 px-4' : 'h-full'} bg-gray-100 text-blue-700 ${isMobileDevice() ? 'text-lg' : 'text-lg'} font-bold flex items-center justify-center gap-3 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95`}
+            className={`w-1/2 ${isMobileDevice() ? 'py-2.5 px-4' : 'h-full'} bg-gray-100 text-blue-700 ${isMobileDevice() ? 'text-base' : 'text-lg'} font-bold flex items-center justify-center gap-2 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95`}
             onClick={() => setCreatingFolder(true)}
           >
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className={`${isMobileDevice() ? 'w-5 h-5' : 'w-7 h-7'}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             Create
           </button>
           <button
-            className={`w-1/2 ${isMobileDevice() ? 'py-3 px-4' : 'h-full'} bg-blue-600 text-white ${isMobileDevice() ? 'text-lg' : 'text-lg'} font-bold flex items-center justify-center gap-3 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95`}
+            className={`w-1/2 ${isMobileDevice() ? 'py-2.5 px-4' : 'h-full'} bg-blue-600 text-white ${isMobileDevice() ? 'text-base' : 'text-lg'} font-bold flex items-center justify-center gap-2 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95`}
             onClick={() => document.getElementById('file-upload-input')?.click()}
           >
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className={`${isMobileDevice() ? 'w-5 h-5' : 'w-7 h-7'}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5 5V3" />
             </svg>
             Upload

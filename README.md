@@ -388,4 +388,134 @@ This addresses the user request for the satellite image to scroll away during fi
 - **Focused File Management**: Once scrolled, users get maximum space for file browsing with essential column headers always visible
 - **No More Visual Conflicts**: Eliminated jarring overlap behavior where navigation elements would cover column headers
 
+# Property Management System
+
+A comprehensive property management application built with Next.js, TypeScript, and Supabase. This system allows users to manage properties, organize files and folders, and view property details with an intuitive interface optimized for both desktop and mobile devices.
+
+## Features
+
+### 🏠 Property Management
+- Interactive property browsing with satellite map views
+- Global address parsing and formatting for international properties
+- Responsive property details modal with enhanced typography
+- Mobile-first design with optimized touch interactions
+
+### 📁 File Management System
+- **Mobile-First File Opening**: Custom mobile viewer avoiding pop-up blockers
+- **Universal File Support**: Images, PDFs, text files, CSV, and Office documents
+- **Smart File Viewing**: 
+  - Images display in full-screen mobile viewer
+  - PDFs open with embedded viewer
+  - Text files shown with proper formatting
+  - CSV files parsed and displayed as formatted tables
+  - Office documents via Google Docs viewer
+- **Folder Organization**: Create, rename, delete, and navigate folder hierarchies
+- **File Operations**: Upload, download, rename, move, and delete files
+- **Real-time Upload Progress**: Visual progress indicators with retry functionality
+
+### 🔍 Search & Navigation
+- **Global Search**: Search across all files and folders
+- **Breadcrumb Navigation**: Easy folder navigation with clickable breadcrumbs
+- **Sorting Options**: Sort by name, date, or size with ascending/descending order
+- **Mobile-Optimized Search**: Sticky search bar that stays visible while scrolling
+
+### 📱 Mobile Optimization
+- **Compact Layout**: Optimized spacing to show more files on mobile screens
+- **Reduced White Space**: Minimized bottom padding and action button heights
+- **Touch-Friendly**: Larger touch targets and intuitive gestures
+- **Viewport Handling**: Dynamic height calculation for mobile browser bars
+- **Enhanced Typography**: Refined text sizes and spacing for mobile readability
+
+### 🎨 User Experience
+- **Professional Design**: Modern glassmorphic effects and refined typography
+- **Loading States**: Skeleton animations during data fetching
+- **Error Handling**: Graceful error messages and retry mechanisms
+- **Accessibility**: Proper ARIA labels and keyboard navigation
+- **Performance**: Optimized scrolling and content visibility
+
+## Technical Architecture
+
+### Frontend
+- **Next.js 14**: React framework with App Router
+- **TypeScript**: Full type safety throughout the application
+- **Tailwind CSS**: Utility-first CSS framework with custom optimizations
+- **Responsive Design**: Mobile-first approach with breakpoint-specific layouts
+
+### Backend & Database
+- **Supabase**: PostgreSQL database with real-time capabilities
+- **File Storage**: Secure file upload and retrieval with signed URLs
+- **Authentication**: User authentication and authorization (ready for implementation)
+
+### Mobile Optimizations
+- **Dynamic Viewport**: Handles mobile browser bar changes
+- **Safe Area Support**: Proper handling of notches and dynamic islands
+- **Touch Optimization**: Prevents zoom on inputs and optimizes scrolling
+- **Performance**: Hardware acceleration and content visibility optimizations
+
+## Recent Updates
+
+### Mobile UI Enhancements (Latest)
+- **Compact File Layout**: Reduced file item height from 64px to 56px on mobile
+- **Optimized Spacing**: Decreased padding and margins to fit more files
+- **Smaller Icons**: Reduced icon sizes while maintaining touch targets
+- **Compressed Header**: More compact property header to maximize file space
+- **Reduced Satellite Image**: Smaller map view to prioritize file browsing
+- **Minimized Action Buttons**: Compact upload/create buttons with smaller icons
+
+### Global Address Formatting
+- **Smart Address Parsing**: Handles US and international address formats
+- **Visual Hierarchy**: Street address prominent with location details below
+- **Responsive Typography**: Adapts text sizes for mobile and desktop
+- **Fallback Handling**: Graceful handling of incomplete address data
+
+### Mobile File Viewer System
+- **Pop-up Blocker Avoidance**: Custom overlay system instead of browser pop-ups
+- **File Type Detection**: Intelligent handling based on file extensions
+- **Content Optimization**: Proper sizing and scrolling for mobile screens
+- **Download Integration**: Easy access to download functionality
+
+## Installation
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Set up environment variables (see `.env.example`)
+4. Run the development server: `npm run dev`
+
+## Environment Variables
+
+Create a `.env.local` file with:
+```
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+```
+
+## Usage
+
+1. **Browse Properties**: View properties on the main interface
+2. **Open Property Details**: Click on any property to open the detailed modal
+3. **Navigate Folders**: Use breadcrumbs or click folders to navigate
+4. **Search Files**: Use the search bar to find specific files or folders
+5. **Upload Files**: Click the Upload button to add new files
+6. **Create Folders**: Click Create to organize your files
+7. **File Operations**: Use the three-dot menu for rename, move, delete operations
+
+## Mobile Experience
+
+The application is optimized for mobile devices with:
+- Touch-friendly interface with proper touch targets
+- Compact layout showing more files per screen
+- Sticky search functionality
+- Custom file viewer avoiding mobile pop-up blockers
+- Responsive design adapting to different screen sizes
+- Proper handling of mobile browser behaviors
+
+## Contributing
+
+This project follows modern development practices with TypeScript, proper error handling, and comprehensive mobile optimization. When contributing, please maintain the mobile-first approach and ensure all features work seamlessly across devices.
+
+## License
+
+This project is licensed under the MIT License.
+
 
