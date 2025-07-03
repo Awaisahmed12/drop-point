@@ -107,7 +107,26 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: Comprehensive Mobile UI & Search Bar Fixes**
+### **Latest Update: iPhone URL Bar & Search Bar Fixes**
+- **iPhone URL Bar Issue Resolved**: Fixed mobile viewport handling to prevent UI elements from being hidden behind the iPhone URL bar:
+  - **Conservative Viewport Calculation**: Reduced modal height to 92% of viewport with 60px buffer for iPhone URL bar
+  - **Enhanced Search Bar Positioning**: Search bar now stays sticky with higher z-index (60) and proper mobile positioning
+  - **Better Mobile Margins**: Added bottom margins and safe area padding to ensure content is always visible
+  - **iPhone-Specific CSS**: Added WebKit-specific fixes for iPhone URL bar behavior
+
+- **Search Bar Always Visible**: Enhanced sticky positioning ensures search bar never gets lost when scrolling:
+  - **Persistent Sticky Behavior**: Search bar remains at top with enhanced z-index and positioning
+  - **Mobile-Optimized Sizing**: Larger touch targets (48px min height) and proper input sizing
+  - **Zoom Prevention**: 16px font size prevents unwanted zoom on iPhone input focus
+  - **Enhanced Visual Feedback**: Added subtle shadow and border to improve visibility
+
+- **Mobile Viewport Improvements**:
+  - **Dynamic Height Calculation**: Better handling of iPhone's variable viewport height
+  - **Safe Area Integration**: Proper padding for devices with notches and dynamic islands
+  - **Overscroll Prevention**: Improved scroll behavior to prevent bounce effects
+  - **WebKit Optimizations**: iPhone-specific CSS fixes for better compatibility
+
+### **Previous Update: Comprehensive Mobile UI & Search Bar Fixes**
 - **Search Bar Disappearing Issue Resolved**: Fixed z-index conflicts that caused the search bar to disappear behind other elements:
   - **Proper Z-Index Hierarchy**: Navigation (z-50), Upload Progress (z-40), Column Headers (z-30)
   - **Consistent Sticky Positioning**: All sticky elements now properly stack without conflicts

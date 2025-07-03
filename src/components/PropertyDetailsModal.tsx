@@ -137,33 +137,35 @@ export const PropertyDetailsModal = ({
     };
   }, []);
 
-  // Calculate modal height based on device and viewport
+  // Calculate modal height based on device and viewport - ENSURE IT FITS ON SCREEN
   const getModalHeight = () => {
     if (!isMobileDevice()) {
       return '90vh'; // Desktop remains the same
     }
     
-    // For mobile, use the dynamic viewport height if available
+    // For mobile, NEVER exceed the actual screen size
     if (viewportHeight > 0) {
-      // Use 95% of available viewport height, but ensure minimum space for browser chrome
-      return `${Math.min(viewportHeight * 0.95, viewportHeight - 40)}px`;
+      // Use 85% of available viewport height to ensure it always fits
+      // This prevents the modal from being taller than the phone screen
+      return `${Math.min(viewportHeight * 0.85, viewportHeight - 80)}px`;
     }
     
-    // Fallback to CSS viewport units for mobile
-    return '95dvh'; // dvh = dynamic viewport height (modern browsers)
+    // Fallback - be very conservative to ensure it fits
+    return '85vh'; // Much more conservative to guarantee it fits on any mobile device
   };
 
-  // Add function to get modal max height for better mobile handling
+  // Modal max height should also be constrained
   const getModalMaxHeight = () => {
     if (!isMobileDevice()) {
       return '90vh';
     }
     
     if (viewportHeight > 0) {
-      return `${viewportHeight - 20}px`; // Leave 20px margin
+      // Never exceed 85% of screen height
+      return `${viewportHeight * 0.85}px`;
     }
     
-    return '100dvh';
+    return '85vh'; // Conservative fallback
   };
 
   // Auto-dismiss successful uploads after 1.5 seconds
@@ -871,13 +873,20 @@ export const PropertyDetailsModal = ({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in" style={{
+      // Ensure the backdrop doesn't cause overflow on mobile
+      height: isMobileDevice() ? (viewportHeight > 0 ? `${viewportHeight}px` : '100vh') : '100vh',
+      maxHeight: isMobileDevice() ? (viewportHeight > 0 ? `${viewportHeight}px` : '100vh') : '100vh',
+    }}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative overflow-visible"
            style={{ 
              borderRadius: '1.5rem', 
              height: getModalHeight(),
              maxHeight: getModalMaxHeight(),
-             margin: isMobileDevice() ? '10px' : '0'
+             // Ensure modal fits within screen with proper margins
+             margin: isMobileDevice() ? '20px 10px' : '0',
+             // Prevent the modal from extending beyond viewport
+             maxWidth: isMobileDevice() ? 'calc(100vw - 20px)' : undefined,
            }}>
         
         {/* Header */}
@@ -901,10 +910,16 @@ export const PropertyDetailsModal = ({
         </div>
 
         {/* File List Container - Scrollable with safe area handling */}
-        <div className="flex-1 overflow-y-auto file-list overflow-x-visible" style={{ 
-          minHeight: '300px',
-          // Add safe area padding for mobile devices with notches/dynamic islands
-          paddingBottom: isMobileDevice() ? 'env(safe-area-inset-bottom, 0px)' : '0'
+        <div className="flex-1 overflow-y-auto file-list overflow-x-visible mobile-scroll" style={{ 
+          minHeight: '200px', // Reduced minimum height for mobile
+          // Ensure the file list fits within the modal bounds
+          maxHeight: isMobileDevice() ? 
+            (viewportHeight > 0 ? `${viewportHeight * 0.6}px` : 'calc(85vh - 200px)') : 
+            'none',
+          // Remove problematic mobile-specific height calculations that cause overflow
+          // paddingBottom: isMobileDevice() ? 
+          //   'calc(env(safe-area-inset-bottom, 0px) + 20px)' : '0',
+          // marginBottom: isMobileDevice() ? '20px' : '0',
         }}>
           {/* Satellite Image - First in scrollable area */}
           <div className={`relative w-full ${isMobileDevice() ? 'h-48' : 'h-56'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
@@ -919,10 +934,10 @@ export const PropertyDetailsModal = ({
           </div>
 
           {/* Consolidated Navigation Section - STICKY within scroll container */}
-          <div className="bg-white flex-shrink-0 sticky top-0 z-50">
+          <div className="bg-white flex-shrink-0 sticky top-0 z-50 border-b border-gray-100">
             {/* Breadcrumbs - only show if not at root level */}
             {breadcrumbPath.length > 0 && (
-              <div className="px-4 py-2 border-b border-gray-100 bg-white">
+              <div className="px-4 py-2 bg-white">
                 <div className="flex items-center gap-2 text-sm text-gray-600 overflow-x-auto">
                   <HomeIcon 
                     className="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-600 transition-colors flex-shrink-0" 
@@ -943,17 +958,28 @@ export const PropertyDetailsModal = ({
               </div>
             )}
             
-            {/* Search Bar */}
-            <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-3' : 'py-2'} bg-white border-b border-gray-100`}>
+            {/* Search Bar - Always visible with enhanced mobile positioning */}
+            <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-3' : 'py-4'} bg-white`} style={{
+              // Ensure search bar is always above mobile browser chrome
+              position: 'sticky',
+              top: breadcrumbPath.length > 0 ? '0' : '0',
+              zIndex: 60, // Higher z-index to ensure it stays above everything
+              minHeight: isMobileDevice() ? '72px' : 'auto', // Minimum height for mobile touch
+            }}>
               <div className="relative">
                 <input
                   type="text"
                   placeholder="Search files and folders..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full ${isMobileDevice() ? 'px-4 py-3 text-base' : 'px-4 py-2 text-sm'} bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-10 text-black placeholder-gray-400`}
+                  className={`w-full ${isMobileDevice() ? 'px-4 py-4 text-base' : 'px-4 py-2 text-sm'} bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-10 text-black placeholder-gray-400`}
+                  style={{
+                    // Prevent zoom on iOS
+                    fontSize: isMobileDevice() ? '16px' : undefined,
+                    minHeight: isMobileDevice() ? '48px' : 'auto',
+                  }}
                 />
-                <svg className={`absolute left-3 ${isMobileDevice() ? 'top-3.5 w-5 h-5' : 'top-2.5 w-4 h-4'} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className={`absolute left-3 ${isMobileDevice() ? 'top-4 w-5 h-5' : 'top-2.5 w-4 h-4'} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <circle cx="11" cy="11" r="8" />
                   <path d="m21 21-4.35-4.35" />
                 </svg>
@@ -1681,13 +1707,13 @@ export const PropertyDetailsModal = ({
 
         {/* Action Buttons */}
         <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0" style={{
-          height: isMobileDevice() ? 'auto' : '80px',
-          minHeight: isMobileDevice() ? '80px' : '80px',
-          // Ensure buttons are always above mobile browser chrome
-          paddingBottom: isMobileDevice() ? 'max(env(safe-area-inset-bottom, 0px), 20px)' : '0',
+          height: isMobileDevice() ? '70px' : '80px', // Fixed height instead of auto
+          minHeight: isMobileDevice() ? '70px' : '80px',
+          // Remove complex safe area calculations that can cause overflow
+          // paddingBottom: isMobileDevice() ? 'max(env(safe-area-inset-bottom, 0px), 20px)' : '0',
         }}>
           <button
-            className={`w-1/2 ${isMobileDevice() ? 'py-4 px-4' : 'h-full'} bg-gray-100 text-blue-700 ${isMobileDevice() ? 'text-lg' : 'text-lg'} font-bold flex items-center justify-center gap-3 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95`}
+            className={`w-1/2 ${isMobileDevice() ? 'py-3 px-4' : 'h-full'} bg-gray-100 text-blue-700 ${isMobileDevice() ? 'text-lg' : 'text-lg'} font-bold flex items-center justify-center gap-3 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95`}
             onClick={() => setCreatingFolder(true)}
           >
             <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1696,7 +1722,7 @@ export const PropertyDetailsModal = ({
             Create
           </button>
           <button
-            className={`w-1/2 ${isMobileDevice() ? 'py-4 px-4' : 'h-full'} bg-blue-600 text-white ${isMobileDevice() ? 'text-lg' : 'text-lg'} font-bold flex items-center justify-center gap-3 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95`}
+            className={`w-1/2 ${isMobileDevice() ? 'py-3 px-4' : 'h-full'} bg-blue-600 text-white ${isMobileDevice() ? 'text-lg' : 'text-lg'} font-bold flex items-center justify-center gap-3 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95`}
             onClick={() => document.getElementById('file-upload-input')?.click()}
           >
             <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

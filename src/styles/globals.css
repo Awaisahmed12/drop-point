@@ -35,6 +35,13 @@ body {
   .mobile-full-height {
     min-height: 100dvh;
   }
+  
+  /* Better iPhone URL bar handling */
+  .mobile-viewport-fix {
+    height: 100dvh;
+    max-height: 100dvh;
+    position: relative;
+  }
 }
 
 @supports not (height: 100dvh) {
@@ -45,6 +52,13 @@ body {
   
   .mobile-full-height {
     min-height: 100vh;
+  }
+  
+  /* Fallback for older browsers */
+  .mobile-viewport-fix {
+    height: 100vh;
+    max-height: 100vh;
+    position: relative;
   }
 }
 
@@ -119,11 +133,27 @@ body {
   will-change: background-position;
 }
 
-/* Mobile-specific optimizations */
+/* Enhanced mobile optimizations for iPhone */
 @media (max-width: 768px) {
   /* Prevent horizontal scrolling */
   body {
     overflow-x: hidden;
+  }
+  
+  /* iPhone URL bar compensation */
+  .ios-url-bar-fix {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 60px);
+  }
+  
+  /* Sticky search bar enhancement */
+  .sticky-search-mobile {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 60 !important;
+    background: white !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
   }
   
   /* Better touch targets */
@@ -154,13 +184,30 @@ body {
   .mobile-scroll {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
+    overscroll-behavior: contain;
   }
   
-  /* Prevent zoom on input focus */
+  /* Enhanced input handling for iPhone */
   input[type="text"],
   input[type="search"],
   textarea {
     font-size: 16px !important;
+    /* Prevent zoom on focus */
+    -webkit-appearance: none;
+    border-radius: 8px;
+  }
+  
+  /* iPhone specific fixes */
+  @supports (-webkit-touch-callout: none) {
+    .mobile-modal {
+      height: calc(100vh - 60px);
+      max-height: calc(100vh - 60px);
+    }
+    
+    .sticky-search-mobile {
+      position: -webkit-sticky !important;
+      position: sticky !important;
+    }
   }
 }
 
