@@ -107,7 +107,22 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: Enhanced Map Controls & Clean POI-Free Experience**
+### **Latest Update: Google Drive-Style Recency Sorting**
+- **Unified File & Folder Sorting**: Completely reimplemented PropertyDetailsModal file viewer with Google Drive-style recency sorting:
+  - **Mixed Content Display**: Files and folders now appear together in a single unified list instead of separate sections
+  - **Recency-First Default**: Automatically sorts by "Last Modified" (descending) on modal open, showing most recently touched items first
+  - **Smart Date Handling**: Uses `uploaded_at` for files and `created_at` for folders when sorting by date
+  - **Maintains All Sort Options**: Users can still sort by name, date, or size (with folders treated as 0-size for size sorting)
+  - **Preserved All Functionality**: Full feature parity - rename, move, delete, open, download actions all work identically
+  - **Consistent UI**: Desktop and mobile layouts preserved with same visual styling and interactions
+
+- **Key Benefits**:
+  - **Intuitive Discovery**: Most recent activity appears at top, making it easier to find what you were just working with
+  - **Reduced Visual Separation**: No artificial boundary between folders and files - everything flows naturally
+  - **Familiar UX**: Matches Google Drive's default behavior that users already understand
+  - **Better Mobile Experience**: Especially helpful on smaller screens where scanning is more difficult
+
+### **Enhanced Map Controls & Clean POI-Free Experience**
 - **Improved Mobile Map Toggle**: Refined the mobile satellite/map toggle for better user experience:
   - **Hidden During Search**: Toggle automatically hides when user starts typing in search bar to reduce visual clutter
   - **Cleaner Design**: Removed emoji icons and simplified to clean text-only buttons ("Map" / "Satellite")
