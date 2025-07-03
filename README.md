@@ -107,21 +107,23 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: Mobile Modal Auto-Height Optimization**
-- **Root Cause Identified**: The white space after upload and create buttons was caused by fixed height calculations that didn't match the actual content height
+### **Latest Update: Mobile Safe Area Insets Implementation**
+- **Safe Area Support**: Implemented CSS `env(safe-area-inset-*)` for universal device compatibility:
+  - **Bottom Safe Area**: Prevents URL bars and home indicators from blocking Upload/Create buttons
+  - **Top Safe Area**: Accounts for notches and status bars in modal positioning
+  - **Dynamic Viewport**: Uses `100dvh` instead of `100vh` for proper mobile browser behavior
 - **Auto-Height Solution**: Replaced complex viewport height calculations with natural content-based sizing:
   - **Content-Driven Height**: Modal now sizes automatically to fit its actual content
   - **Eliminated Fixed Heights**: Removed `viewportHeight` calculations that created empty space
   - **Natural Overflow**: Modal ends exactly at the action buttons without forced spacing
+- **Cross-Device Compatibility**: 
+  - **iPhone Support**: Works with Safari's bottom URL bar and home indicator
+  - **Android Support**: Handles various browser chrome configurations
+  - **Fallback Values**: Provides 20px fallback padding when safe area values aren't supported
 - **Simplified Architecture**: 
   - **Removed Complex Functions**: Eliminated `getModalHeight()` and `getModalMaxHeight()` redundancy
-  - **Cleaner Code**: Consolidated modal sizing logic into a single `getModalDimensions()` function
-  - **Better Maintainability**: Simplified approach reduces bugs and improves code clarity
-- **Perfect Mobile Experience**: 
-  - **No White Space**: Modal content flows naturally without gaps or forced heights
-  - **Blurred Background Visible**: Users can see the map background below the modal as intended
-  - **Preserved Desktop Layout**: Desktop modal remains perfectly centered and functional
-- **Performance Benefits**: Reduced JavaScript calculations and DOM measurements for better mobile performance
+  - **Cleaner Code**: Consolidated height logic into single `getModalDimensions()` function
+  - **Better Performance**: Reduced computational overhead with direct CSS safe area usage
 
 ### **Previous Update: Root Cause Fix for Mobile Modal White Space**
 - **Identified the Real Issue**: The white space wasn't from modal margins - it was from the backdrop container's flexbox centering

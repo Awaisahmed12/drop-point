@@ -76,8 +76,6 @@ export const PropertyDetailsModal = ({
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Mobile viewport height state
-  const [viewportHeight, setViewportHeight] = useState(0);
   
   // Mobile file viewer state
   const [mobileFileViewer, setMobileFileViewer] = useState<{
@@ -114,14 +112,14 @@ export const PropertyDetailsModal = ({
       };
     }
     
-    // Mobile: let modal size naturally to content height with small top margin
+    // Mobile: let modal size naturally to content height with safe area support
     // This prevents white space after buttons by not forcing a specific height
     const topMargin = 20;
     
     return {
       height: 'auto', // Let content determine height
-      maxHeight: `calc(100vh - ${topMargin * 2}px)`, // Prevent overflow
-      margin: `${topMargin}px 10px 0 10px` // Only top and side margins
+      maxHeight: `calc(100dvh - ${topMargin}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 20px))`, // Account for safe areas
+      margin: `calc(${topMargin}px + env(safe-area-inset-top, 0px)) 10px env(safe-area-inset-bottom, 20px) 10px` // Safe area aware margins
     };
   };
 
@@ -200,72 +198,6 @@ export const PropertyDetailsModal = ({
   // Parse the current property address
   const { streetAddress, locationInfo } = parseAddress(property?.address || '');
 
-  // Dynamic viewport height handling for mobile browsers
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const updateViewportHeight = () => {
-      // Use the visual viewport API if available (modern browsers)
-      if (window.visualViewport) {
-        setViewportHeight(window.visualViewport.height);
-      } else {
-        // Fallback to window.innerHeight
-        setViewportHeight(window.innerHeight);
-      }
-    };
-
-    // Set initial height
-    updateViewportHeight();
-
-    // Listen for viewport changes
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateViewportHeight);
-      window.visualViewport.addEventListener('scroll', updateViewportHeight);
-    } else {
-      window.addEventListener('resize', updateViewportHeight);
-      window.addEventListener('orientationchange', updateViewportHeight);
-    }
-
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateViewportHeight);
-        window.visualViewport.removeEventListener('scroll', updateViewportHeight);
-      } else {
-        window.removeEventListener('resize', updateViewportHeight);
-        window.removeEventListener('orientationchange', updateViewportHeight);
-      }
-    };
-  }, []);
-
-  // Calculate modal height based on device and viewport - EXTEND TO BOTTOM
-  const getModalHeight = () => {
-    if (!isMobileDevice()) {
-      return '90vh'; // Desktop remains the same
-    }
-    
-    // For mobile, extend all the way to bottom with only top margin
-    if (viewportHeight > 0) {
-      // Use full height minus only top margin (20px)
-      return `${viewportHeight - 20}px`;
-    }
-    
-    // Fallback - extend to bottom
-    return 'calc(100vh - 20px)';
-  };
-
-  // Modal max height should also extend to bottom
-  const getModalMaxHeight = () => {
-    if (!isMobileDevice()) {
-      return '90vh';
-    }
-    
-    if (viewportHeight > 0) {
-      // Full height minus top margin only
-      return `${viewportHeight - 20}px`;
-    }
-    
-    return 'calc(100vh - 20px)';
-  };
 
   // Auto-dismiss successful uploads after 1.5 seconds
   useEffect(() => {
@@ -1804,6 +1736,7 @@ export const PropertyDetailsModal = ({
         <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0" style={{
           height: isMobileDevice() ? '56px' : '70px', // Reduced height for mobile
           minHeight: isMobileDevice() ? '56px' : '70px',
+          paddingBottom: isMobileDevice() ? 'env(safe-area-inset-bottom, 0px)' : '0px', // Safe area padding for mobile
         }}>
           <button
             className={`w-1/2 ${isMobileDevice() ? 'py-2.5 px-4' : 'h-full'} bg-gray-100 text-blue-700 ${isMobileDevice() ? 'text-base' : 'text-lg'} font-bold flex items-center justify-center gap-2 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95`}
