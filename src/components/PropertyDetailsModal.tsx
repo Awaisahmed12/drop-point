@@ -1014,63 +1014,10 @@ export const PropertyDetailsModal = ({
             </div>
           </div>
 
-          {/* Upload Progress Section - STICKY */}
-          {pendingUploads.length > 0 && (
-            <div className="bg-white border-b border-gray-200 px-4 py-3 sticky z-40" style={{
-              top: breadcrumbPath.length > 0 ? '140px' : '80px' // Adjust based on navigation height
-            }}>
-              <div className="space-y-3">
-                {pendingUploads.map(upload => (
-                  <div key={upload.id} className="flex items-center gap-3">
-                    <FileIcon type={upload.file.name.split('.').pop() || 'file'} size={24} />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-gray-900 truncate">
-                        {upload.file.name}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full transition-all duration-300 ${
-                              upload.status === 'uploading' ? 'bg-blue-500' :
-                              upload.status === 'success' ? 'bg-green-500' :
-                              'bg-red-500'
-                            }`}
-                            style={{ width: `${upload.progress}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-gray-500 whitespace-nowrap">
-                          {upload.status === 'uploading' ? `${upload.progress}%` :
-                           upload.status === 'success' ? 'Done' :
-                           'Failed'}
-                        </span>
-                      </div>
-                    </div>
-                    {(upload.status === 'success' || upload.status === 'error') && (
-                      <button
-                        onClick={() => onDismiss(upload.id)}
-                        className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Column Headers - STICKY, positioned after upload section */}
+          {/* Column Headers - STICKY, positioned after navigation */}
           <div className={`hidden sm:grid grid-cols-12 gap-4 px-3 ${isMobileDevice() ? 'py-3' : 'py-2'} text-sm border-b border-gray-200 bg-white sticky z-30`}
                style={{ 
-                 top: (() => {
-                   let baseHeight = breadcrumbPath.length > 0 ? 140 : 80; // Navigation height
-                   if (pendingUploads.length > 0) {
-                     baseHeight += (pendingUploads.length * 60 + 24); // Upload section height
-                   }
-                   return `${baseHeight}px`;
-                 })()
+                 top: breadcrumbPath.length > 0 ? '140px' : '80px' // Navigation height only
                }}>
             <button
               className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
@@ -1094,7 +1041,7 @@ export const PropertyDetailsModal = ({
 
           {/* Compact Uploading Files - STICKY within scroll container */}
           {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).length > 0 && (
-            <div className="px-4 pb-2 bg-white flex-shrink-0 sticky z-10 border-b border-gray-50" style={{ top: `${selectedFolder === 'master' ? 96 : 120}px` }}>
+            <div className="px-4 pb-2 bg-white flex-shrink-0 sticky z-10 border-b border-gray-50" style={{ top: `${breadcrumbPath.length > 0 ? '140px' : '80px'}` }}>
               <div className="space-y-1">
                 {pendingUploads.filter(p => (selectedFolder === 'master' ? !p.folder_id : p.folder_id === selectedFolder) && p.property_id === property?.id).map(pending => (
                   <div key={pending.id} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
@@ -1105,12 +1052,12 @@ export const PropertyDetailsModal = ({
                     {/* Compact File Icon and Name */}
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <FileIcon
-                        type={pending.name.split('.').pop() || 'file'}
+                        type={pending.file.name.split('.').pop() || 'file'}
                         size={20}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-gray-900 truncate text-xs">
-                          {getFileNameWithoutExtension(pending.name)}
+                          {getFileNameWithoutExtension(pending.file.name)}
                         </div>
                       </div>
                     </div>
