@@ -107,7 +107,45 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: iPhone URL Bar & Search Bar Fixes**
+### **Latest Update: Refined Global Address Formatting & Enhanced Visual Design**
+- **Polished Address Display**: Completely redesigned property details modal header with refined typography and visual hierarchy:
+  - **Enhanced Typography**: Professional letter-spacing, improved line heights, and refined font weights
+  - **Subtle Gradient Effects**: Elegant background gradients and text gradients for premium appearance
+  - **Better Visual Hierarchy**: Clear distinction between street address (primary) and location info (secondary)
+  - **Improved Spacing**: Optimized padding, margins, and element positioning for better visual balance
+  - **Refined Close Button**: Glassmorphic design with subtle shadows and smooth hover animations
+
+- **Advanced Address Parsing**: Enhanced global address parsing with improved logic:
+  - **US Address Detection**: Better recognition of state + ZIP patterns (e.g., "TX 77407", "Texas 77407")
+  - **International Format Handling**: Smart detection of country names and regional formatting
+  - **Edge Case Handling**: Improved parsing for various address formats and empty components
+  - **Consistent Formatting**: More reliable address component separation and display
+
+- **Enhanced Visual Design**:
+  - **Gradient Backgrounds**: Subtle linear gradients for depth and sophistication
+  - **Text Shadows**: Refined text shadows for better readability and visual appeal
+  - **Glassmorphism Effects**: Backdrop blur and transparency for modern design language
+  - **Smooth Animations**: Cubic-bezier transitions for premium feel
+  - **Better Typography**: Improved letter-spacing and line-height for optimal readability
+
+### **Previous Update: Global Address Formatting in Property Details**
+- **Enhanced Address Display**: Redesigned property details modal header to show addresses in a more readable, hierarchical format:
+  - **Street Address**: Prominently displayed as the main header (larger, bold text)
+  - **Location Info**: City, state/province, ZIP/postal code, and country shown below in smaller text
+  - **Global Compatibility**: Smart parsing handles various international address formats:
+    - **US Format**: "5318 Gemstone Park Rd" → "Richmond, TX 77407, USA"
+    - **International**: "123 Main Street" → "London, England, UK"
+    - **Simple Format**: "Property Name" → "City, Country"
+  - **Responsive Design**: Optimal text sizing for both mobile and desktop viewing
+  - **Graceful Fallback**: If parsing fails, displays the full address as before
+
+- **Smart Address Parsing Logic**:
+  - Automatically detects US ZIP code patterns (e.g., "TX 77407")
+  - Handles comma-separated address components intelligently
+  - Supports various international address formats
+  - Maintains backward compatibility with existing address data
+
+### **Previous Update: iPhone URL Bar & Search Bar Fixes**
 - **iPhone URL Bar Issue Resolved**: Fixed mobile viewport handling to prevent UI elements from being hidden behind the iPhone URL bar:
   - **Conservative Viewport Calculation**: Reduced modal height to 92% of viewport with 60px buffer for iPhone URL bar
   - **Enhanced Search Bar Positioning**: Search bar now stays sticky with higher z-index (60) and proper mobile positioning

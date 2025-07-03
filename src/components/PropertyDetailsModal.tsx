@@ -100,6 +100,81 @@ export const PropertyDetailsModal = ({
            window.innerWidth <= 768;
   };
 
+  // Global address parsing and formatting utility
+  const parseAddress = (fullAddress: string) => {
+    if (!fullAddress) return { streetAddress: '', locationInfo: '' };
+    
+    // Clean up the address and split by commas
+    const parts = fullAddress.split(',').map(part => part.trim()).filter(part => part.length > 0);
+    
+    if (parts.length < 2) {
+      // If no commas, treat entire string as street address
+      return { streetAddress: fullAddress.trim(), locationInfo: '' };
+    }
+    
+    // First part is the street address
+    const streetAddress = parts[0];
+    
+    // Remaining parts form the location info
+    const locationParts = parts.slice(1);
+    
+    // Handle different address formats
+    if (locationParts.length >= 2) {
+      const city = locationParts[0];
+      const stateOrRegion = locationParts[1];
+      
+      // Check for US state + ZIP pattern (e.g., "TX 77407" or "Texas 77407")
+      const usStateZipMatch = stateOrRegion.match(/^([A-Z]{2}|[A-Za-z\s]+)\s+(\d{5}(-\d{4})?)$/);
+      
+      if (usStateZipMatch) {
+        // US format detected
+        const state = usStateZipMatch[1];
+        const zip = usStateZipMatch[2];
+        
+        // Check if there's a country after the state/zip
+        const remainingParts = locationParts.slice(2);
+        const country = remainingParts.length > 0 ? remainingParts.join(', ') : '';
+        
+        return {
+          streetAddress,
+          locationInfo: `${city}, ${state} ${zip}${country ? `, ${country}` : ''}`
+        };
+      } else {
+        // International or other format
+        // Check if last part looks like a country (typically longer and capitalized)
+        const lastPart = locationParts[locationParts.length - 1];
+        const isCountry = lastPart.length > 2 && /^[A-Z]/.test(lastPart);
+        
+        if (isCountry && locationParts.length > 2) {
+          // Format: City, Region, Country
+          const city = locationParts[0];
+          const region = locationParts.slice(1, -1).join(', ');
+          const country = lastPart;
+          
+          return {
+            streetAddress,
+            locationInfo: `${city}, ${region}, ${country}`
+          };
+        } else {
+          // Simple format: just join all location parts
+          return {
+            streetAddress,
+            locationInfo: locationParts.join(', ')
+          };
+        }
+      }
+    } else {
+      // Only one location part (e.g., "Street, City")
+      return {
+        streetAddress,
+        locationInfo: locationParts[0]
+      };
+    }
+  };
+
+  // Parse the current property address
+  const { streetAddress, locationInfo } = parseAddress(property?.address || '');
+
   // Dynamic viewport height handling for mobile browsers
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -890,20 +965,31 @@ export const PropertyDetailsModal = ({
            }}>
         
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-2 bg-white border-b border-blue-100 rounded-t-3xl flex-shrink-0">
-          <div className="flex flex-col gap-1 min-w-0 flex-1 mr-4">
-            <span className={`${isMobileDevice() ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'} font-extrabold text-gray-900 truncate`} title={property.address}>
-              {property?.address}
-            </span>
+        <div className="modal-header-refined flex items-center justify-between px-5 py-4 rounded-t-3xl flex-shrink-0">
+          <div className="flex flex-col min-w-0 flex-1 mr-4">
+            {/* Street Address - Primary */}
+            <h1 className={`property-title ${isMobileDevice() ? 'text-lg' : 'text-xl'} font-semibold leading-tight mb-0.5`} 
+                style={{ letterSpacing: '-0.02em' }}
+                title={streetAddress}>
+              {streetAddress || property?.address}
+            </h1>
+            {/* Location Info - Secondary */}
+            {locationInfo && (
+              <p className={`property-location ${isMobileDevice() ? 'text-sm' : 'text-base'} font-medium leading-snug`} 
+                 style={{ letterSpacing: '-0.005em' }}
+                 title={locationInfo}>
+                {locationInfo}
+              </p>
+            )}
           </div>
           <button
-            className={`${isMobileDevice() ? 'p-3' : 'p-2'} rounded-full hover:bg-gray-100 transition-colors cursor-pointer flex-shrink-0`}
+            className={`close-button ${isMobileDevice() ? 'p-2.5' : 'p-2'} rounded-full cursor-pointer flex-shrink-0`}
             onClick={() => {
               onClose();
               setCreatingFolder(false);
             }}
           >
-            <svg className={`${isMobileDevice() ? 'w-7 h-7' : 'w-6 h-6'} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className={`${isMobileDevice() ? 'w-5 h-5' : 'w-4 h-4'} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -922,7 +1008,7 @@ export const PropertyDetailsModal = ({
           // marginBottom: isMobileDevice() ? '20px' : '0',
         }}>
           {/* Satellite Image - First in scrollable area */}
-          <div className={`relative w-full ${isMobileDevice() ? 'h-48' : 'h-56'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
+          <div className={`relative w-full ${isMobileDevice() ? 'h-32' : 'h-40'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
             <Image
               src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
               alt="Property satellite view"
