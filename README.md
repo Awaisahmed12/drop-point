@@ -107,7 +107,49 @@ DropPoint is a sophisticated real estate document management application that co
 
 ## 🚀 Recent Enhancements
 
-### **Latest Update: Compact Header Design & File-Focused Layout**
+### **Latest Update: Mobile Modal Auto-Height Optimization**
+- **Root Cause Identified**: The white space after upload and create buttons was caused by fixed height calculations that didn't match the actual content height
+- **Auto-Height Solution**: Replaced complex viewport height calculations with natural content-based sizing:
+  - **Content-Driven Height**: Modal now sizes automatically to fit its actual content
+  - **Eliminated Fixed Heights**: Removed `viewportHeight` calculations that created empty space
+  - **Natural Overflow**: Modal ends exactly at the action buttons without forced spacing
+- **Simplified Architecture**: 
+  - **Removed Complex Functions**: Eliminated `getModalHeight()` and `getModalMaxHeight()` redundancy
+  - **Cleaner Code**: Consolidated modal sizing logic into a single `getModalDimensions()` function
+  - **Better Maintainability**: Simplified approach reduces bugs and improves code clarity
+- **Perfect Mobile Experience**: 
+  - **No White Space**: Modal content flows naturally without gaps or forced heights
+  - **Blurred Background Visible**: Users can see the map background below the modal as intended
+  - **Preserved Desktop Layout**: Desktop modal remains perfectly centered and functional
+- **Performance Benefits**: Reduced JavaScript calculations and DOM measurements for better mobile performance
+
+### **Previous Update: Root Cause Fix for Mobile Modal White Space**
+- **Identified the Real Issue**: The white space wasn't from modal margins - it was from the backdrop container's flexbox centering
+- **Flexbox Alignment Fix**: Changed backdrop from `items-center` to `items-start` on mobile
+- **Perfect Mobile Positioning**: Modal now starts from top margin and extends to calculated height without centering
+- **Preserved Desktop Experience**: Desktop modal remains perfectly centered as intended
+- **Clean Solution**: Single CSS class change that addresses the root cause instead of workarounds
+
+### **Previous Update: Mobile Modal Bottom Spacing Fix**
+- **Eliminated Bottom White Space**: Fixed the white gap that appeared after the action buttons on mobile
+- **Perfect Mobile Alignment**: Modal now ends exactly at the action buttons, just like on desktop
+- **Clean Mobile Experience**: Removed unnecessary bottom margin that was causing the floating white space
+- **Preserved Desktop Styling**: Maintained the beautiful floating modal appearance on desktop
+
+### **Previous Update: Clean Mobile Modal Sizing Implementation**
+- **Simplified Mobile Dimensions Logic**: Replaced complex viewport calculations with a clean 5-step approach:
+  1. **Device Detection**: Accurately identifies mobile vs desktop devices
+  2. **Screen Dimensions**: Gets actual screen height and visual viewport dimensions
+  3. **Browser Chrome Accounting**: Automatically detects and accounts for mobile browser bars (URL bar, etc.)
+  4. **Modal Sizing**: Calculates optimal modal height based on available screen space
+  5. **Background Visibility**: Ensures blurred map background shows through by removing bottom margins
+
+- **Eliminated White Space Issues**: Fixed persistent white space at bottom of mobile modal:
+  - **No Bottom Margin**: Modal now extends to screen bottom with only top margin
+  - **Proper Height Calculation**: Uses visual viewport height for accurate mobile sizing
+  - **Browser Chrome Aware**: Accounts for mobile browser UI elements automatically
+
+### **Previous Update: Compact Header Design & File-Focused Layout**
 - **Streamlined Header**: Redesigned property details modal with a more compact, refined header that prioritizes file browsing:
   - **Reduced Header Size**: Smaller padding (py-4 vs py-6) and more compact typography for less visual weight
   - **Optimized Text Sizing**: Smaller but still readable font sizes (text-lg/xl vs text-2xl/3xl) with refined spacing

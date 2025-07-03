@@ -100,6 +100,31 @@ export const PropertyDetailsModal = ({
            window.innerWidth <= 768;
   };
 
+  // New clean mobile dimensions logic
+  const getModalDimensions = () => {
+    if (typeof window === 'undefined') return { height: '90vh', margin: '0' };
+    
+    const isWeb = !isMobileDevice();
+    
+    if (isWeb) {
+      // Desktop: centered with margins
+      return {
+        height: '90vh',
+        margin: '0'
+      };
+    }
+    
+    // Mobile: let modal size naturally to content height with small top margin
+    // This prevents white space after buttons by not forcing a specific height
+    const topMargin = 20;
+    
+    return {
+      height: 'auto', // Let content determine height
+      maxHeight: `calc(100vh - ${topMargin * 2}px)`, // Prevent overflow
+      margin: `${topMargin}px 10px 0 10px` // Only top and side margins
+    };
+  };
+
   // Global address parsing and formatting utility
   const parseAddress = (fullAddress: string) => {
     if (!fullAddress) return { streetAddress: '', locationInfo: '' };
@@ -212,35 +237,34 @@ export const PropertyDetailsModal = ({
     };
   }, []);
 
-  // Calculate modal height based on device and viewport - ENSURE IT FITS ON SCREEN
+  // Calculate modal height based on device and viewport - EXTEND TO BOTTOM
   const getModalHeight = () => {
     if (!isMobileDevice()) {
       return '90vh'; // Desktop remains the same
     }
     
-    // For mobile, NEVER exceed the actual screen size
+    // For mobile, extend all the way to bottom with only top margin
     if (viewportHeight > 0) {
-      // Use 85% of available viewport height to ensure it always fits
-      // This prevents the modal from being taller than the phone screen
-      return `${Math.min(viewportHeight * 0.85, viewportHeight - 80)}px`;
+      // Use full height minus only top margin (20px)
+      return `${viewportHeight - 20}px`;
     }
     
-    // Fallback - be very conservative to ensure it fits
-    return '85vh'; // Much more conservative to guarantee it fits on any mobile device
+    // Fallback - extend to bottom
+    return 'calc(100vh - 20px)';
   };
 
-  // Modal max height should also be constrained
+  // Modal max height should also extend to bottom
   const getModalMaxHeight = () => {
     if (!isMobileDevice()) {
       return '90vh';
     }
     
     if (viewportHeight > 0) {
-      // Never exceed 85% of screen height
-      return `${viewportHeight * 0.85}px`;
+      // Full height minus top margin only
+      return `${viewportHeight - 20}px`;
     }
     
-    return '85vh'; // Conservative fallback
+    return 'calc(100vh - 20px)';
   };
 
   // Auto-dismiss successful uploads after 1.5 seconds
@@ -785,8 +809,8 @@ export const PropertyDetailsModal = ({
 
     return (
       <div className="fixed inset-0 z-50 bg-black/90 flex flex-col" style={{
-        height: viewportHeight > 0 ? `${viewportHeight}px` : '100dvh',
-        maxHeight: viewportHeight > 0 ? `${viewportHeight}px` : '100dvh'
+        height: '100dvh',
+        maxHeight: '100dvh'
       }}>
         {/* Header */}
         <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-200 flex-shrink-0">
@@ -838,9 +862,7 @@ export const PropertyDetailsModal = ({
                 alt={file.file_name}
                 className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
                 style={{ 
-                  maxHeight: viewportHeight > 0 
-                    ? `${viewportHeight - 120}px` 
-                    : 'calc(100dvh - 120px)' 
+                  maxHeight: 'calc(100dvh - 120px)' 
                 }}
               />
             </div>
@@ -948,19 +970,13 @@ export const PropertyDetailsModal = ({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in" style={{
-      // Ensure the backdrop doesn't cause overflow on mobile
-      height: isMobileDevice() ? (viewportHeight > 0 ? `${viewportHeight}px` : '100vh') : '100vh',
-      maxHeight: isMobileDevice() ? (viewportHeight > 0 ? `${viewportHeight}px` : '100vh') : '100vh',
-    }}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative overflow-visible"
+    <div className={`fixed inset-0 z-40 flex ${isMobileDevice() ? 'items-start' : 'items-center'} justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in`}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative overflow-hidden"
            style={{ 
              borderRadius: '1.5rem', 
-             height: getModalHeight(),
-             maxHeight: getModalMaxHeight(),
-             // Ensure modal fits within screen with proper margins
-             margin: isMobileDevice() ? '20px 10px' : '0',
-             // Prevent the modal from extending beyond viewport
+             height: getModalDimensions().height,
+             maxHeight: getModalDimensions().maxHeight,
+             margin: getModalDimensions().margin,
              maxWidth: isMobileDevice() ? 'calc(100vw - 20px)' : undefined,
            }}>
         
@@ -997,15 +1013,8 @@ export const PropertyDetailsModal = ({
 
         {/* File List Container - Scrollable with safe area handling */}
         <div className="flex-1 overflow-y-auto file-list overflow-x-visible mobile-scroll" style={{ 
-          minHeight: '200px', // Reduced minimum height for mobile
-          // Ensure the file list fits within the modal bounds
-          maxHeight: isMobileDevice() ? 
-            (viewportHeight > 0 ? `${viewportHeight * 0.6}px` : 'calc(85vh - 200px)') : 
-            'none',
-          // Remove problematic mobile-specific height calculations that cause overflow
-          // paddingBottom: isMobileDevice() ? 
-          //   'calc(env(safe-area-inset-bottom, 0px) + 20px)' : '0',
-          // marginBottom: isMobileDevice() ? '20px' : '0',
+          minHeight: '200px', // Minimum height for content
+          // Let content naturally size on mobile instead of fixed height restrictions
         }}>
           {/* Satellite Image - First in scrollable area */}
           <div className={`relative w-full ${isMobileDevice() ? 'h-28' : 'h-32'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
