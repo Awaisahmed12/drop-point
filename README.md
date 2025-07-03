@@ -339,3 +339,143 @@ DropPoint is a sophisticated real estate document management application that co
 - **Headers**: `font-extrabold` for property addresses and main titles
 - **Body Text**: `font-medium` for file names and important information
 - **Secondary Text**: `
+
+## Mobile Viewport Optimization System
+
+**Global Implementation**: The mobile viewport magic from PropertyDetailsModal is now available globally through:
+
+#### `useMobileViewport()` Hook
+```tsx
+const { 
+  isMobile, 
+  getModalDimensions, 
+  getMobileStyles,
+  getMobilePositioning,
+  mobileClasses 
+} = useMobileViewport();
+```
+
+#### Key Features:
+- **Dynamic Viewport Units**: Uses `100dvh` instead of `100vh` for perfect mobile rendering
+- **Safe Area Support**: Automatic handling of iPhone notches and dynamic islands
+- **Input Optimization**: Prevents zoom on mobile inputs with 16px font size
+- **Touch Targets**: Ensures 44px+ minimum touch areas
+- **Modal Positioning**: Smart positioning that adapts to mobile constraints
+- **Page Containers**: Full-height containers that respect mobile browser behavior
+
+#### CSS Utilities:
+- `.mobile-viewport-fix`: Perfect full-screen containers
+- `.mobile-safe-area`: Automatic safe area padding
+- `.mobile-modal-overlay`: Optimized modal positioning
+- `.mobile-scroll`: Touch-optimized scrolling
+
+#### Meta Tags:
+- Viewport configuration with `viewport-fit=cover`
+- iOS web app optimizations
+- Touch callout and zoom prevention
+
+### Technical Decisions & Tradeoffs
+
+1. **Mobile-First Architecture**
+   - **Decision**: Global mobile viewport system with dynamic units
+   - **Why**: Ensures perfect rendering across all devices and screen sizes
+   - **Tradeoff**: Slightly more complex CSS, but eliminates mobile UI issues
+
+2. **Supabase for Backend**
+   - **Decision**: Use Supabase for auth, database, and storage
+   - **Why**: Rapid development, real-time features, scalable infrastructure
+   - **Tradeoff**: Vendor lock-in vs. development speed
+
+3. **Google Maps Integration**
+   - **Decision**: Google Maps API for property visualization
+   - **Why**: Best-in-class mapping with property search integration
+   - **Tradeoff**: API costs vs. user experience quality
+
+4. **File Management Approach**
+   - **Decision**: Property-centric file organization (like Google Drive per property)
+   - **Why**: Intuitive for users, scalable, familiar UX patterns
+   - **Tradeoff**: More complex state management vs. user comprehension
+
+## File Structure
+
+```
+src/
+├── components/           # React components
+│   ├── PropertyDetailsModal.tsx  # Main property file management
+│   ├── UserAuthForm.tsx          # Authentication UI
+│   ├── MoveModal.tsx            # File/folder moving
+│   ├── FileIcon.tsx             # File type icons
+│   ├── SkeletonItem.tsx         # Loading states
+│   └── EyeIcon.tsx              # Password visibility toggle
+├── hooks/               # Custom React hooks
+│   └── useMobileViewport.ts     # Global mobile optimization
+├── pages/               # Next.js pages
+│   ├── index.tsx        # Login/signup page
+│   ├── map.tsx          # Main application interface
+│   ├── _app.tsx         # App wrapper
+│   └── _document.tsx    # HTML document with mobile meta tags
+├── styles/              # Global styles
+│   └── globals.css      # Mobile-first CSS with viewport utilities
+├── utils/               # Utility functions
+│   ├── supabaseClient.ts        # Database client
+│   └── fileManagement.ts        # File operation utilities
+└── constants/           # Application constants
+    └── index.ts         # API keys and configuration
+```
+
+## Getting Started
+
+1. **Clone and Install**
+   ```bash
+   git clone <repository-url>
+   cd drop-point
+   npm install
+   ```
+
+2. **Environment Setup**
+   ```bash
+   # Create .env.local with:
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+   ```
+
+3. **Database Setup**
+   - Configure Supabase project
+   - Set up authentication
+   - Create storage buckets for property files
+
+4. **Run Development Server**
+   ```bash
+   npm run dev
+   ```
+
+## Key Dependencies
+
+- **Next.js 14**: React framework with App Router
+- **TypeScript**: Type safety and developer experience
+- **Tailwind CSS**: Utility-first styling with mobile-first design
+- **Supabase**: Backend as a Service (auth, database, storage)
+- **Google Maps React**: Maps integration with property visualization
+- **React Hooks**: State management and lifecycle handling
+
+## Mobile Optimization Features
+
+- **Perfect Viewport Handling**: Uses `100dvh` and safe areas for flawless mobile rendering
+- **Touch-Friendly Interface**: 44px+ touch targets, optimized button sizes
+- **Input Optimization**: Prevents zoom on iOS, proper keyboard handling
+- **Performance**: Optimized scrolling, GPU acceleration for animations
+- **Progressive Enhancement**: Works perfectly across all device sizes
+
+## Future Enhancements
+
+- **Advanced Search**: Filter properties by type, value, location
+- **Collaboration**: Share properties and files with team members
+- **Analytics**: Property portfolio insights and reporting
+- **Offline Support**: PWA capabilities for field work
+- **File Versioning**: Track document changes over time
+- **Bulk Operations**: Mass file uploads and organization tools
+
+---
+
+**DropPoint** - Where properties meet digital organization. Built for the modern real estate professional who needs their data accessible anywhere, anytime, on any device.

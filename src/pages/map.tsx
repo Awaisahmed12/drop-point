@@ -1,14 +1,15 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { GoogleMap, LoadScript } from '@react-google-maps/api';
+import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
+import { GOOGLE_MAPS_API_KEY } from '../../constants';
+import { useMobileViewport } from '../hooks/useMobileViewport';
+import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
+import { supabase } from '../utils/supabaseClient';
 import { useRouter } from 'next/router';
 
-import { supabase } from '../utils/supabaseClient';
-import { GoogleMap, LoadScript } from '@react-google-maps/api';
-
-import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
 import { 
   containerStyle, 
   US_CENTER, 
-  GOOGLE_MAPS_API_KEY, 
   GOOGLE_MAP_LIBRARIES, 
   DEFAULT_ZOOM, 
   SEARCH_ZOOM, 
@@ -22,8 +23,6 @@ import {
 import { MapSearch } from '../components/MapSearch';
 import { MapControls } from '../components/MapControls';
 import { PropertyInfoCard } from '../components/PropertyInfoCard';
-import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
-
 import { MoveModal } from '../components/MoveModal';
 import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
 
@@ -37,6 +36,7 @@ import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement'
 
 export default function MapPage() {
   const router = useRouter();
+  const { getMobileStyles, mobileClasses } = useMobileViewport();
   const [loading, setLoading] = useState(true);
   const [mapCenter, setMapCenter] = useState(US_CENTER);
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -61,8 +61,6 @@ export default function MapPage() {
   // Custom autocomplete state (used by internal search handling)
   const [inputValue, setInputValue] = useState('');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
-
-
 
   // Replace folders state with backend-driven state
   const [folders, setFolders] = useState<PropertyFolder[]>([]);
@@ -215,8 +213,6 @@ export default function MapPage() {
     };
   }, [inputValue]);
 
-
-
   // Helper to compare coordinates with a small threshold
   function coordsChanged(a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null) {
     if (!a || !b) return true;
@@ -296,8 +292,6 @@ export default function MapPage() {
       };
     }
   }, [map, handleUserInteraction]);
-
-
 
   // Click outside handler removed - dropdown handled by MapSearch component
 
@@ -1169,14 +1163,16 @@ export default function MapPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className={`min-h-screen flex items-center justify-center bg-gray-50 ${mobileClasses.fullScreen}`}
+           style={getMobileStyles('page')}>
         <div className="text-lg text-gray-600">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden">
+    <div className={`relative w-screen h-screen overflow-hidden ${mobileClasses.fullScreen}`} 
+         style={getMobileStyles('page')}>
       <LoadScript
         googleMapsApiKey={GOOGLE_MAPS_API_KEY}
         libraries={GOOGLE_MAP_LIBRARIES}

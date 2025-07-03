@@ -2,17 +2,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
 import Image from 'next/image';
-
-function EyeIcon({ open }: { open: boolean }) {
-  return open ? (
-    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-  ) : (
-    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.956 9.956 0 012.223-3.592m3.1-2.727A9.956 9.956 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.956 9.956 0 01-4.043 5.306M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" /></svg>
-  );
-}
+import { EyeIcon } from './EyeIcon';
+import { useMobileViewport } from '../hooks/useMobileViewport';
 
 export default function UserAuthForm() {
   const router = useRouter();
+  const { getMobileStyles, mobileClasses } = useMobileViewport();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -76,7 +71,8 @@ export default function UserAuthForm() {
         <input
           type="email"
           placeholder="Email"
-          className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow"
+          className={`w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow ${mobileClasses.input}`}
+          style={getMobileStyles('input')}
           value={email}
           onChange={e => setEmail(e.target.value)}
           autoComplete="email"
@@ -86,7 +82,8 @@ export default function UserAuthForm() {
           <input
             type={showPassword ? 'text' : 'password'}
             placeholder="Password"
-            className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow pr-10"
+            className={`w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow pr-10 ${mobileClasses.input}`}
+            style={getMobileStyles('input')}
             value={password}
             onChange={e => setPassword(e.target.value)}
             autoComplete={isSignUp ? 'new-password' : 'current-password'}
@@ -94,7 +91,7 @@ export default function UserAuthForm() {
           />
           <button
             type="button"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none cursor-pointer"
+            className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none cursor-pointer ${mobileClasses.touchTarget}`}
             onClick={() => {
               setShowPassword((v) => !v);
             }}
@@ -108,7 +105,8 @@ export default function UserAuthForm() {
             <input
               type={showConfirmPassword ? 'text' : 'password'}
               placeholder="Confirm Password"
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow pr-10"
+              className={`w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow pr-10 ${mobileClasses.input}`}
+              style={getMobileStyles('input')}
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
               autoComplete="new-password"
@@ -116,7 +114,7 @@ export default function UserAuthForm() {
             />
             <button
               type="button"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none cursor-pointer"
+              className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none cursor-pointer ${mobileClasses.touchTarget}`}
               onClick={() => {
                 setShowConfirmPassword((v) => !v);
               }}
@@ -131,27 +129,33 @@ export default function UserAuthForm() {
         )}
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer"
+          className={`w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer ${mobileClasses.touchTarget}`}
           disabled={loading}
         >
           {loading ? (isSignUp ? 'Signing Up...' : 'Logging In...') : (isSignUp ? 'Sign Up' : 'Log In')}
         </button>
       </form>
-      <div className="flex flex-col gap-2 items-center mt-2">
+      
+      {/* Error and message display */}
+      {error && (
+        <div className="text-red-600 text-sm text-center bg-red-50 border border-red-200 rounded-lg p-3">
+          {error}
+        </div>
+      )}
+      {message && (
+        <div className="text-green-600 text-sm text-center bg-green-50 border border-green-200 rounded-lg p-3">
+          {message}
+        </div>
+      )}
+      
+      <div className="text-center">
         <button
-          className="text-blue-600 hover:underline text-base font-medium cursor-pointer"
-          onClick={() => {
-            setIsSignUp(!isSignUp);
-            setError(null);
-            setMessage(null);
-            setPassword('');
-            setConfirmPassword('');
-          }}
+          type="button"
+          className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+          onClick={() => setIsSignUp(!isSignUp)}
         >
           {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
         </button>
-        {error && <div className="text-red-600 text-base text-center font-semibold animate-fade-in">{error}</div>}
-        {message && <div className="text-green-600 text-base text-center font-semibold animate-fade-in">{message}</div>}
       </div>
     </div>
   );
