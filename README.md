@@ -198,6 +198,13 @@ src/
 - **Improved default sorting**: Changed initial sort state to 'date' descending (most recent first) to match Google Drive behavior
 - **Eliminated sorting glitches**: Name column now toggles sort direction properly without interference from automatic sort field changes
 
+### **Enhanced Desktop Current Location Button**
+- **Intuitive positioning**: Moved current location button from left sidebar to right side of screen, positioned after the search bar
+- **Better visual hierarchy**: Button now appears as a complement to the search functionality rather than separate map controls
+- **Improved accessibility**: Larger button with clear "Current Location" label for better desktop usability
+- **Smart layout**: Map type controls remain on left side, current location on right side for balanced interface
+- **Contextual placement**: Button positioned where users naturally look after using the search bar for navigation
+
 ### **Mobile Map Improvements**
 - Clean satellite/map toggle (hidden during search)
 - POI-free experience (no distracting business markers)

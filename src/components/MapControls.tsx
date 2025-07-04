@@ -16,10 +16,9 @@ export const MapControls = ({
   currentLocationLoading = false,
   showPropertyInfoCard = false
 }: MapControlsProps) => {
-  // Desktop controls (left side, larger)
-  const desktopControls = (
-    <div className="hidden sm:flex absolute top-6 left-6 z-30 flex-col gap-2">
-      {/* Map type controls */}
+  // Desktop map type controls (left side)
+  const desktopMapControls = (
+    <div className="hidden sm:flex absolute top-6 left-6 z-30">
       <div className="flex gap-2 bg-white rounded-lg shadow-lg p-2">
         <button
           className={`px-3 py-1 rounded font-semibold text-sm ${
@@ -42,52 +41,55 @@ export const MapControls = ({
           Satellite
         </button>
       </div>
-      
-      {/* Current location button for desktop */}
-      {onCurrentLocationClick && (
-        <button
-          className={`w-10 h-10 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl cursor-pointer ${
-            currentLocationLoading ? 'opacity-75' : ''
-          }`}
-          onClick={onCurrentLocationClick}
-          disabled={currentLocationLoading}
-          style={{ 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-          }}
-        >
-          {currentLocationLoading ? (
-            /* Loading spinner */
-            <svg 
-              width="16" 
-              height="16" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-              className="animate-spin"
-            >
-              <path d="M21 12a9 9 0 11-6.219-8.56"/>
-            </svg>
-          ) : (
-            /* Current location GPS pin icon */
-            <svg 
-              width="16" 
-              height="16" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
-          )}
-        </button>
-      )}
+    </div>
+  );
+
+  // Desktop current location button (positioned after search bar)
+  const desktopCurrentLocationButton = onCurrentLocationClick && (
+    <div className="hidden sm:flex absolute top-6 right-6 z-30">
+      <button
+        className={`px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm ${
+          currentLocationLoading ? 'opacity-75' : ''
+        }`}
+        onClick={onCurrentLocationClick}
+        disabled={currentLocationLoading}
+        style={{ 
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+        }}
+      >
+        {currentLocationLoading ? (
+          /* Loading spinner */
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+            className="animate-spin"
+          >
+            <path d="M21 12a9 9 0 11-6.219-8.56"/>
+          </svg>
+        ) : (
+          /* Current location GPS pin icon */
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+            <circle cx="12" cy="10" r="3"></circle>
+          </svg>
+        )}
+        {currentLocationLoading ? 'Locating...' : 'Current Location'}
+      </button>
     </div>
   );
 
@@ -185,7 +187,8 @@ export const MapControls = ({
 
   return (
     <>
-      {desktopControls}
+      {desktopMapControls}
+      {desktopCurrentLocationButton}
       {mobileControls}
       {mobileCurrentLocationButton}
     </>
