@@ -71,7 +71,7 @@ export const MapControls = ({
               <path d="M21 12a9 9 0 11-6.219-8.56"/>
             </svg>
           ) : (
-            /* Current location crosshair icon */
+            /* Current location GPS pin icon */
             <svg 
               width="16" 
               height="16" 
@@ -82,9 +82,8 @@ export const MapControls = ({
               strokeLinecap="round" 
               strokeLinejoin="round"
             >
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M12 1v6m0 8v6"></path>
-              <path d="m1 12 6 0m8 0 6 0"></path>
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
             </svg>
           )}
         </button>
@@ -165,7 +164,7 @@ export const MapControls = ({
             <path d="M21 12a9 9 0 11-6.219-8.56"/>
           </svg>
         ) : (
-          /* Current location crosshair icon */
+          /* Current location GPS pin icon */
           <svg 
             width="16" 
             height="16" 
@@ -176,9 +175,8 @@ export const MapControls = ({
             strokeLinecap="round" 
             strokeLinejoin="round"
           >
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M12 1v6m0 8v6"></path>
-            <path d="m1 12 6 0m8 0 6 0"></path>
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+            <circle cx="12" cy="10" r="3"></circle>
           </svg>
         )}
       </button>
