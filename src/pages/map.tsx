@@ -61,6 +61,7 @@ export default function MapPage() {
   // Custom autocomplete state (used by internal search handling)
   const [inputValue, setInputValue] = useState('');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // Replace folders state with backend-driven state
   const [folders, setFolders] = useState<PropertyFolder[]>([]);
@@ -1149,6 +1150,111 @@ export default function MapPage() {
     };
   }, []);
 
+  // Add state for current location loading
+  const [currentLocationLoading, setCurrentLocationLoading] = useState(false);
+
+  // Current location handler
+  const handleCurrentLocationClick = useCallback(() => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by this browser.');
+      return;
+    }
+
+    setCurrentLocationLoading(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        const newCenter = { lat: latitude, lng: longitude };
+        
+        // Update map center and zoom
+        setMapCenter(newCenter);
+        setZoom(SEARCH_ZOOM);
+        
+        if (map) {
+          map.panTo(newCenter);
+          map.setZoom(SEARCH_ZOOM);
+        }
+
+        // Update interaction state and fetch address
+        setHasInteracted(true);
+        setInputValue('');
+        lastFetchedCenter.current = newCenter;
+        
+        // Check cache first
+        const cached = getAddressFromCache(latitude, longitude);
+        if (cached) {
+          setAddress(cached.address);
+          setSnappedLatLng(cached.snappedLatLng);
+          setAddressLoading(false);
+          
+          // Try to prefetch property data if this is a saved property
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: property } = await supabase
+              .from('properties')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('address', cached.address)
+              .maybeSingle();
+
+            if (property) {
+              const isCached = await isPropertyDataCached(cached.address);
+              if (!isCached) {
+                const [folderResult, filesResult] = await Promise.all([
+                  supabase
+                    .from('property_folders')
+                    .select('*')
+                    .eq('property_id', property.id)
+                    .eq('user_id', user.id)
+                    .is('deleted_at', null)
+                    .order('created_at', { ascending: true }),
+                  supabase
+                    .from('property_files')
+                    .select('*')
+                    .eq('property_id', property.id)
+                    .order('uploaded_at', { ascending: false })
+                ]);
+
+                if (folderResult.data && filesResult.data) {
+                  await cachePropertyData(cached.address, filesResult.data, folderResult.data);
+                }
+              }
+            }
+          }
+        } else {
+          // Fetch address for current location
+          fetchAddress(latitude, longitude);
+        }
+        
+        setCurrentLocationLoading(false);
+      },
+      (error) => {
+        setCurrentLocationLoading(false);
+        let errorMessage = 'Unable to retrieve your location.';
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Location access denied. Please enable location permissions.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'Location information is unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'Location request timed out.';
+            break;
+        }
+        
+        alert(errorMessage);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000 // Cache location for 1 minute
+      }
+    );
+  }, [map, isPropertyDataCached, cachePropertyData]);
+
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center bg-gray-50 ${mobileClasses.fullScreen}`}
@@ -1219,11 +1325,15 @@ export default function MapPage() {
           onInputChange={setInputValue}
           predictions={predictions}
           onPredictionsChange={setPredictions}
+          onShowDropdownChange={setShowDropdown}
         />
         <MapControls 
           mapType={mapType}
           onMapTypeChange={setMapType}
-          isSearching={inputValue.length > 0}
+          showDropdown={showDropdown}
+          onCurrentLocationClick={handleCurrentLocationClick}
+          currentLocationLoading={currentLocationLoading}
+          showPropertyInfoCard={hasInteracted && !!address}
         />
         {hasInteracted && address && (
           <PropertyInfoCard

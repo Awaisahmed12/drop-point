@@ -10,6 +10,7 @@ DropPoint is a map-based document management platform for real estate profession
 - Smart address detection using reverse geocoding
 - User geolocation with fallback to US center
 - POI-free experience (no distracting business markers)
+- Current location button for instant navigation to user's position
 
 ### **Property Management**
 - One-click property saving from map coordinates
@@ -153,6 +154,22 @@ src/
 - **Progressive Enhancement**: Works across all device sizes
 
 ## 🎯 Recent Updates
+
+### **Current Location Feature**
+- **One-tap navigation**: Google Maps-style current location button for instant positioning
+- **Smart geolocation**: High-accuracy positioning with intelligent fallback and caching
+- **Visual feedback**: Loading spinner and proper error handling for location requests
+- **Seamless integration**: Works with existing address detection and property prefetching
+- **Permission handling**: Clear error messages for location access issues
+- **Precise positioning**: Button calculates exact clearance (220px) above property info card to prevent overlap
+- **Responsive design**: Separate positioning for mobile (bottom-right) and desktop (left sidebar) layouts
+
+### **Google Maps-Style Map Controls**
+- **Circular toggle button**: Redesigned mobile map controls to match Google Maps UX
+- **Smart positioning**: Button positioned on right side, avoids search dropdown interference
+- **Layers icon**: Professional layers icon instead of text labels
+- **Improved visibility**: Shows when user finishes typing, stays accessible during navigation
+- **Enhanced mobile experience**: 44px touch target, proper shadows and hover states
 
 ### **Race Condition Fix - PropertyDetailsModal**
 - **Fixed mobile race condition**: Property details modal now loads data immediately on first click

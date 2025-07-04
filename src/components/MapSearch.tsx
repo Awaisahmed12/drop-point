@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Prediction } from '../../types';
 
 interface MapSearchProps {
@@ -7,6 +7,7 @@ interface MapSearchProps {
   onInputChange: (value: string) => void;
   predictions: Prediction[];
   onPredictionsChange: (predictions: Prediction[]) => void;
+  onShowDropdownChange?: (show: boolean) => void;
 }
 
 export const MapSearch = ({ 
@@ -14,13 +15,20 @@ export const MapSearch = ({
   inputValue, 
   onInputChange, 
   predictions, 
-  onPredictionsChange 
+  onPredictionsChange,
+  onShowDropdownChange
 }: MapSearchProps) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const justSelectedRef = useRef(false);
+
+  // Update showDropdown and notify parent
+  const updateShowDropdown = useCallback((show: boolean) => {
+    setShowDropdown(show);
+    onShowDropdownChange?.(show);
+  }, [onShowDropdownChange]);
 
   // Fetch predictions from the autocomplete API
   const fetchPredictions = async (input: string): Promise<Prediction[]> => {
@@ -45,10 +53,10 @@ export const MapSearch = ({
     if (value.trim()) {
       const newPredictions = await fetchPredictions(value);
       onPredictionsChange(newPredictions);
-      setShowDropdown(newPredictions.length > 0);
+      updateShowDropdown(newPredictions.length > 0);
     } else {
       onPredictionsChange([]);
-      setShowDropdown(false);
+      updateShowDropdown(false);
     }
     setSelectedIndex(0);
   };
@@ -73,7 +81,7 @@ export const MapSearch = ({
         }
         break;
       case 'Escape':
-        setShowDropdown(false);
+        updateShowDropdown(false);
         inputRef.current?.blur();
         break;
     }
@@ -86,7 +94,7 @@ export const MapSearch = ({
 
     justSelectedRef.current = true;
     onInputChange(prediction.description);
-    setShowDropdown(false);
+    updateShowDropdown(false);
     onPredictionsChange([]);
     setSelectedIndex(0);
     onPlaceSelect(prediction);
@@ -100,14 +108,14 @@ export const MapSearch = ({
   // Handle input focus
   const handleFocus = () => {
     if (inputValue && !justSelectedRef.current) {
-      setShowDropdown(predictions.length > 0);
+      updateShowDropdown(predictions.length > 0);
     }
   };
 
   // Handle clear button
   const handleClear = () => {
     onInputChange('');
-    setShowDropdown(false);
+    updateShowDropdown(false);
     onPredictionsChange([]);
     setSelectedIndex(0);
     inputRef.current?.focus();
@@ -118,13 +126,13 @@ export const MapSearch = ({
     const handleClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
           inputRef.current && !inputRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
+        updateShowDropdown(false);
       }
     };
 
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+  }, [updateShowDropdown]);
 
   return (
     <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-30 w-full max-w-xl px-4">
