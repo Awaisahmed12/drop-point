@@ -192,6 +192,12 @@ src/
 - **Enhanced navigation reliability**: Back button and breadcrumb path now work correctly in all folder navigation scenarios
 - **Smart parent navigation**: Back button intelligently navigates to parent folder or root, with proper fallback logic
 
+### **Column Header Sorting Fix**
+- **Fixed Name column sorting**: Removed conflicting useEffect that was preventing Name column from showing sort indicators
+- **Consistent sort behavior**: All column headers (Name, Modified, Size) now properly display up/down arrows when clicked
+- **Improved default sorting**: Changed initial sort state to 'date' descending (most recent first) to match Google Drive behavior
+- **Eliminated sorting glitches**: Name column now toggles sort direction properly without interference from automatic sort field changes
+
 ### **Mobile Map Improvements**
 - Clean satellite/map toggle (hidden during search)
 - POI-free experience (no distracting business markers)

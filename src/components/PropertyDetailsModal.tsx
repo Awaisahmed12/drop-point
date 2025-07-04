@@ -73,8 +73,8 @@ export const PropertyDetailsModal = ({
   const [folderMenuId, setFolderMenuId] = useState<string | null>(null);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [moveFileTarget, setMoveFileTarget] = useState<PropertyFile | null>(null);
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchQuery, setSearchQuery] = useState('');
   
   
@@ -269,14 +269,6 @@ export const PropertyDetailsModal = ({
     });
   }, [files, folders, selectedFolder, sortField, sortDirection, searchQuery]);
 
-  // Set default sort to date (recency) descending like Google Drive
-  useEffect(() => {
-    // Only set default once when modal opens
-    if (isOpen && sortField === 'name') {
-      setSortField('date');
-      setSortDirection('desc');
-    }
-  }, [isOpen, sortField]);
 
   // Toggle sort direction
   const toggleSort = (field: SortField) => {
@@ -1140,7 +1132,7 @@ export const PropertyDetailsModal = ({
                                     }}
                                   >Rename</button>
                                   <button
-                                    className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                                    className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-red-600 hover:text-white font-medium cursor-pointer"
                                     onClick={e => {
                                       e.stopPropagation();
                                       onFolderDelete(folder);
@@ -1238,7 +1230,7 @@ export const PropertyDetailsModal = ({
                                     }}
                                   >Rename</button>
                                   <button
-                                    className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                                    className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-red-600 hover:text-white font-medium cursor-pointer"
                                     onClick={e => {
                                       e.stopPropagation();
                                       onFolderDelete(folder);
@@ -1358,7 +1350,7 @@ export const PropertyDetailsModal = ({
                                     }}
                                   >Rename</button>
                                   <button
-                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-blue-600 hover:text-white font-medium cursor-pointer"
                                     onClick={e => {
                                       e.stopPropagation();
                                       setMoveFileTarget(file);
@@ -1367,20 +1359,7 @@ export const PropertyDetailsModal = ({
                                     }}
                                   >Move</button>
                                   <button
-                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      setFileMenuId(null);
-                                      try {
-                                        await openFileInline(file);
-                                      } catch (error) {
-                                        console.error('Error opening file:', error);
-                                        alert('Unable to open file. Please try again.');
-                                      }
-                                    }}
-                                  >Open</button>
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-green-600 hover:text-white font-medium cursor-pointer"
+                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-green-600 hover:text-white font-medium cursor-pointer"
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
@@ -1518,20 +1497,7 @@ export const PropertyDetailsModal = ({
                                     }}
                                   >Move</button>
                                   <button
-                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      setFileMenuId(null);
-                                      try {
-                                        await openFileInline(file);
-                                      } catch (error) {
-                                        console.error('Error opening file:', error);
-                                        alert('Unable to open file. Please try again.');
-                                      }
-                                    }}
-                                  >Open</button>
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-green-600 hover:text-white font-medium cursor-pointer"
+                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-green-600 hover:text-white font-medium cursor-pointer"
                                     onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
