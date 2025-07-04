@@ -495,6 +495,7 @@ export default function MapPage() {
   };
 
   // Modify the fetchFiles function to use cache
+  /* REMOVED: fetchFiles function is no longer needed - data fetching is now handled directly in the onSelect handler
   const fetchFiles = useCallback(async () => {
     if (!savedProperty) return;
     
@@ -562,20 +563,7 @@ export default function MapPage() {
       setFilesLoading(false);
     }
   }, [savedProperty, getCachedPropertyData, cachePropertyData]);
-
-  // Fetch files for the selected property
-  useEffect(() => {
-    if (showDetailsModal && savedProperty) {
-      // Only fetch if we don't have the data in cache
-      const checkCache = async () => {
-        const cached = await getCachedPropertyData(savedProperty.address);
-        if (!cached) {
-          fetchFiles();
-        }
-      };
-      checkCache();
-    }
-  }, [showDetailsModal, savedProperty, fetchFiles, getCachedPropertyData]);
+  */
 
   // shortAddress function moved to PropertyDetailsModal
 
@@ -1258,35 +1246,77 @@ export default function MapPage() {
                     .maybeSingle();
                   dbProperty = existing;
                 }
-                            if (dbProperty) {
-              setSavedProperty(dbProperty);
-              // Check if we have cached data
-              const cached = await getCachedPropertyData(address);
-              if (cached) {
-                // Use cached data immediately
-                setFolders(cached.folders);
-                setPropertyFiles(cached.files);
-                setFoldersLoading(false);
-                setFilesLoading(false);
-              } else {
-                // No cached data - set loading states before opening modal
-                setFoldersLoading(true);
-                setFilesLoading(true);
-              }
-            } else {
-              setSavedProperty({
-                address,
-                lat: center?.lat() ?? 0,
-                lng: center?.lng() ?? 0,
-                label: null,
-                notes: null,
-                id: null, // Not saved yet
-              });
-              // New property - set loading states
-              setFoldersLoading(true);
-              setFilesLoading(true);
-            }
-            setShowDetailsModal(true);
+
+                if (dbProperty) {
+                  setSavedProperty(dbProperty);
+                  
+                  // Check if we have cached data
+                  const cached = await getCachedPropertyData(address);
+                  if (cached) {
+                    // Use cached data immediately
+                    setFolders(cached.folders);
+                    setPropertyFiles(cached.files);
+                    setFoldersLoading(false);
+                    setFilesLoading(false);
+                  } else {
+                    // No cached data - set loading states and fetch
+                    setFoldersLoading(true);
+                    setFilesLoading(true);
+                    
+                    // Fetch data immediately
+                    try {
+                      const [folderResult, filesResult] = await Promise.all([
+                        supabase
+                          .from('property_folders')
+                          .select('*')
+                          .eq('property_id', dbProperty.id)
+                          .eq('user_id', user!.id)
+                          .is('deleted_at', null)
+                          .order('created_at', { ascending: true }),
+                        supabase
+                          .from('property_files')
+                          .select('*')
+                          .eq('property_id', dbProperty.id)
+                          .order('uploaded_at', { ascending: false })
+                      ]);
+
+                      if (folderResult.data) {
+                        setFolders(folderResult.data);
+                      }
+
+                      if (filesResult.data) {
+                        setPropertyFiles(filesResult.data);
+                      }
+
+                      // Cache the fetched data
+                      if (folderResult.data && filesResult.data) {
+                        await cachePropertyData(address, filesResult.data, folderResult.data);
+                      }
+                    } catch (error) {
+                      console.error('Error fetching property data:', error);
+                    } finally {
+                      setFoldersLoading(false);
+                      setFilesLoading(false);
+                    }
+                  }
+                } else {
+                  setSavedProperty({
+                    address,
+                    lat: center?.lat() ?? 0,
+                    lng: center?.lng() ?? 0,
+                    label: null,
+                    notes: null,
+                    id: null, // Not saved yet
+                  });
+                  // New property - clear data and set not loading
+                  setFolders([]);
+                  setPropertyFiles([]);
+                  setFoldersLoading(false);
+                  setFilesLoading(false);
+                }
+                
+                // Open modal after all data is ready
+                setShowDetailsModal(true);
               }
             }}
           />
