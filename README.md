@@ -183,6 +183,15 @@ src/
 - Smart date handling (uploaded_at for files, created_at for folders)
 - All sort options preserved (name, date, size)
 
+### **Folder Navigation Bug Fixes**
+- **Fixed breadcrumb navigation**: Breadcrumbs now properly show when inside folders and allow back navigation
+- **Added dedicated back button**: Clear "Back" button with left arrow icon appears when inside any folder for intuitive navigation
+- **Corrected home icon behavior**: Home icon now properly navigates to root folder ('master') instead of causing blank state
+- **Resolved empty state display**: Fixed issue where clicking home icon would show blank screen with no files/folders
+- **Improved folder state management**: Consistent handling of 'master' vs empty string for root folder identification
+- **Enhanced navigation reliability**: Back button and breadcrumb path now work correctly in all folder navigation scenarios
+- **Smart parent navigation**: Back button intelligently navigates to parent folder or root, with proper fallback logic
+
 ### **Mobile Map Improvements**
 - Clean satellite/map toggle (hidden during search)
 - POI-free experience (no distracting business markers)
