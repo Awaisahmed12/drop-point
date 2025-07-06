@@ -40,6 +40,43 @@ DropPoint is a map-based document management platform for real estate profession
 **Maps**: Google Maps JavaScript API + Places API
 **Security**: Row Level Security (RLS) with signed URLs
 
+## 📱💻 Mobile & Web UI Architecture
+
+DropPoint is designed with **dual interfaces** - mobile and web - that share core logic while providing optimized experiences for each platform:
+
+### **Shared Logic Layer (SRP Focus)**
+- **Business Logic**: Centralized in `utils/` and custom hooks for consistent behavior
+- **Data Management**: Unified Supabase client and API calls across both interfaces
+- **State Management**: Shared React hooks for property, file, and user state
+- **Validation**: Common form validation and error handling logic
+- **File Operations**: Unified upload, download, and management functions
+
+### **Platform-Specific UI Components**
+- **Mobile Interface**: Touch-optimized components with 44px+ targets, swipe gestures, and mobile-first layouts
+- **Web Interface**: Desktop-optimized components with hover states, keyboard shortcuts, and larger information density
+- **Responsive Breakpoints**: Seamless transitions between mobile and desktop experiences
+- **Conditional Rendering**: Components adapt based on screen size and device capabilities
+
+### **Code Organization for Maintainability**
+```
+src/
+├── components/
+│   ├── shared/          # Platform-agnostic components
+│   ├── mobile/          # Mobile-specific UI components
+│   └── web/             # Web-specific UI components
+├── hooks/               # Shared business logic hooks
+├── utils/               # Platform-independent utilities
+└── styles/              # Responsive CSS with mobile-first approach
+```
+
+### **Benefits of This Architecture**
+- **DRY Principle**: Business logic written once, used everywhere
+- **Single Responsibility**: Each component has a clear, focused purpose
+- **Easier Testing**: Shared logic can be unit tested independently
+- **Consistent Behavior**: Same functionality across all platforms
+- **Faster Development**: New features implemented once, work everywhere
+- **Better Maintenance**: Bug fixes and improvements benefit both interfaces
+
 ## 📊 Database Schema
 
 ```sql
@@ -153,7 +190,40 @@ src/
 - **Performance**: GPU acceleration, optimized scrolling
 - **Progressive Enhancement**: Works across all device sizes
 
-## 🎯 Recent Updates
+## 🎯 Recent Updates & Features
+
+### **PropertySwitcher Feature ✅ **COMPLETED & INTEGRATED**
+
+**Status**: Fully implemented and integrated into PropertyDetailsModal
+
+The PropertySwitcher allows users to quickly switch between their saved properties directly from the PropertyDetailsModal header. When a property is selected, the system automatically moves the background map, updates the satellite image, and loads the selected property's files and folders.
+
+**Key Features**:
+- **Searchable dropdown** with property addresses and file counts
+- **Smart sorting** by last accessed date (most recent first)
+- **File count display** (e.g., "123 Main St (45 files)")
+- **Graceful handling** of properties with no files
+- **Mobile-responsive** design with touch-friendly interactions
+- **Performance optimized** for 20+ properties with virtualization
+- **Loading states** and error handling
+
+**Components**:
+1. **useUserProperties Hook** (`src/hooks/useUserProperties.ts`) - Fetches user properties with file counts
+2. **PropertySwitcher Component** (`src/components/PropertySwitcher.tsx`) - The dropdown UI component
+3. **usePropertySwitcher Hook** (`src/hooks/usePropertySwitcher.ts`) - Handles property switching logic
+4. **PropertyDetailsModal Integration** - Fully integrated into the modal header
+
+**Location**: The PropertySwitcher appears in the PropertyDetailsModal header, between the property address and the close button, displaying a chevron (▼) dropdown icon.
+
+**Usage**: When you open a PropertyDetailsModal, you'll see the dropdown next to the property address. Click it to see all your saved properties with file counts, search through them, and switch to any property instantly.
+
+### **Key Features Implemented**
+- **Interactive Map System**: LandGlide-style crosshair with dual view modes (Glider/Pin)
+- **Property Management**: One-click saving with duplicate prevention
+- **File Management**: Drag-and-drop uploads with 30+ file format support
+- **Hierarchical Folders**: Nested folder structure with breadcrumb navigation
+- **Mobile-First Design**: Responsive UI optimized for mobile and desktop
+- **Real-time Updates**: Live file operations with progress tracking
 
 ### **Current Location Feature**
 - **One-tap navigation**: Google Maps-style current location button for instant positioning

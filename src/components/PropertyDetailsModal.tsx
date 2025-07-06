@@ -3,9 +3,11 @@ import Image from 'next/image';
 
 import { MoveModal } from './MoveModal';
 import { FileIcon } from './FileIcon';
-import { SkeletonItem } from './SkeletonItem';
+import { PropertySwitcher } from './PropertySwitcher';
 import { useMobileViewport } from '../hooks/useMobileViewport';
+import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
+import type { PropertyWithFileCount } from '../hooks/useUserProperties';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
 import { getFileSignedUrl } from '../utils/supabaseClient';
@@ -41,6 +43,10 @@ interface PropertyDetailsModalProps {
   // Cache functions - for future use
   getCachedPropertyData?: (address: string) => Promise<{ files: PropertyFile[]; folders: PropertyFolder[] } | null>;
   cachePropertyData?: (address: string, files: PropertyFile[], folders: PropertyFolder[]) => void;
+  
+  // Property switching
+  onPropertySwitch?: (property: PropertyWithFileCount, files: PropertyFile[], folders: PropertyFolder[]) => void;
+  onMapMove?: (lat: number, lng: number) => void;
 }
 
 export const PropertyDetailsModal = ({ 
@@ -60,7 +66,9 @@ export const PropertyDetailsModal = ({
   onFolderCreate,
   onFolderDelete,
   pendingUploads,
-  onDismiss
+  onDismiss,
+  onPropertySwitch,
+  onMapMove
 }: PropertyDetailsModalProps) => {
   // State for UI interactions
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -76,6 +84,7 @@ export const PropertyDetailsModal = ({
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchQuery, setSearchQuery] = useState('');
+  const [switchingProperty, setSwitchingProperty] = useState(false);
   
   
   // Mobile file viewer state
@@ -99,6 +108,27 @@ export const PropertyDetailsModal = ({
     getMobileStyles,
     mobileClasses 
   } = useMobileViewport();
+
+  // Property switching hook
+  const { switchToProperty } = usePropertySwitcher({
+    onMapMove,
+    onPropertyDataLoad: (property, files, folders) => {
+      onPropertySwitch?.(property, files, folders);
+    },
+    onLoadingStateChange: setSwitchingProperty,
+    onError: (error) => {
+      console.error('Property switch error:', error);
+      // You could add a toast notification here
+    }
+  });
+
+  // Convert current property to PropertyWithFileCount format
+  const currentPropertyWithFileCount: PropertyWithFileCount | null = property ? {
+    ...property,
+    file_count: files.length,
+    created_at: undefined, // PropertyWithFileCount doesn't have created_at
+    last_accessed: new Date().toISOString() // Current time as last accessed
+  } : null;
 
   // Global address parsing and formatting utility
   const parseAddress = (fullAddress: string) => {
@@ -908,6 +938,19 @@ export const PropertyDetailsModal = ({
               </p>
             )}
           </div>
+          
+          {/* PropertySwitcher Placeholder - This is where the dropdown should appear */}
+          <div className="flex items-center gap-2">
+            {/* Property Switcher */}
+            {currentPropertyWithFileCount && (
+              <PropertySwitcher
+                currentProperty={currentPropertyWithFileCount}
+                onPropertySelect={switchToProperty}
+                disabled={switchingProperty}
+              />
+            )}
+          </div>
+          
           <button
             className={`close-button ${isMobile ? 'p-2' : 'p-2'} rounded-full cursor-pointer flex-shrink-0`}
             onClick={() => {
