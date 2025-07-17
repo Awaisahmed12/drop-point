@@ -265,14 +265,7 @@ export const PropertyDetailsModal = ({
         .map(folder => ({ ...folder, itemType: 'folder' as const }))
     ];
 
-    console.log('📋 [MODAL] Combined items - Total:', allItems.length, 'Selected folder:', selectedFolder);
-    if (allItems.length > 0) {
-      console.log('📋 [MODAL] Combined items preview:', allItems.slice(0, 5).map(item => ({ 
-        name: item.itemType === 'file' ? item.file_name : item.name, 
-        type: item.itemType,
-        date: item.itemType === 'file' ? item.uploaded_at : item.created_at
-      })));
-    }
+
     
     return allItems.sort((a, b) => {
       let comparison = 0;
@@ -890,18 +883,7 @@ export const PropertyDetailsModal = ({
     );
   };
 
-  // Debug logging for files prop changes
-  useEffect(() => {
-    console.log('📋 [MODAL] Files prop updated, count:', files.length);
-    if (files.length > 0) {
-      console.log('📋 [MODAL] Latest files:', files.slice(0, 3).map(f => f.file_name));
-    }
-  }, [files]);
 
-  // Debug logging for modal state
-  useEffect(() => {
-    console.log('📋 [MODAL] Modal opened:', isOpen, 'Property:', property?.address);
-  }, [isOpen, property?.address]);
 
   if (!isOpen || !property) return null;
 

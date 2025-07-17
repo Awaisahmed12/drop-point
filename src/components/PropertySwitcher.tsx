@@ -22,16 +22,8 @@ export const PropertySwitcher = ({
   const { isMobile } = useMobileViewport();
   const { properties, loading } = useUserProperties();
 
-  // Debug logging
-  useEffect(() => {
-    console.log('PropertySwitcher - Properties:', properties.length, properties);
-    console.log('PropertySwitcher - Current property:', currentProperty);
-    console.log('PropertySwitcher - Loading:', loading);
-  }, [properties, currentProperty, loading]);
-
-  // Filter properties based on search query and exclude current property
+  // Filter properties based on search query (keep current property but we'll handle it specially)
   const filteredProperties = properties.filter(property => {
-    if (currentProperty && property.id === currentProperty.id) return false;
     if (!searchQuery) return true;
     return property.address.toLowerCase().includes(searchQuery.toLowerCase());
   });
@@ -46,50 +38,10 @@ export const PropertySwitcher = ({
   // Limit to 20 properties for performance
   const displayProperties = sortedProperties.slice(0, 20);
 
-  // Debug logging for filtered properties
+  // Simple cleanup when dropdown closes
   useEffect(() => {
-    console.log('PropertySwitcher - Filtered properties:', filteredProperties.length);
-    console.log('PropertySwitcher - Display properties:', displayProperties.length, displayProperties);
-  }, [filteredProperties, displayProperties]);
-
-  // Block ALL clicks outside dropdown when open
-  useEffect(() => {
-    const handleGlobalClick = (event: MouseEvent) => {
-      if (isOpen) {
-        // If click is outside the dropdown, prevent it entirely
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-          event.preventDefault();
-          event.stopPropagation();
-          event.stopImmediatePropagation();
-          
-          setIsOpen(false);
-          setSearchQuery('');
-          return false;
-        }
-      }
-    };
-
-    const handleGlobalMouseDown = (event: MouseEvent) => {
-      if (isOpen) {
-        // If mousedown is outside the dropdown, prevent it entirely
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-          event.preventDefault();
-          event.stopPropagation();
-          event.stopImmediatePropagation();
-          return false;
-        }
-      }
-    };
-
-    if (isOpen) {
-      // Capture phase to intercept before any other handlers
-      document.addEventListener('click', handleGlobalClick, true);
-      document.addEventListener('mousedown', handleGlobalMouseDown, true);
-      
-      return () => {
-        document.removeEventListener('click', handleGlobalClick, true);
-        document.removeEventListener('mousedown', handleGlobalMouseDown, true);
-      };
+    if (!isOpen) {
+      setSearchQuery('');
     }
   }, [isOpen]);
 
@@ -101,8 +53,8 @@ export const PropertySwitcher = ({
   }, [isOpen]);
 
   // Handle property selection
-  const handlePropertySelect = (property: PropertyWithFileCount) => {
-    onPropertySelect(property);
+  const handlePropertySelect = async (property: PropertyWithFileCount) => {
+    await onPropertySelect(property);
     setIsOpen(false);
     setSearchQuery('');
   };
@@ -179,13 +131,16 @@ export const PropertySwitcher = ({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className={`absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] ${
+        <div className={`absolute bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] ${
           isMobile 
-            ? 'w-80 max-w-[calc(100vw-2rem)]' 
-            : 'w-96'
+            ? 'top-full right-0 mt-2 w-72 max-w-[calc(100vw-3rem)]' 
+            : 'top-full right-0 mt-2 w-96'
         }`} style={{ 
           zIndex: 9999,
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+          ...(isMobile ? { 
+            maxHeight: '50vh'
+          } : {})
         }}>
           {/* Search Input */}
           <div className="p-3 border-b border-gray-100">
@@ -216,26 +171,45 @@ export const PropertySwitcher = ({
             ) : (
               displayProperties.map((property) => {
                 const { streetAddress, locationInfo } = parseAddress(property.address);
+                const isCurrentProperty = currentProperty && property.id === currentProperty.id;
                 
                 return (
                   <button
                     key={property.id}
-                    onClick={() => handlePropertySelect(property)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0"
+                    onClick={() => !isCurrentProperty && handlePropertySelect(property)}
+                    disabled={isCurrentProperty}
+                    className={`w-full px-4 py-3 text-left transition-colors border-b border-gray-50 last:border-b-0 ${
+                      isCurrentProperty 
+                        ? 'bg-blue-50 cursor-not-allowed opacity-75' 
+                        : 'hover:bg-gray-50 cursor-pointer'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 truncate text-sm">
+                        <div className={`font-medium truncate text-sm flex items-center gap-2 ${
+                          isCurrentProperty ? 'text-blue-700' : 'text-gray-900'
+                        }`}>
                           {streetAddress || property.address}
+                          {isCurrentProperty && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-200 text-blue-800">
+                              Current
+                            </span>
+                          )}
                         </div>
                         {locationInfo && (
-                          <div className="text-xs text-gray-500 truncate mt-0.5">
+                          <div className={`text-xs truncate mt-0.5 ${
+                            isCurrentProperty ? 'text-blue-600' : 'text-gray-500'
+                          }`}>
                             {locationInfo}
                           </div>
                         )}
                       </div>
                       <div className="flex-shrink-0 ml-3">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          isCurrentProperty 
+                            ? 'bg-blue-200 text-blue-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
                           {property.file_count} file{property.file_count !== 1 ? 's' : ''}
                         </span>
                       </div>

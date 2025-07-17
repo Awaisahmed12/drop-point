@@ -17,6 +17,11 @@ DropPoint is a map-based document management platform for real estate profession
 - Duplicate prevention system
 - Property portfolio accessible from dashboard
 - Address validation and coordinate snapping
+- **Property Switcher**: Quick access dropdown to switch between properties with smart search
+- Real-time property switching with instant file/folder loading
+- Automatic map repositioning when switching properties
+- Smart dropdown UX: shows all properties including current one (marked as "Current")
+- Automatic "last accessed" timestamp updates for intelligent property ordering
 
 ### **File Management**
 - Drag-and-drop uploads with real-time progress tracking
@@ -32,6 +37,15 @@ DropPoint is a map-based document management platform for real estate profession
 - Touch-optimized interface (44px+ touch targets)
 - Responsive layout for all screen sizes
 - iOS web app optimizations
+
+### **Enhanced User Experience**
+- Global cursor pointer rules for all clickable elements
+- Smart click handling with overlay-based dropdown controls
+- Consistent hover states and interaction feedback
+- Seamless property switching without page reloads
+- **FIXED**: Critical race condition bug where files disappeared during property switching
+- Intuitive property dropdown that shows all properties with proper "Current" marking
+- Resolved useEffect conflict that was clearing file state immediately after property switches
 
 ## 🏗️ Architecture
 

@@ -768,10 +768,10 @@ export default function MapPage() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [pendingUploads]);
 
-  // Clear pendingUploads and propertyFiles when switching properties
+  // Clear pendingUploads when switching properties
+  // Note: propertyFiles are now managed by the property switcher, so we don't clear them here
   useEffect(() => {
     setPendingUploads([]);
-    setPropertyFiles([]);
   }, [savedProperty?.id]);
 
   // File utility functions moved to utils/fileManagement.ts
@@ -1456,6 +1456,27 @@ export default function MapPage() {
           getCachedPropertyData={getCachedPropertyData}
           cachePropertyData={cachePropertyData}
           onDismiss={dismissPendingUpload}
+          onPropertySwitch={(property, files, folders) => {
+            // Update the current property and its data
+            setSavedProperty(property);
+            setPropertyFiles(files);
+            setFolders(folders);
+            setSelectedFolder('master'); // Reset to root folder
+            
+            // Reset loading states since we have fresh data
+            setFoldersLoading(false);
+            setFilesLoading(false);
+            
+            // Clear any pending uploads for the previous property
+            setPendingUploads([]);
+            
+            // Update the property cache with the new data
+            cachePropertyData(property.address, files, folders);
+          }}
+          onMapMove={(lat, lng) => {
+            // Update map center when switching properties
+            setMapCenter({ lat, lng });
+          }}
         />
 
       </LoadScript>
