@@ -33,32 +33,50 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
         return;
       }
 
-      // Fetch properties with file counts using a join query
+      // First, get all properties for the user
       const { data: propertiesData, error: propertiesError } = await supabase
         .from('properties')
-        .select(`
-          *,
-          property_files!inner(id)
-        `)
+        .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('updated_at', { ascending: false });
 
       if (propertiesError) {
         throw propertiesError;
       }
 
-      // Transform data to include file counts
-      const propertiesWithCounts: PropertyWithFileCount[] = propertiesData?.map(property => ({
-        ...property,
-        file_count: property.property_files?.length || 0,
-        // Use updated_at if available, otherwise created_at
-        last_accessed: property.updated_at || property.created_at
-      })) || [];
+      if (!propertiesData || propertiesData.length === 0) {
+        setProperties([]);
+        return;
+      }
 
-      // Filter out properties with no files
-      const propertiesWithFiles = propertiesWithCounts.filter(p => p.file_count > 0);
+      // Get file counts for each property
+      const propertiesWithCounts: PropertyWithFileCount[] = await Promise.all(
+        propertiesData.map(async (property) => {
+          const { count, error: countError } = await supabase
+            .from('property_files')
+            .select('*', { count: 'exact', head: true })
+            .eq('property_id', property.id);
 
-      setProperties(propertiesWithFiles);
+          if (countError) {
+            console.error('Error counting files for property', property.id, countError);
+          }
+
+          return {
+            ...property,
+            file_count: count || 0,
+            last_accessed: property.updated_at || property.created_at
+          };
+        })
+      );
+
+      // Sort by last accessed (most recent first), then by created date
+      const sortedProperties = propertiesWithCounts.sort((a, b) => {
+        const aDate = new Date(a.last_accessed || a.created_at || '1970-01-01');
+        const bDate = new Date(b.last_accessed || b.created_at || '1970-01-01');
+        return bDate.getTime() - aDate.getTime();
+      });
+
+      setProperties(sortedProperties);
     } catch (err) {
       console.error('Error fetching user properties:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch properties');

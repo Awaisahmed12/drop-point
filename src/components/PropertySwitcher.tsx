@@ -22,6 +22,13 @@ export const PropertySwitcher = ({
   const { isMobile } = useMobileViewport();
   const { properties, loading } = useUserProperties();
 
+  // Debug logging
+  useEffect(() => {
+    console.log('PropertySwitcher - Properties:', properties.length, properties);
+    console.log('PropertySwitcher - Current property:', currentProperty);
+    console.log('PropertySwitcher - Loading:', loading);
+  }, [properties, currentProperty, loading]);
+
   // Filter properties based on search query and exclude current property
   const filteredProperties = properties.filter(property => {
     if (currentProperty && property.id === currentProperty.id) return false;
@@ -38,6 +45,12 @@ export const PropertySwitcher = ({
 
   // Limit to 20 properties for performance
   const displayProperties = sortedProperties.slice(0, 20);
+
+  // Debug logging for filtered properties
+  useEffect(() => {
+    console.log('PropertySwitcher - Filtered properties:', filteredProperties.length);
+    console.log('PropertySwitcher - Display properties:', displayProperties.length, displayProperties);
+  }, [filteredProperties, displayProperties]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -100,15 +113,19 @@ export const PropertySwitcher = ({
       <button
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
-        className={`flex items-center gap-2 transition-colors ${
+        className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all duration-200 ${
           disabled 
             ? 'cursor-not-allowed opacity-50' 
-            : 'cursor-pointer hover:text-blue-600'
-        }`}
+            : 'cursor-pointer hover:bg-blue-50 hover:shadow-sm'
+        } bg-white/80 border border-gray-200/60 backdrop-blur-sm`}
         onKeyDown={handleKeyDown}
+        title="Switch property"
       >
+        <span className="text-xs font-medium text-gray-600 hidden sm:inline">
+          Switch
+        </span>
         <ChevronDownIcon 
-          className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} transition-transform duration-200 ${
+          className={`${isMobile ? 'w-4 h-4' : 'w-4 h-4'} text-gray-700 transition-transform duration-200 ${
             isOpen ? 'rotate-180' : ''
           }`} 
         />
@@ -116,11 +133,14 @@ export const PropertySwitcher = ({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className={`absolute top-full left-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 ${
+        <div className={`absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] ${
           isMobile 
             ? 'w-80 max-w-[calc(100vw-2rem)]' 
             : 'w-96'
-        }`}>
+        }`} style={{ 
+          zIndex: 9999,
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+        }}>
           {/* Search Input */}
           <div className="p-3 border-b border-gray-100">
             <div className="relative">
@@ -139,7 +159,11 @@ export const PropertySwitcher = ({
 
           {/* Properties List */}
           <div className="max-h-64 overflow-y-auto">
-            {displayProperties.length === 0 ? (
+            {loading ? (
+              <div className="p-4 text-center text-gray-500 text-sm">
+                Loading properties...
+              </div>
+            ) : displayProperties.length === 0 ? (
               <div className="p-4 text-center text-gray-500 text-sm">
                 {searchQuery ? 'No properties match your search' : 'No other properties found'}
               </div>
