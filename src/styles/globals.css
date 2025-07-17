@@ -336,3 +336,76 @@ body {
 .animate-fade-in {
   animation: fade-in 0.2s ease-out;
 }
+
+/* ================================
+   GLOBAL CURSOR POINTER RULES
+   ================================ */
+
+/* Apply pointer cursor to all standard clickable elements */
+button,
+a,
+[role="button"],
+[role="link"],
+.cursor-pointer,
+[onClick],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+label,
+summary {
+  cursor: pointer !important;
+}
+
+/* Apply pointer cursor to elements with click handlers */
+[onclick] {
+  cursor: pointer !important;
+}
+
+/* Apply pointer cursor to common interactive classes */
+.hover\:bg-gray-100,
+.hover\:bg-gray-50,
+.hover\:bg-blue-50,
+.hover\:bg-blue-100,
+.hover\:bg-red-50,
+.hover\:bg-green-50,
+.hover\:text-blue-600,
+.hover\:text-blue-700,
+.hover\:text-gray-700,
+.hover\:shadow,
+.hover\:shadow-sm,
+.hover\:shadow-lg,
+.transition-colors,
+.group:hover {
+  cursor: pointer !important;
+}
+
+/* Specific overrides for our app's clickable patterns */
+.file-list [style*="cursor: pointer"],
+.property-title,
+.property-location,
+.close-button,
+div[onClick],
+span[onClick] {
+  cursor: pointer !important;
+}
+
+/* Ensure disabled elements don't show pointer */
+button:disabled,
+[disabled],
+.cursor-not-allowed,
+.opacity-50:disabled {
+  cursor: not-allowed !important;
+}
+
+/* Text cursor for inputs and text areas */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+textarea,
+[contenteditable="true"] {
+  cursor: text !important;
+}
