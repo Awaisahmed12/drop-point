@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useUserProperties, type PropertyWithFileCount } from '../hooks/useUserProperties';
 import { useMobileViewport } from '../hooks/useMobileViewport';
@@ -52,18 +52,46 @@ export const PropertySwitcher = ({
     console.log('PropertySwitcher - Display properties:', displayProperties.length, displayProperties);
   }, [filteredProperties, displayProperties]);
 
-  // Close dropdown when clicking outside
+  // Block ALL clicks outside dropdown when open
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-        setSearchQuery('');
+    const handleGlobalClick = (event: MouseEvent) => {
+      if (isOpen) {
+        // If click is outside the dropdown, prevent it entirely
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          
+          setIsOpen(false);
+          setSearchQuery('');
+          return false;
+        }
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    const handleGlobalMouseDown = (event: MouseEvent) => {
+      if (isOpen) {
+        // If mousedown is outside the dropdown, prevent it entirely
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          return false;
+        }
+      }
+    };
+
+    if (isOpen) {
+      // Capture phase to intercept before any other handlers
+      document.addEventListener('click', handleGlobalClick, true);
+      document.addEventListener('mousedown', handleGlobalMouseDown, true);
+      
+      return () => {
+        document.removeEventListener('click', handleGlobalClick, true);
+        document.removeEventListener('mousedown', handleGlobalMouseDown, true);
+      };
+    }
+  }, [isOpen]);
 
   // Focus search input when dropdown opens
   useEffect(() => {
@@ -108,9 +136,27 @@ export const PropertySwitcher = ({
   }
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      {/* Dropdown Trigger */}
-      <button
+    <>
+      {/* Click blocker overlay when dropdown is open */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-[9998] bg-transparent"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsOpen(false);
+            setSearchQuery('');
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        />
+      )}
+      
+      <div className="relative" ref={dropdownRef}>
+        {/* Dropdown Trigger */}
+        <button
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all duration-200 ${
@@ -209,5 +255,6 @@ export const PropertySwitcher = ({
         </div>
       )}
     </div>
+    </>
   );
 }; 
