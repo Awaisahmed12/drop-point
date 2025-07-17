@@ -1463,6 +1463,9 @@ export default function MapPage() {
             setFolders(folders);
             setSelectedFolder('master'); // Reset to root folder
             
+            // Update satellite image coordinates to show the new property
+            setSnappedLatLng({ lat: property.lat, lng: property.lng });
+            
             // Reset loading states since we have fresh data
             setFoldersLoading(false);
             setFilesLoading(false);
