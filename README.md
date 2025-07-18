@@ -283,6 +283,7 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 - **Enhanced Search UX**: Added clear button (X) that appears when typing, allowing users to easily cancel searches without hassle
 - **Comprehensive Search Clearing**: Search clears on all navigation actions - folder entry, breadcrumb navigation, back button, property switching, and modal close
 - **Intuitive Navigation Flow**: Users can search globally, then enter folders or switch properties with a clean slate for context-specific browsing
+- **Complete Property Switching**: Property selection card now updates to show the correct address when switching properties (previously showed old address)
 
 **Technical Implementation**:
 - Modified sorting algorithm to prioritize folders over files while maintaining secondary sort criteria
@@ -290,6 +291,8 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 - Implemented conditional clear button with proper mobile/desktop sizing
 - Enhanced search input with right padding when clear button is visible
 - Integrated search clearing into `usePropertySwitcher` hook's `onPropertyDataLoad` callback
+- **Property Selection Card Sync**: Added `setAddress(property.address)` to property switching to update the map selection card
+- **Complete Map Synchronization**: Property switching now updates map center, pans to new location, and prevents redundant address fetching
 
 ### **Google Drive-Style File Sorting**
 - Unified file/folder display in single list
@@ -318,6 +321,20 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 - **Improved accessibility**: Larger button with clear "Current Location" label for better desktop usability
 - **Smart layout**: Map type controls remain on left side, current location on right side for balanced interface
 - **Contextual placement**: Button positioned where users naturally look after using the search bar for navigation
+
+### **Property Switching Synchronization Fix ✅ COMPLETED**
+
+**Status**: Fixed property selection card address synchronization issue
+
+**Problem**: When switching properties using the PropertySwitcher dropdown, the property selection card (blue card at bottom of map) would continue showing the previous property's address, creating confusion about which property was actually selected.
+
+**Solution**: 
+- **Property Selection Card Update**: Property switching now updates the selection card to show the correct address
+- **Complete Map Synchronization**: Map center updates and pans to the new property location
+- **Consistent State Management**: All UI elements (modal, satellite image, selection card, map center) now stay perfectly synchronized
+- **Prevents Redundant Fetching**: Updates internal tracking to prevent unnecessary address API calls
+
+**Impact**: Property switching now provides a seamless, consistent experience where all UI elements update together, eliminating confusion about which property is currently selected.
 
 ### **Mobile Map Improvements**
 - Clean satellite/map toggle (hidden during search)

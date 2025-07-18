@@ -1526,6 +1526,9 @@ export default function MapPage() {
             setFolders(folders);
             setSelectedFolder('master'); // Reset to root folder
             
+            // Update the property selection card address
+            setAddress(property.address);
+            
             // Update satellite image coordinates to show the new property
             setSnappedLatLng({ lat: property.lat, lng: property.lng });
             
@@ -1542,6 +1545,11 @@ export default function MapPage() {
           onMapMove={(lat, lng) => {
             // Update map center when switching properties
             setMapCenter({ lat, lng });
+            if (map) {
+              map.panTo({ lat, lng });
+            }
+            // Update the last fetched center to prevent unnecessary address fetching
+            lastFetchedCenter.current = { lat, lng };
           }}
         />
 
