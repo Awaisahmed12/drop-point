@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Head from 'next/head';
 import { GoogleMap, LoadScript } from '@react-google-maps/api';
 import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
@@ -1321,6 +1322,14 @@ export default function MapPage() {
   return (
     <div className={`relative w-screen h-screen overflow-hidden ${mobileClasses.fullScreen}`} 
          style={getMobileStyles('page')}>
+      <Head>
+        <title>Map View - DropPoint Real Estate Document Management</title>
+        <meta name="description" content="Interactive map interface for managing real estate properties and documents. Select properties, upload files, and organize your real estate portfolio with our map-based system." />
+        <meta property="og:title" content="Map View - DropPoint Real Estate Document Management" />
+        <meta property="og:description" content="Interactive map interface for managing real estate properties and documents. Select properties, upload files, and organize your real estate portfolio with our map-based system." />
+        <meta property="twitter:title" content="Map View - DropPoint Real Estate Document Management" />
+        <meta property="twitter:description" content="Interactive map interface for managing real estate properties and documents. Select properties, upload files, and organize your real estate portfolio with our map-based system." />
+      </Head>
       <LoadScript
         googleMapsApiKey={GOOGLE_MAPS_API_KEY}
         libraries={GOOGLE_MAP_LIBRARIES}

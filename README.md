@@ -45,6 +45,7 @@ DropPoint is a map-based document management platform for real estate profession
 - Smart click handling with overlay-based dropdown controls
 - Consistent hover states and interaction feedback
 - Seamless property switching without page reloads
+- **Social Media Integration**: Rich link previews with DropPoint logo when sharing on Twitter, Facebook, LinkedIn, etc.
 - **FIXED**: Critical race condition bug where files disappeared during property switching
 - Intuitive property dropdown that shows all properties with proper "Current" marking
 - Resolved useEffect conflict that was clearing file state immediately after property switches

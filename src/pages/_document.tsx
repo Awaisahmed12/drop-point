@@ -5,7 +5,6 @@ export default function Document() {
     <Html lang="en">
       <Head>
         {/* Basic metadata */}
-        <title>DropPoint - Real Estate Document Management</title>
         <meta name="description" content="Map-based document management platform for real estate professionals. Select properties from an interactive map, organize unlimited files per property, and access everything from anywhere." />
         <meta name="keywords" content="real estate, document management, property files, map-based, file organization, real estate tools" />
         <meta name="author" content="DropPoint" />
@@ -20,13 +19,13 @@ export default function Document() {
         <meta property="og:title" content="DropPoint - Real Estate Document Management" />
         <meta property="og:description" content="Map-based document management platform for real estate professionals. Select properties from an interactive map, organize unlimited files per property, and access everything from anywhere." />
         <meta property="og:image" content="https://drop-point-xi.vercel.app/logo.png" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
+        <meta property="og:image:width" content="505" />
+        <meta property="og:image:height" content="482" />
         <meta property="og:image:alt" content="DropPoint Logo - Real Estate Document Management" />
         <meta property="og:site_name" content="DropPoint" />
         
         {/* Twitter */}
-        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:card" content="summary" />
         <meta property="twitter:url" content="https://drop-point-xi.vercel.app/" />
         <meta property="twitter:title" content="DropPoint - Real Estate Document Management" />
         <meta property="twitter:description" content="Map-based document management platform for real estate professionals. Select properties from an interactive map, organize unlimited files per property, and access everything from anywhere." />
