@@ -45,12 +45,7 @@ export const PropertySwitcher = ({
     }
   }, [isOpen]);
 
-  // Focus search input when dropdown opens
-  useEffect(() => {
-    if (isOpen && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [isOpen]);
+  // Focus search input when dropdown opens - REMOVED to prevent mobile keyboard popup
 
   // Handle property selection
   const handlePropertySelect = async (property: PropertyWithFileCount) => {
@@ -145,14 +140,14 @@ export const PropertySwitcher = ({
           {/* Search Input */}
           <div className="p-3 border-b border-gray-100">
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input
                 ref={searchInputRef}
                 type="text"
                 placeholder="Search properties..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm placeholder-gray-600"
                 onKeyDown={handleKeyDown}
               />
             </div>
@@ -190,11 +185,6 @@ export const PropertySwitcher = ({
                           isCurrentProperty ? 'text-blue-700' : 'text-gray-900'
                         }`}>
                           {streetAddress || property.address}
-                          {isCurrentProperty && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-200 text-blue-800">
-                              Current
-                            </span>
-                          )}
                         </div>
                         {locationInfo && (
                           <div className={`text-xs truncate mt-0.5 ${

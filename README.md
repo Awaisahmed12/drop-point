@@ -221,6 +221,8 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 - **File count display** (e.g., "123 Main St (45 files)")
 - **Graceful handling** of properties with no files
 - **Mobile-responsive** design with touch-friendly interactions
+- **Improved Mobile UX**: Search input only focuses when user explicitly taps it (no auto-keyboard popup)
+- **Enhanced Readability**: Darker placeholder text for better visibility
 - **Performance optimized** for 20+ properties with virtualization
 - **Loading states** and error handling
 
