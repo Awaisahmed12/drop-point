@@ -1570,6 +1570,209 @@ export const PropertyDetailsModal = ({
           }
         }} multiple />
 
+        {/* Upload Progress Toasts - Apple-inspired design */}
+        {pendingUploads.length > 0 && (
+          <div className={`fixed z-[9999] ${
+            isMobile 
+              ? 'top-4 left-4 right-4' 
+              : 'top-4 right-4 w-96'
+          }`}>
+            {/* Summary toast for multiple uploads */}
+            {pendingUploads.length > 1 && (
+              <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-4 mb-3 transform transition-all duration-300 ease-out">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+                      <svg className="w-4 h-4 text-white animate-pulse" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Uploading {pendingUploads.filter(p => p.status === 'uploading').length} files
+                      </p>
+                      <div className="w-48 bg-gray-200 rounded-full h-1.5 mt-1">
+                        <div 
+                          className="bg-blue-500 h-1.5 rounded-full transition-all duration-300 ease-out"
+                          style={{ 
+                            width: `${pendingUploads.reduce((acc, upload) => acc + upload.progress, 0) / pendingUploads.length}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      // Dismiss all pending uploads
+                      pendingUploads.forEach(upload => onDismiss(upload.id));
+                    }}
+                    className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                  >
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Individual file toasts */}
+            <div className="space-y-2 max-h-80 overflow-hidden">
+              {pendingUploads.slice(0, 4).map((upload) => (
+                <div 
+                  key={upload.id}
+                  className={`bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-white/20 p-3 transform transition-all duration-500 ease-out ${
+                    upload.status === 'success' 
+                      ? 'bg-green-50/95 border-green-200/30' 
+                      : upload.status === 'error'
+                      ? 'bg-red-50/95 border-red-200/30'
+                      : ''
+                  }`}
+                  style={{
+                    animation: upload.status === 'success' 
+                      ? 'slideInThenOut 2.5s ease-out forwards' 
+                      : 'slideIn 0.3s ease-out'
+                  }}
+                >
+                  <div className="flex items-center">
+                    {/* File Icon */}
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${
+                      upload.status === 'uploading' 
+                        ? 'bg-blue-100' 
+                        : upload.status === 'success'
+                        ? 'bg-green-100'
+                        : upload.status === 'error'
+                        ? 'bg-red-100'
+                        : 'bg-gray-100'
+                    }`}>
+                      {upload.status === 'uploading' && (
+                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      )}
+                      {upload.status === 'success' && (
+                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {upload.status === 'error' && (
+                        <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                    </div>
+                    
+                    {/* File Info */}
+                    <div className="flex-1 min-w-0 mr-2">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {upload.name}
+                      </p>
+                      {upload.status === 'uploading' && (
+                        <div className="flex items-center mt-1">
+                          <div className="flex-1 bg-gray-200 rounded-full h-1 mr-2">
+                            <div 
+                              className="bg-blue-500 h-1 rounded-full transition-all duration-300 ease-out"
+                              style={{ width: `${upload.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-500 font-medium">
+                            {upload.progress}%
+                          </span>
+                        </div>
+                      )}
+                      {upload.status === 'success' && (
+                        <p className="text-xs text-green-600 font-medium mt-0.5">
+                          Uploaded successfully
+                        </p>
+                      )}
+                      {upload.status === 'error' && (
+                        <p className="text-xs text-red-600 font-medium mt-0.5">
+                          {upload.error || 'Upload failed'}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex items-center space-x-1">
+                      {upload.status === 'uploading' && (
+                        <button
+                          onClick={upload.cancel}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors group"
+                          title="Cancel"
+                        >
+                          <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-red-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                      {upload.status === 'error' && (
+                        <button
+                          onClick={upload.retry}
+                          className="p-1.5 rounded-lg hover:bg-blue-50 transition-colors group"
+                          title="Retry"
+                        >
+                          <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onDismiss(upload.id)}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors group"
+                        title="Dismiss"
+                      >
+                        <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Show more indicator */}
+              {pendingUploads.length > 4 && (
+                <div className="bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-white/20 p-2 text-center">
+                  <p className="text-xs text-gray-500">
+                    +{pendingUploads.length - 4} more files uploading...
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Add custom CSS for animations */}
+        <style jsx>{`
+          @keyframes slideIn {
+            from {
+              opacity: 0;
+              transform: translateX(100%);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(0);
+            }
+          }
+          
+          @keyframes slideInThenOut {
+            0% {
+              opacity: 0;
+              transform: translateX(100%);
+            }
+            15% {
+              opacity: 1;
+              transform: translateX(0);
+            }
+            85% {
+              opacity: 1;
+              transform: translateX(0);
+            }
+            100% {
+              opacity: 0;
+              transform: translateX(100%);
+            }
+          }
+        `}</style>
+
         {/* Action Buttons */}
         <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0" style={{
           height: isMobile ? '56px' : '70px', // Reduced height for mobile

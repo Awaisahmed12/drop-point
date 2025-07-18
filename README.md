@@ -26,6 +26,10 @@ DropPoint is a map-based document management platform for real estate profession
 
 ### **File Management**
 - **Seamless Upload Workflow**: Upload files to any property - system auto-saves new properties on first upload
+- **Apple-Inspired Upload Experience**: Toast notifications with micro-interactions that feel lightning-fast
+- **Smart Progress Psychology**: Immediate visual feedback with smooth animations and perceived speed optimization
+- **Intelligent Error Recovery**: One-tap retry functionality with clear, non-intrusive error messaging
+- **Mobile-First Perfection**: Optimized toast positioning and touch targets for mobile and desktop
 - Drag-and-drop uploads with real-time progress tracking
 - Hierarchical folder system with unlimited nesting
 - Support for 30+ file formats (PDF, images, documents, etc.)
