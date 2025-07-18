@@ -362,6 +362,31 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 
 **Impact**: Mobile users now experience reliable file uploads without mysterious permission errors, especially on slower networks.
 
+### **Zoom-Based Property Selection ✅ COMPLETED**
+
+**Status**: Property selection card now only appears at appropriate zoom levels
+
+**Problem**: Users reported the property selection card was annoying - constantly popping up and disappearing as they browsed/swiped around the map at city or neighborhood zoom levels, when they weren't actually trying to select specific properties.
+
+**Solution**: 
+- **Zoom Threshold**: Added `PROPERTY_SELECTION_MIN_ZOOM = 16` constant for minimum zoom level
+- **Smart Address Fetching**: Only fetch addresses and show selection card when zoomed in to property level (zoom ≥ 16)
+- **Automatic Cleanup**: Clear address and hide card when zooming out below threshold
+- **Improved UX**: Users can now browse freely at neighborhood/city level without constant card interruptions
+
+**Technical Details**:
+- **Zoom Level 16**: Sweet spot where individual buildings/properties are clearly visible
+- **Event Handling**: Added `onZoomChanged` handler to track zoom level changes
+- **State Management**: Automatically clear interaction state when zooming out
+- **Address Caching**: Preserves performance while respecting zoom boundaries
+
+**Zoom Level Context**:
+- **Level 12** (Default): City/neighborhood overview
+- **Level 16** (Selection threshold): Individual properties visible 
+- **Level 19** (Search zoom): Street-level detail
+
+**Impact**: Users can now browse the map freely without property selection interruptions until they zoom in to actually select properties.
+
 ### **Mobile Map Improvements**
 - Clean satellite/map toggle (hidden during search)
 - POI-free experience (no distracting business markers)

@@ -14,6 +14,7 @@ import {
   GOOGLE_MAP_LIBRARIES, 
   DEFAULT_ZOOM, 
   SEARCH_ZOOM, 
+  PROPERTY_SELECTION_MIN_ZOOM,
   MAP_TYPE_KEY, 
   DEFAULT_MAP_TYPE 
 } from '../../constants';
@@ -221,12 +222,39 @@ export default function MapPage() {
     return Math.abs(a.lat - b.lat) > 0.00001 || Math.abs(a.lng - b.lng) > 0.00001;
   }
 
+  // Handle zoom changes
+  const handleZoomChange = useCallback(() => {
+    if (map) {
+      const currentZoom = map.getZoom();
+      if (currentZoom !== undefined) {
+        setZoom(currentZoom);
+        
+        // Clear address and interaction state if zoomed out below threshold
+        if (currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
+          setAddress('');
+          setHasInteracted(false);
+          setAddressLoading(false);
+          setSnappedLatLng(null);
+          lastFetchedCenter.current = null;
+        }
+      }
+    }
+  }, [map]);
+
   // On dragend or zoom_changed, set hasInteracted and fetch address if center changed
   const handleUserInteraction = useCallback(async () => {
     if (map) {
       const center = map.getCenter();
-      if (center) {
+      const currentZoom = map.getZoom();
+      
+      if (center && currentZoom !== undefined) {
         const coords = { lat: center.lat(), lng: center.lng() };
+        
+        // Only fetch address if zoomed in enough
+        if (currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
+          return;
+        }
+        
         if (coordsChanged(lastFetchedCenter.current, coords)) {
           lastFetchedCenter.current = coords;
           setHasInteracted(true);
@@ -1382,6 +1410,8 @@ export default function MapPage() {
           center={mapCenter}
           zoom={zoom}
           onLoad={setMap}
+          onDragEnd={handleUserInteraction}
+          onZoomChanged={handleZoomChange}
           mapTypeId={mapType as google.maps.MapTypeId}
           options={{
             tilt: 0,
@@ -1439,9 +1469,9 @@ export default function MapPage() {
           showDropdown={showDropdown}
           onCurrentLocationClick={handleCurrentLocationClick}
           currentLocationLoading={currentLocationLoading}
-          showPropertyInfoCard={hasInteracted && !!address}
+          showPropertyInfoCard={hasInteracted && !!address && zoom >= PROPERTY_SELECTION_MIN_ZOOM}
         />
-        {hasInteracted && address && (
+        {hasInteracted && address && zoom >= PROPERTY_SELECTION_MIN_ZOOM && (
           <PropertyInfoCard
             address={address}
             addressLoading={addressLoading}
