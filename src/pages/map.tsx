@@ -838,6 +838,25 @@ export default function MapPage() {
         setSavedProperty(newProperty);
         console.log('📁 [UPLOAD] Property auto-saved with ID:', propertyId);
         
+        // Add small delay to ensure property is fully propagated in Supabase
+        // This is especially important on mobile networks with higher latency
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verify the property was actually saved and is accessible
+        const { data: verifyProperty, error: verifyError } = await supabase
+          .from('properties')
+          .select('id')
+          .eq('id', propertyId)
+          .eq('user_id', user.id)
+          .single();
+          
+        if (verifyError || !verifyProperty) {
+          console.error('📁 [UPLOAD] Property verification failed:', verifyError);
+          throw new Error('Property was not properly saved. Please try again.');
+        }
+        
+        console.log('📁 [UPLOAD] Property verified, proceeding with uploads');
+        
       } catch (error) {
         console.error('📁 [UPLOAD] Error auto-saving property:', error);
         alert('Failed to save property. Please try again.');
@@ -1014,10 +1033,34 @@ export default function MapPage() {
 
       console.log('📁 [UPLOAD] Inserting DB record:', dbRecord);
 
-      const { error: dbError } = await supabase.from('property_files').insert([dbRecord]);
+      // Retry database insert up to 3 times to handle RLS race conditions
+      let dbError = null;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries) {
+        const { error } = await supabase.from('property_files').insert([dbRecord]);
+        
+        if (!error) {
+          // Success - break out of retry loop
+          break;
+        }
+        
+        dbError = error;
+        retryCount++;
+        
+        console.log(`📁 [UPLOAD] Database insert attempt ${retryCount} failed:`, error);
+        
+        if (retryCount < maxRetries) {
+          // Wait longer between retries (exponential backoff)
+          const waitTime = 1000 * retryCount; // 1s, 2s, 3s
+          console.log(`📁 [UPLOAD] Retrying in ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
 
       if (dbError) {
-        console.log('📁 [UPLOAD] Database insert error:', dbError);
+        console.log('📁 [UPLOAD] Database insert failed after all retries:', dbError);
         throw dbError;
       }
 

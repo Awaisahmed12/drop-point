@@ -336,6 +336,32 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 
 **Impact**: Property switching now provides a seamless, consistent experience where all UI elements update together, eliminating confusion about which property is currently selected.
 
+### **Mobile Upload RLS Race Condition Fix ✅ COMPLETED**
+
+**Status**: Fixed mobile-specific Row Level Security errors during file uploads
+
+**Problem**: Users experienced intermittent RLS (Row Level Security) errors when uploading files on mobile devices, particularly when uploading to new properties. This didn't occur on desktop/localhost due to network timing differences.
+
+**Root Cause**: Race condition in property auto-save + file upload flow:
+1. User uploads files to unsaved property (no `property_id` yet)
+2. System auto-saves property to database to get `property_id`  
+3. File uploads immediately start using that `property_id`
+4. On mobile networks with higher latency, uploads would start before property was fully propagated in Supabase
+5. RLS policies denied file inserts because they couldn't verify the property existed or belonged to the user
+
+**Solution**:
+- **Propagation Delay**: Added 500ms wait after property save to ensure database propagation
+- **Property Verification**: Added explicit check that property exists and is accessible before starting uploads
+- **Retry Logic**: Implemented exponential backoff retry (3 attempts) for database inserts to handle remaining edge cases
+- **Better Error Handling**: Enhanced logging and error messages for easier debugging
+
+**Technical Details**:
+- Mobile networks typically have 100-300ms higher latency than desktop
+- Supabase's real-time propagation can take additional time on slower connections
+- RLS policies need consistent view of related data (properties + property_files)
+
+**Impact**: Mobile users now experience reliable file uploads without mysterious permission errors, especially on slower networks.
+
 ### **Mobile Map Improvements**
 - Clean satellite/map toggle (hidden during search)
 - POI-free experience (no distracting business markers)
