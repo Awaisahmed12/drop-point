@@ -30,7 +30,7 @@ interface PropertyDetailsModalProps {
   onFolderChange: (folderId: string) => void;
   
   // File operations
-  onFileUpload: (files: FileList) => void;
+  onFileUpload: (files: FileList) => Promise<void>;
   onFileDelete: (file: PropertyFile) => void;
   onFileRename: (item: PropertyFile | PropertyFolder, newName: string) => void;
   onFolderCreate: (name: string) => void;
@@ -1559,8 +1559,15 @@ export const PropertyDetailsModal = ({
         </div>
 
         {/* Hidden file input for upload */}
-        <input id="file-upload-input" type="file" className="hidden" onChange={(e) => {
-          if (e.target.files) onFileUpload(e.target.files);
+        <input id="file-upload-input" type="file" className="hidden" onChange={async (e) => {
+          if (e.target.files) {
+            try {
+              await onFileUpload(e.target.files);
+            } catch (error) {
+              console.error('File upload error:', error);
+              // You could add a toast notification here
+            }
+          }
         }} multiple />
 
         {/* Action Buttons */}

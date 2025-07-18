@@ -777,19 +777,73 @@ export default function MapPage() {
   // File utility functions moved to utils/fileManagement.ts
 
   // File upload handling
-  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     console.log('📁 [UPLOAD] File input changed');
     const files = e.target.files;
     if (!files || files.length === 0) {
       console.log('📁 [UPLOAD] No files selected');
       return;
     }
-    if (!savedProperty?.id) {
-      console.log('📁 [UPLOAD] No saved property ID, aborting upload');
-      alert('Please save the property first before uploading files.');
+    
+    if (!savedProperty) {
+      console.log('📁 [UPLOAD] No property selected, aborting upload');
+      alert('Please select a property first before uploading files.');
       return;
     }
-    const propertyId = savedProperty.id;
+
+    let propertyId: string = savedProperty.id || '';
+    
+    // If property doesn't have an ID yet, save it to the database first
+    if (!propertyId) {
+      console.log('📁 [UPLOAD] Property not saved yet, auto-saving to database...');
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          alert('You must be logged in to upload files.');
+          return;
+        }
+
+        // Save the property to the database
+        const { data: newProperty, error: saveError } = await supabase
+          .from('properties')
+          .insert([{
+            user_id: user.id,
+            address: savedProperty.address,
+            lat: savedProperty.lat,
+            lng: savedProperty.lng,
+            label: savedProperty.label,
+            notes: savedProperty.notes,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }])
+          .select()
+          .single();
+
+        if (saveError) {
+          console.error('📁 [UPLOAD] Error saving property:', saveError);
+          alert('Failed to save property. Please try again.');
+          return;
+        }
+
+        if (!newProperty) {
+          console.error('📁 [UPLOAD] No property returned after save');
+          alert('Failed to save property. Please try again.');
+          return;
+        }
+
+        // Update the saved property with the new ID
+        propertyId = newProperty.id;
+        setSavedProperty(newProperty);
+        console.log('📁 [UPLOAD] Property auto-saved with ID:', propertyId);
+        
+      } catch (error) {
+        console.error('📁 [UPLOAD] Error auto-saving property:', error);
+        alert('Failed to save property. Please try again.');
+        return;
+      }
+    }
+
     const folderIdForUpload = selectedFolder === 'master' ? null : selectedFolder;
     console.log('📁 [UPLOAD] Property ID:', propertyId, 'Folder ID:', folderIdForUpload);
     
@@ -1442,8 +1496,8 @@ export default function MapPage() {
           filesLoading={filesLoading}
           selectedFolder={selectedFolder}
           onFolderChange={setSelectedFolder}
-          onFileUpload={(files: FileList) => {
-            handleFileInputChange({ target: { files } } as React.ChangeEvent<HTMLInputElement>);
+          onFileUpload={async (files: FileList) => {
+            await handleFileInputChange({ target: { files } } as React.ChangeEvent<HTMLInputElement>);
           }}
           onFileDelete={handleDeleteFile}
           onFileRename={handleRename}
