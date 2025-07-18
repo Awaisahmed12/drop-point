@@ -33,7 +33,10 @@ DropPoint is a map-based document management platform for real estate profession
 - Drag-and-drop uploads with real-time progress tracking
 - Hierarchical folder system with unlimited nesting
 - Support for 30+ file formats (PDF, images, documents, etc.)
-- Google Drive-style unified file/folder sorting (recency-first default)
+- **Document Management Best Practices**: Folders automatically appear at the top of listings (standard industry practice)
+- **Smart Search & Navigation**: Search automatically clears when entering folders for proper context management
+- **Enhanced Search UX**: Clear button (X) for easy search cancellation without hassle
+- **Google Drive-style unified file/folder sorting** with folders-first organization
 - Batch operations and smart file organization
 - In-app file viewer for mobile (no pop-up blockers)
 
@@ -270,9 +273,27 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 - **Improved loading states**: Proper loading state management for cached vs fresh data
 - **Enhanced mobile reliability**: Modal opens with data ready, no more second-click requirement
 
+### **Document Management UX Improvements ✅ COMPLETED**
+
+**Status**: Fully implemented with industry-standard document management practices
+
+**Key Improvements**:
+- **Folders-First Organization**: Folders now appear at the top of file listings, following standard document management conventions (like Windows Explorer, macOS Finder, Google Drive)
+- **Smart Search Context Management**: Search automatically clears when navigating into folders, maintaining proper context and avoiding confusion
+- **Enhanced Search UX**: Added clear button (X) that appears when typing, allowing users to easily cancel searches without hassle
+- **Comprehensive Search Clearing**: Search clears on all navigation actions - folder entry, breadcrumb navigation, back button, property switching, and modal close
+- **Intuitive Navigation Flow**: Users can search globally, then enter folders or switch properties with a clean slate for context-specific browsing
+
+**Technical Implementation**:
+- Modified sorting algorithm to prioritize folders over files while maintaining secondary sort criteria
+- Added `setSearchQuery('')` to all folder navigation handlers and property switching callback
+- Implemented conditional clear button with proper mobile/desktop sizing
+- Enhanced search input with right padding when clear button is visible
+- Integrated search clearing into `usePropertySwitcher` hook's `onPropertyDataLoad` callback
+
 ### **Google Drive-Style File Sorting**
 - Unified file/folder display in single list
-- Recency-first default sorting (most recently modified first)
+- **Folders-first organization** with secondary sorting by user criteria
 - Smart date handling (uploaded_at for files, created_at for folders)
 - All sort options preserved (name, date, size)
 

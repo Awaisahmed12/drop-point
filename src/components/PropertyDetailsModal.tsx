@@ -113,6 +113,8 @@ export const PropertyDetailsModal = ({
   const { switchToProperty } = usePropertySwitcher({
     onMapMove,
     onPropertyDataLoad: (property, files, folders) => {
+      // Clear search when switching properties
+      setSearchQuery('');
       onPropertySwitch?.(property, files, folders);
     },
     onLoadingStateChange: setSwitchingProperty,
@@ -239,7 +241,7 @@ export const PropertyDetailsModal = ({
   const folderNameValidationMsg = folderNameError(newFolderName);
   const isFolderNameValid = !!newFolderName && !folderNameValidationMsg;
 
-  // Sorting logic - Combined files and folders sorted by recency (Google Drive style)
+  // Sorting logic - Folders first, then files (standard document management practice)
   const sortedItems = useMemo(() => {
     // Combine files and folders into a single array with unified interface
     const allItems: (PropertyFile & { itemType: 'file' } | PropertyFolder & { itemType: 'folder' })[] = [
@@ -265,9 +267,13 @@ export const PropertyDetailsModal = ({
         .map(folder => ({ ...folder, itemType: 'folder' as const }))
     ];
 
-
-    
     return allItems.sort((a, b) => {
+      // Always put folders before files
+      if (a.itemType !== b.itemType) {
+        return a.itemType === 'folder' ? -1 : 1;
+      }
+      
+      // Within the same type, sort by the selected criteria
       let comparison = 0;
       switch (sortField) {
         case 'name':
@@ -938,6 +944,7 @@ export const PropertyDetailsModal = ({
               onClick={() => {
                 onClose();
                 setCreatingFolder(false);
+                setSearchQuery('');
               }}
               title="Close"
             >
@@ -976,14 +983,20 @@ export const PropertyDetailsModal = ({
                   <div className="flex items-center gap-2 text-xs text-gray-600 overflow-x-auto">
                     <HomeIcon 
                       className="w-3 h-3 text-gray-400 cursor-pointer hover:text-blue-600 transition-colors flex-shrink-0" 
-                      onClick={() => onFolderChange('master')}
+                      onClick={() => {
+                        setSearchQuery('');
+                        onFolderChange('master');
+                      }}
                     />
                     {breadcrumbPath.map((folder) => (
                       <div key={folder.id} className="flex items-center gap-2 flex-shrink-0">
                         <span className="text-gray-400">/</span>
                         <button
                           className="text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
-                          onClick={() => onFolderChange(folder.id)}
+                          onClick={() => {
+                            setSearchQuery('');
+                            onFolderChange(folder.id);
+                          }}
                         >
                           {folder.name}
                         </button>
@@ -1000,6 +1013,8 @@ export const PropertyDetailsModal = ({
                           // Go back to parent folder
                           const currentFolder = folders.find(f => f.id === selectedFolder);
                           const parentId = currentFolder?.parent_id || 'master';
+                          // Clear search when navigating back
+                          setSearchQuery('');
                           onFolderChange(parentId);
                         }}
                       >
@@ -1027,7 +1042,7 @@ export const PropertyDetailsModal = ({
                     placeholder="Search files and folders..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className={`w-full ${isMobile ? 'px-4 py-4 text-base' : 'px-4 py-2 text-sm'} bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-10 text-black placeholder-gray-400`}
+                    className={`w-full ${isMobile ? 'px-4 py-4 text-base' : 'px-4 py-2 text-sm'} bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-10 ${searchQuery ? 'pr-10' : ''} text-black placeholder-gray-400`}
                     style={{
                       // Prevent zoom on iOS
                       fontSize: isMobile ? '16px' : undefined,
@@ -1038,6 +1053,17 @@ export const PropertyDetailsModal = ({
                     <circle cx="11" cy="11" r="8" />
                     <path d="m21 21-4.35-4.35" />
                   </svg>
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className={`absolute right-3 ${isMobile ? 'top-4 w-5 h-5' : 'top-2.5 w-4 h-4'} text-gray-400 hover:text-gray-600 transition-colors rounded-full flex items-center justify-center`}
+                      title="Clear search"
+                    >
+                      <svg className="w-full h-full" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1094,6 +1120,8 @@ export const PropertyDetailsModal = ({
                                 return;
                               }
                               
+                              // Clear search when entering a folder
+                              setSearchQuery('');
                               onFolderChange(folder.id);
                             }}
                           >
@@ -1182,6 +1210,8 @@ export const PropertyDetailsModal = ({
                                 return;
                               }
                               
+                              // Clear search when entering a folder
+                              setSearchQuery('');
                               onFolderChange(folder.id);
                             }}
                           >
