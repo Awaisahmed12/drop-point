@@ -11,6 +11,7 @@ DropPoint is a map-based document management platform for real estate profession
 - User geolocation with fallback to US center
 - POI-free experience (no distracting business markers)
 - Current location button for instant navigation to user's position
+- **Priority Search**: User's saved properties appear first in search results, even from different locations
 
 ### **Property Management**
 - One-click property saving from map coordinates

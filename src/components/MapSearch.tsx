@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Prediction } from '../../types';
+import { supabase } from '../utils/supabaseClient';
 
 interface MapSearchProps {
   onPlaceSelect: (prediction: Prediction) => void;
@@ -30,12 +31,27 @@ export const MapSearch = ({
     onShowDropdownChange?.(show);
   }, [onShowDropdownChange]);
 
-  // Fetch predictions from the autocomplete API
+  // Fetch predictions from the autocomplete API with auth token
   const fetchPredictions = async (input: string): Promise<Prediction[]> => {
     if (!input.trim()) return [];
     
     try {
-      const response = await fetch(`/api/autocomplete?input=${encodeURIComponent(input)}`);
+      // Get the current session to include auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add auth token if available
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      
+      const response = await fetch(`/api/autocomplete?input=${encodeURIComponent(input)}`, {
+        headers
+      });
+      
       if (!response.ok) throw new Error('Failed to fetch predictions');
       
       const data = await response.json();
@@ -164,16 +180,46 @@ export const MapSearch = ({
             ref={dropdownRef}
             className="absolute z-30 w-full bg-white border border-gray-200 rounded-b-lg shadow-lg mt-1 max-h-60 overflow-auto"
           >
-            {predictions.map((prediction, i) => (
-              <div
-                key={prediction.place_id}
-                className={`px-4 py-2 cursor-pointer text-gray-800 ${i === selectedIndex ? 'bg-blue-100' : ''}`}
-                onMouseDown={() => selectPrediction(i)}
-                style={{ fontWeight: i === selectedIndex ? 500 : 400 }}
-              >
-                {prediction.description}
-              </div>
-            ))}
+            {predictions.map((prediction, i) => {
+              const isUserProperty = prediction.types?.includes('user_property') || (prediction as any).user_property;
+              
+              return (
+                <div
+                  key={prediction.place_id}
+                  className={`px-4 py-2 cursor-pointer text-gray-800 flex items-center gap-2 ${
+                    i === selectedIndex ? 'bg-blue-100' : ''
+                  } ${isUserProperty ? 'border-l-4 border-l-blue-500 bg-blue-50' : ''}`}
+                  onMouseDown={() => selectPrediction(i)}
+                  style={{ fontWeight: i === selectedIndex ? 500 : 400 }}
+                >
+                  {isUserProperty && (
+                    <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2V7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 21v-4a2 2 0 012-2h4a2 2 0 012 2v4" />
+                    </svg>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    {isUserProperty ? (
+                      <div>
+                        <div className="font-semibold text-blue-900 truncate">
+                          {prediction.structured_formatting?.main_text || prediction.description.split(',')[0]}
+                        </div>
+                        <div className="text-sm text-blue-700 truncate">
+                          {prediction.structured_formatting?.secondary_text || prediction.description.split(',').slice(1).join(',')}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="truncate">{prediction.description}</div>
+                    )}
+                  </div>
+                  {isUserProperty && (
+                    <span className="text-xs text-blue-600 font-medium flex-shrink-0">
+                      My Property
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

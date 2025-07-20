@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { GoogleMap, LoadScript } from '@react-google-maps/api';
 import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
-import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
 import { supabase } from '../utils/supabaseClient';
@@ -11,6 +10,7 @@ import { useRouter } from 'next/router';
 import { 
   containerStyle, 
   US_CENTER, 
+  GOOGLE_MAPS_API_KEY,
   GOOGLE_MAP_LIBRARIES, 
   DEFAULT_ZOOM, 
   SEARCH_ZOOM, 
@@ -183,18 +183,59 @@ export default function MapPage() {
 
   // Try to get user's geolocation on mount
   useEffect(() => {
+    console.log('🌍 [GEOLOCATION] Checking geolocation support...');
+    console.log('🌍 [GEOLOCATION] Navigator available:', typeof navigator !== 'undefined');
+    console.log('🌍 [GEOLOCATION] Geolocation available:', typeof navigator !== 'undefined' && 'geolocation' in navigator);
+    console.log('🌍 [GEOLOCATION] Secure context (HTTPS):', window.isSecureContext);
+    console.log('🌍 [GEOLOCATION] Current protocol:', window.location.protocol);
+    console.log('🌍 [GEOLOCATION] Current hostname:', window.location.hostname);
+    
     if (typeof window !== 'undefined' && navigator.geolocation) {
+      console.log('🌍 [GEOLOCATION] Attempting to get current position on mount...');
+      
+      // First, check permissions if available
+      if ('permissions' in navigator) {
+        navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+          console.log('🌍 [GEOLOCATION] Permission status:', result.state);
+          console.log('🌍 [GEOLOCATION] Permission details:', result);
+        }).catch((err) => {
+          console.log('🌍 [GEOLOCATION] Could not check permissions:', err);
+        });
+      }
+      
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          console.log('🌍 [GEOLOCATION] Success on mount:', position.coords);
+          console.log('🌍 [GEOLOCATION] Accuracy:', position.coords.accuracy);
+          console.log('🌍 [GEOLOCATION] Timestamp:', new Date(position.timestamp));
           setMapCenter({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           });
+          console.log('🌍 [GEOLOCATION] Map center updated to:', {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
         },
-        () => {
+        (error) => {
+          console.log('🌍 [GEOLOCATION] Error on mount:', error.code, error.message);
+          console.log('🌍 [GEOLOCATION] Error constants:', {
+            PERMISSION_DENIED: GeolocationPositionError.PERMISSION_DENIED,
+            POSITION_UNAVAILABLE: GeolocationPositionError.POSITION_UNAVAILABLE,
+            TIMEOUT: GeolocationPositionError.TIMEOUT
+          });
           // If denied or unavailable, do nothing (fallback to US_CENTER)
+        },
+        {
+          enableHighAccuracy: false, // Use false for faster initial load
+          timeout: 8000,
+          maximumAge: 300000 // 5 minutes cache for initial load
         }
       );
+    } else {
+      console.log('🌍 [GEOLOCATION] Navigator.geolocation not available');
+      console.log('🌍 [GEOLOCATION] Window available:', typeof window !== 'undefined');
+      console.log('🌍 [GEOLOCATION] Navigator available:', typeof navigator !== 'undefined');
     }
   }, []);
 
@@ -386,7 +427,7 @@ export default function MapPage() {
 
   async function fetchPredictions(input: string): Promise<Prediction[]> {
     if (!input) return [];
-    const url = `/api/autocomplete?query=${encodeURIComponent(input)}`;
+    const url = `/api/autocomplete?input=${encodeURIComponent(input)}`;
     const res = await fetch(url);
     const data = await res.json();
     return data.predictions || [];
@@ -411,6 +452,76 @@ export default function MapPage() {
     justSelectedRef.current = true;
     setInputValue(prediction.description);
     setPredictions([]);
+    
+    // Check if this is a user property
+    const isUserProperty = prediction.types?.includes('user_property') || (prediction as any).user_property;
+    
+    if (isUserProperty) {
+      // Handle user property selection directly
+      const propertyId = (prediction as any).property_id;
+      if (propertyId) {
+        console.log('🏠 User property selected:', prediction.description);
+        
+        // Get the property details from database
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: property } = await supabase
+            .from('properties')
+            .select('*')
+            .eq('id', propertyId)
+            .eq('user_id', user.id)
+            .single();
+          
+          if (property) {
+            const coords = { lat: property.lat, lng: property.lng };
+            setMapCenter(coords);
+            setZoom(SEARCH_ZOOM);
+            setHasInteracted(true);
+            lastFetchedCenter.current = coords;
+            
+            // Set address directly from database
+            setAddress(property.address);
+            setSnappedLatLng({ lat: property.lat, lng: property.lng });
+            setAddressLoading(false);
+            
+            // Cache the address
+            saveAddressToCache(property.lat, property.lng, property.address, { lat: property.lat, lng: property.lng });
+            
+            // Try to prefetch property data
+            const isCached = await isPropertyDataCached(property.address);
+            if (!isCached) {
+              const [folderResult, filesResult] = await Promise.all([
+                supabase
+                  .from('property_folders')
+                  .select('*')
+                  .eq('property_id', property.id)
+                  .eq('user_id', user.id)
+                  .is('deleted_at', null)
+                  .order('created_at', { ascending: true }),
+                supabase
+                  .from('property_files')
+                  .select('*')
+                  .eq('property_id', property.id)
+                  .order('uploaded_at', { ascending: false })
+              ]);
+
+              if (folderResult.data && filesResult.data) {
+                await cachePropertyData(property.address, filesResult.data, folderResult.data);
+              }
+            }
+            
+            if (map) {
+              map.panTo(coords);
+              map.setZoom(SEARCH_ZOOM);
+            }
+            
+            return; // Exit early for user properties
+          }
+        }
+      }
+    }
+    
+    // Handle regular Google Places prediction
     const loc = await geocodePlaceId(prediction.place_id);
     if (loc) {
       setMapCenter(loc);
@@ -1281,25 +1392,35 @@ export default function MapPage() {
 
   // Current location handler
   const handleCurrentLocationClick = useCallback(() => {
+    console.log('🌍 [GEOLOCATION] Current location button clicked');
+    
     if (!navigator.geolocation) {
+      console.log('🌍 [GEOLOCATION] Geolocation not supported');
       alert('Geolocation is not supported by this browser.');
       return;
     }
 
     setCurrentLocationLoading(true);
+    console.log('🌍 [GEOLOCATION] Starting getCurrentPosition...');
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        console.log('🌍 [GEOLOCATION] Success:', position.coords);
         const { latitude, longitude } = position.coords;
         const newCenter = { lat: latitude, lng: longitude };
+        
+        console.log('🌍 [GEOLOCATION] New center:', newCenter);
         
         // Update map center and zoom
         setMapCenter(newCenter);
         setZoom(SEARCH_ZOOM);
         
         if (map) {
+          console.log('🌍 [GEOLOCATION] Updating map position...');
           map.panTo(newCenter);
           map.setZoom(SEARCH_ZOOM);
+        } else {
+          console.log('🌍 [GEOLOCATION] Warning: Map not ready yet');
         }
 
         // Update interaction state and fetch address
@@ -1310,6 +1431,7 @@ export default function MapPage() {
         // Check cache first
         const cached = getAddressFromCache(latitude, longitude);
         if (cached) {
+          console.log('🌍 [GEOLOCATION] Using cached address:', cached.address);
           setAddress(cached.address);
           setSnappedLatLng(cached.snappedLatLng);
           setAddressLoading(false);
@@ -1350,32 +1472,51 @@ export default function MapPage() {
           }
         } else {
           // Fetch address for current location
+          console.log('🌍 [GEOLOCATION] Fetching address for coordinates...');
           fetchAddress(latitude, longitude);
         }
         
         setCurrentLocationLoading(false);
+        console.log('🌍 [GEOLOCATION] Location update complete');
       },
       (error) => {
         setCurrentLocationLoading(false);
+        console.log('🌍 [GEOLOCATION] Error:', error);
+        console.log('🌍 [GEOLOCATION] Error details:', {
+          code: error.code,
+          message: error.message,
+          PERMISSION_DENIED: error.PERMISSION_DENIED,
+          POSITION_UNAVAILABLE: error.POSITION_UNAVAILABLE,
+          TIMEOUT: error.TIMEOUT
+        });
+        
         let errorMessage = 'Unable to retrieve your location.';
+        let debugInfo = '';
         
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied. Please enable location permissions.';
+            errorMessage = 'Location access denied. Please enable location permissions in your browser settings.';
+            debugInfo = 'To enable: Click the location icon in your address bar, or go to browser settings > Privacy > Location.';
             break;
           case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information is unavailable.';
+            errorMessage = 'Location information is unavailable. Please check your GPS and internet connection.';
+            debugInfo = 'Try: 1) Enable GPS/location services 2) Check internet connection 3) Try again in a few seconds';
             break;
           case error.TIMEOUT:
-            errorMessage = 'Location request timed out.';
+            errorMessage = 'Location request timed out. Please try again.';
+            debugInfo = 'The location request took too long. Your device might be having trouble getting a GPS fix.';
             break;
+          default:
+            errorMessage = `Location error (${error.code}): ${error.message}`;
+            debugInfo = 'Unknown geolocation error occurred.';
         }
         
-        alert(errorMessage);
+        console.log('🌍 [GEOLOCATION] Debug info:', debugInfo);
+        alert(`${errorMessage}\n\n${debugInfo}`);
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 15000, // Increased timeout to 15 seconds
         maximumAge: 60000 // Cache location for 1 minute
       }
     );
@@ -1409,7 +1550,12 @@ export default function MapPage() {
           mapContainerStyle={containerStyle}
           center={mapCenter}
           zoom={zoom}
-          onLoad={setMap}
+          onLoad={(mapInstance) => {
+            console.log('🗺️ [MAP] Map loaded successfully');
+            console.log('🗺️ [MAP] Initial center:', mapCenter);
+            console.log('🗺️ [MAP] Initial zoom:', zoom);
+            setMap(mapInstance);
+          }}
           onDragEnd={handleUserInteraction}
           onZoomChanged={handleZoomChange}
           mapTypeId={mapType as google.maps.MapTypeId}

@@ -31,9 +31,15 @@ export type Prediction = {
   description: string; 
   place_id: string; 
   matched_substrings?: unknown; 
-  structured_formatting?: unknown; 
+  structured_formatting?: {
+    main_text?: string;
+    secondary_text?: string;
+  }; 
   terms?: unknown; 
-  types?: string[] 
+  types?: string[];
+  // User property specific fields
+  user_property?: boolean;
+  property_id?: string;
 };
 
 // Upload file status type
