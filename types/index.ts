@@ -40,6 +40,7 @@ export type Prediction = {
   // User property specific fields
   user_property?: boolean;
   property_id?: string;
+  isUserProperty?: boolean;
 };
 
 // Upload file status type

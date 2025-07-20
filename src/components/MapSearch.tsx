@@ -177,7 +177,7 @@ export const MapSearch = ({
             className="absolute z-30 w-full bg-white border border-gray-200 rounded-b-lg shadow-lg mt-1 max-h-60 overflow-auto"
           >
             {predictions.map((prediction, i) => {
-              const isUserProperty = prediction.types?.includes('user_property') || (prediction as any).user_property;
+              const isUserProperty = prediction.isUserProperty || prediction.types?.includes('user_property');
               
               return (
                 <div

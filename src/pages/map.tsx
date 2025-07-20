@@ -569,11 +569,11 @@ export default function MapPage() {
     setPredictions([]);
     
     // Check if this is a user property
-    const isUserProperty = prediction.types?.includes('user_property') || (prediction as any).user_property;
+    const isUserProperty = prediction.types?.includes('user_property') || prediction.user_property;
     
     if (isUserProperty) {
       // Handle user property selection directly
-      const propertyId = (prediction as any).property_id;
+      const propertyId = prediction.property_id;
       if (propertyId) {
         console.log('🏠 User property selected:', prediction.description);
         
