@@ -39,6 +39,9 @@ DropPoint is a map-based document management platform for real estate profession
 - **Smart Search & Navigation**: Search automatically clears when entering folders for proper context management
 - **Enhanced Search UX**: Clear button (X) for easy search cancellation without hassle
 - **Google Drive-style unified file/folder sorting** with folders-first organization
+- **Dual View Modes**: Toggle between Grid view (default, iOS Files-style icons) and List view (detailed)
+- **Persistent View Preferences**: User's preferred view mode saved across sessions
+- **iOS Files-inspired Grid View**: Beautiful icon-based layout with 3 columns on mobile, 4-6 on desktop (default view)
 - Batch operations and smart file organization
 - In-app file viewer for mobile (no pop-up blockers)
 

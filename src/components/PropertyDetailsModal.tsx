@@ -86,7 +86,24 @@ export const PropertyDetailsModal = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [switchingProperty, setSwitchingProperty] = useState(false);
   
-  
+  // View mode state with localStorage persistence
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('droppoint-view-mode');
+      return (saved === 'grid' || saved === 'list') ? saved : 'grid';
+    }
+    return 'grid';
+  });
+
+  // Save view mode preference
+  const toggleViewMode = () => {
+    const newMode = viewMode === 'list' ? 'grid' : 'list';
+    setViewMode(newMode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('droppoint-view-mode', newMode);
+    }
+  };
+
   // Mobile file viewer state
   const [mobileFileViewer, setMobileFileViewer] = useState<{
     isOpen: boolean;
@@ -929,6 +946,33 @@ export const PropertyDetailsModal = ({
           
           {/* Action buttons with proper spacing */}
           <div className="flex items-center gap-3">
+            {/* View Toggle Button */}
+            <button
+              className={`${isMobile ? 'p-2' : 'p-2.5'} rounded-full cursor-pointer flex-shrink-0 hover:bg-gray-100 transition-colors`}
+              onClick={toggleViewMode}
+              title={`Switch to ${viewMode === 'list' ? 'grid' : 'list'} view`}
+            >
+              {viewMode === 'list' ? (
+                // Grid icon when in list mode
+                <svg className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+              ) : (
+                // List icon when in grid mode
+                <svg className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <line x1="8" y1="6" x2="21" y2="6" />
+                  <line x1="8" y1="12" x2="21" y2="12" />
+                  <line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6" x2="3.01" y2="6" />
+                  <line x1="3" y1="12" x2="3.01" y2="12" />
+                  <line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+              )}
+            </button>
+
             {/* Property Switcher */}
             {currentPropertyWithFileCount && (
               <PropertySwitcher
@@ -1068,7 +1112,7 @@ export const PropertyDetailsModal = ({
               </div>
 
               {/* Column Headers - Sticky and always visible */}
-              <div className={`hidden sm:grid grid-cols-12 gap-4 px-3 ${isMobile ? 'py-3' : 'py-2'} text-sm border-b border-gray-200 bg-white`}>
+              <div className={`hidden sm:grid grid-cols-12 gap-4 px-3 ${isMobile ? 'py-3' : 'py-2'} text-sm border-b border-gray-200 bg-white ${viewMode === 'grid' ? 'sm:hidden' : ''}`}>
                 <button
                   className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
                   onClick={() => toggleSort('name')}
@@ -1102,35 +1146,551 @@ export const PropertyDetailsModal = ({
 
                 {/* Combined Files and Folders - Google Drive Style */}
                 <div className="px-4">
-                  {sortedItems.map(item => {
-                    if (item.itemType === 'folder') {
-                      // Render folder
-                      const folder = item;
-                      return (
-                        <div key={`folder-${folder.id}`}>
-                          {/* Desktop Folder Layout */}
-                          <div
-                            className="hidden sm:grid grid-cols-12 gap-4 items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
-                            style={{ cursor: 'pointer', minHeight: 40 }}
-                            onClick={() => {
-                              // If any menu is open, close it instead of navigating to folder
-                              if (fileMenuId || folderMenuId) {
+                  {viewMode === 'list' ? (
+                    // List View (existing layout)
+                    sortedItems.map(item => {
+                      if (item.itemType === 'folder') {
+                        // Render folder
+                        const folder = item;
+                        return (
+                          <div key={`folder-${folder.id}`}>
+                            {/* Desktop Folder Layout */}
+                            <div
+                              className="hidden sm:grid grid-cols-12 gap-4 items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
+                              style={{ cursor: 'pointer', minHeight: 40 }}
+                              onClick={() => {
+                                // If any menu is open, close it instead of navigating to folder
+                                if (fileMenuId || folderMenuId) {
+                                  setFileMenuId(null);
+                                  setFolderMenuId(null);
+                                  return;
+                                }
+                                
+                                // Clear search when entering a folder
+                                setSearchQuery('');
+                                onFolderChange(folder.id);
+                              }}
+                            >
+                              <div className="col-span-7 flex items-center min-w-0">
+                                <HeroFolderIcon style={{ width: 28, height: 28, color: '#fbbf24' }} />
+                                <div className="ml-3 flex-1 min-w-0">
+                                  {renamingFileId === folder.id ? (
+                                    <input
+                                      className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-40"
+                                      value={renamingFileName}
+                                      autoFocus
+                                      onClick={e => e.stopPropagation()}
+                                      onFocus={e => {
+                                        const input = e.target as HTMLInputElement;
+                                        input.setSelectionRange(0, folder.name.length);
+                                      }}
+                                      onChange={e => setRenamingFileName(e.target.value)}
+                                      onBlur={async () => {
+                                        await handleRename(folder, renamingFileName);
+                                      }}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                        if (e.key === 'Escape') {
+                                          setRenamingFileId(null);
+                                          setRenamingFileName('');
+                                        }
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="text-gray-900 font-medium truncate">
+                                      {folder.name}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="col-span-3 text-xs text-gray-500">
+                                {formatDate(folder.created_at)}
+                              </div>
+                              <div className="col-span-2 flex items-center justify-end relative">
+                                <button
+                                  className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
+                                  style={{ minWidth: 24, minHeight: 24 }}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setFileMenuId(null);
+                                    setFolderMenuId(folderMenuId === folder.id ? null : folder.id);
+                                  }}
+                                  title="Folder actions"
+                                >
+                                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                                  </svg>
+                                </button>
+                                {folderMenuId === folder.id && (
+                                  <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setRenamingFileId(folder.id);
+                                        setRenamingFileName(folder.name);
+                                        setFolderMenuId(null);
+                                      }}
+                                    >Rename</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        onFolderDelete(folder);
+                                      }}
+                                    >Delete</button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Mobile Folder Layout */}
+                            <div
+                              className={`sm:hidden flex items-center justify-between ${isMobile ? 'px-4 py-2.5' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
+                              style={{ cursor: 'pointer', minHeight: isMobile ? '56px' : '56px' }}
+                              onClick={() => {
+                                // If any menu is open, close it instead of navigating to folder
+                                if (fileMenuId || folderMenuId) {
+                                  setFileMenuId(null);
+                                  setFolderMenuId(null);
+                                  return;
+                                }
+                                
+                                // Clear search when entering a folder
+                                setSearchQuery('');
+                                onFolderChange(folder.id);
+                              }}
+                            >
+                              <div className="flex items-center min-w-0 flex-1">
+                                <HeroFolderIcon style={{ width: 32, height: 32, color: '#fbbf24' }} />
+                                <div className={`${isMobile ? 'ml-3' : 'ml-3'} flex-1 min-w-0`}>
+                                  {renamingFileId === folder.id ? (
+                                    <div className="flex items-center w-full">
+                                      <input
+                                        className={`font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 ${isMobile ? 'text-base' : 'text-base'} flex-1`}
+                                        value={renamingFileName}
+                                        autoFocus
+                                        onClick={e => e.stopPropagation()}
+                                        onFocus={e => {
+                                          const input = e.target as HTMLInputElement;
+                                          input.setSelectionRange(0, renamingFileName.length);
+                                        }}
+                                        onChange={e => setRenamingFileName(e.target.value)}
+                                        onBlur={async () => {
+                                          const trimmed = renamingFileName.trim();
+                                          if (trimmed) {
+                                            await handleRename(folder, trimmed);
+                                          } else {
+                                            setRenamingFileId(null);
+                                            setRenamingFileName('');
+                                          }
+                                        }}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                          if (e.key === 'Escape') {
+                                            setRenamingFileId(null);
+                                            setRenamingFileName('');
+                                          }
+                                        }}
+                                      />
+                                      <span className={`text-gray-400 ${isMobile ? 'text-sm ml-2' : 'text-sm ml-2'}`}>{folder.name}</span>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-base' : 'text-base'}`}>
+                                        {folder.name}
+                                      </div>
+                                      <div className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500 mt-0.5 flex items-center gap-2`}>
+                                        <span>{formatDate(folder.created_at)}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="relative">
+                                <button
+                                  className={`${isMobile ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setFolderMenuId(null);
+                                    setFileMenuId(folderMenuId === folder.id ? null : folder.id);
+                                  }}
+                                  title="Folder actions"
+                                >
+                                  <svg className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                                  </svg>
+                                </button>
+                                {folderMenuId === folder.id && (
+                                  <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setRenamingFileId(folder.id);
+                                        setRenamingFileName(folder.name);
+                                        setFolderMenuId(null);
+                                      }}
+                                    >Rename</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        onFolderDelete(folder);
+                                      }}
+                                    >Delete</button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        // Render file
+                        const file = item;
+                        const [, ext] = splitFileNameAndExt(file.file_name);
+                        return (
+                          <div key={`file-${file.id}`}>
+                            {/* Desktop File Layout */}
+                            <div
+                              className="hidden sm:grid grid-cols-12 gap-4 items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
+                              style={{ cursor: 'pointer', minHeight: 40 }}
+                              onClick={async (e) => {
+                                if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
+                                  return;
+                                }
+                                
+                                // If any menu is open, close it instead of opening the file
+                                if (fileMenuId || folderMenuId) {
+                                  setFileMenuId(null);
+                                  setFolderMenuId(null);
+                                  return;
+                                }
+                                
+                                try {
+                                  await openFileInline(file);
+                                } catch (error) {
+                                  console.error('Error opening file:', error);
+                                  alert('Unable to open file. Please try again.');
+                                }
+                              }}
+                            >
+                              <div className="col-span-7 flex items-center min-w-0">
+                                <FileIcon
+                                  type={file.file_name.split('.').pop() || 'file'}
+                                  size={28}
+                                />
+                                <div className="ml-3 flex-1 min-w-0 text-gray-900 font-medium truncate">
+                                  {renamingFileId === file.id ? (
+                                    <div className="flex items-center w-full">
+                                      <input
+                                        className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-base flex-1"
+                                        value={renamingFileName}
+                                        autoFocus
+                                        onClick={e => e.stopPropagation()}
+                                        onFocus={e => {
+                                          const input = e.target as HTMLInputElement;
+                                          input.setSelectionRange(0, renamingFileName.length);
+                                        }}
+                                        onChange={e => setRenamingFileName(e.target.value)}
+                                        onBlur={async () => {
+                                          const trimmed = renamingFileName.trim();
+                                          if (trimmed) {
+                                            await handleRename(file, trimmed);
+                                          } else {
+                                            setRenamingFileId(null);
+                                            setRenamingFileName('');
+                                          }
+                                        }}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                          if (e.key === 'Escape') {
+                                            setRenamingFileId(null);
+                                            setRenamingFileName('');
+                                          }
+                                        }}
+                                      />
+                                      <span className="text-gray-400 text-sm ml-2">{ext}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-900 font-medium truncate">
+                                      {getFileNameWithoutExtension(file.file_name)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="col-span-3 text-xs text-gray-500">
+                                {formatDate(file.modified_at || file.uploaded_at)}
+                              </div>
+                              <div className="col-span-2 flex items-center justify-end relative">
+                                <span className="hidden sm:inline-block text-xs text-gray-500 mr-2">{formatFileSize(file.file_size)}</span>
+                                <button
+                                  className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
+                                  style={{ minWidth: 24, minHeight: 24 }}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setFolderMenuId(null);
+                                    setFileMenuId(fileMenuId === file.id ? null : file.id);
+                                  }}
+                                  title="File actions"
+                                >
+                                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                                  </svg>
+                                </button>
+                                {fileMenuId === file.id && (
+                                  <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setRenamingFileId(file.id);
+                                        setRenamingFileName(getFileNameWithoutExtension(file.file_name));
+                                        setTimeout(() => {
+                                          setFileMenuId(null);
+                                          setFolderMenuId(null);
+                                        }, 50);
+                                      }}
+                                    >Rename</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setMoveFileTarget(file);
+                                        setShowMoveModal(true);
+                                        setFileMenuId(null);
+                                      }}
+                                    >Move</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-green-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
+                                          window.open(fileUrl, '_blank');
+                                        } catch (error) {
+                                          console.error('Error downloading file:', error);
+                                          alert('Unable to download file. Please try again.');
+                                        }
+                                      }}
+                                    >Download</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        onFileDelete(file);
+                                        setFileMenuId(null);
+                                      }}
+                                    >Delete</button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Mobile File Layout */}
+                            <div
+                              className={`sm:hidden flex items-center justify-between ${isMobile ? 'px-4 py-2.5' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
+                              style={{ cursor: 'pointer', minHeight: isMobile ? '56px' : '56px' }}
+                              onClick={async (e) => {
+                                if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
+                                  return;
+                                }
+                                
+                                // If any menu is open, close it instead of opening the file
+                                if (fileMenuId || folderMenuId) {
+                                  setFileMenuId(null);
+                                  setFolderMenuId(null);
+                                  return;
+                                }
+                                
+                                try {
+                                  await openFileInline(file);
+                                } catch (error) {
+                                  console.error('Error opening file:', error);
+                                  alert('Unable to open file. Please try again.');
+                                }
+                              }}
+                            >
+                              <div className="flex items-center min-w-0 flex-1">
+                                <FileIcon
+                                  type={file.file_name.split('.').pop() || 'file'}
+                                  size={isMobile ? 32 : 32}
+                                />
+                                <div className={`${isMobile ? 'ml-3' : 'ml-3'} flex-1 min-w-0`}>
+                                  {renamingFileId === file.id ? (
+                                    <div className="flex items-center w-full">
+                                      <input
+                                        className={`font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 ${isMobile ? 'text-base' : 'text-base'} flex-1`}
+                                        value={renamingFileName}
+                                        autoFocus
+                                        onClick={e => e.stopPropagation()}
+                                        onFocus={e => {
+                                          const input = e.target as HTMLInputElement;
+                                          input.setSelectionRange(0, renamingFileName.length);
+                                        }}
+                                        onChange={e => setRenamingFileName(e.target.value)}
+                                        onBlur={async () => {
+                                          const trimmed = renamingFileName.trim();
+                                          if (trimmed) {
+                                            await handleRename(file, trimmed);
+                                          } else {
+                                            setRenamingFileId(null);
+                                            setRenamingFileName('');
+                                          }
+                                        }}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                          if (e.key === 'Escape') {
+                                            setRenamingFileId(null);
+                                            setRenamingFileName('');
+                                          }
+                                        }}
+                                      />
+                                      <span className={`text-gray-400 ${isMobile ? 'text-sm ml-2' : 'text-sm ml-2'}`}>{ext}</span>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-base' : 'text-base'}`}>
+                                        {getFileNameWithoutExtension(file.file_name)}
+                                      </div>
+                                      <div className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500 mt-0.5 flex items-center gap-2`}>
+                                        <span>{formatDate(file.modified_at || file.uploaded_at)}</span>
+                                        <span>•</span>
+                                        <span>{formatFileSize(file.file_size)}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="relative">
+                                <button
+                                  className={`${isMobile ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setFolderMenuId(null);
+                                    setFileMenuId(fileMenuId === file.id ? null : file.id);
+                                  }}
+                                  title="File actions"
+                                >
+                                  <svg className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                                  </svg>
+                                </button>
+                                {fileMenuId === file.id && (
+                                  <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setRenamingFileId(file.id);
+                                        setRenamingFileName(getFileNameWithoutExtension(file.file_name));
+                                        setTimeout(() => {
+                                          setFileMenuId(null);
+                                          setFolderMenuId(null);
+                                        }, 50);
+                                      }}
+                                    >Rename</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setMoveFileTarget(file);
+                                        setShowMoveModal(true);
+                                        setFileMenuId(null);
+                                      }}
+                                    >Move</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-green-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
+                                          window.open(fileUrl, '_blank');
+                                        } catch (error) {
+                                          console.error('Error downloading file:', error);
+                                          alert('Unable to download file. Please try again.');
+                                        }
+                                      }}
+                                    >Download</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        onFileDelete(file);
+                                        setFileMenuId(null);
+                                      }}
+                                    >Delete</button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                    })
+                  ) : (
+                    // Grid View (new iOS Files-style layout)
+                    <div className={`grid gap-3 ${isMobile ? 'grid-cols-3' : 'grid-cols-4 sm:grid-cols-5 lg:grid-cols-6'} p-2`}>
+                      {sortedItems.map(item => {
+                        if (item.itemType === 'folder') {
+                          // Grid Folder Item
+                          const folder = item;
+                          return (
+                            <div
+                              key={`grid-folder-${folder.id}`}
+                              className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition cursor-pointer group"
+                              onClick={() => {
+                                // Clear search when entering a folder
+                                setSearchQuery('');
+                                onFolderChange(folder.id);
+                              }}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
                                 setFileMenuId(null);
-                                setFolderMenuId(null);
-                                return;
-                              }
-                              
-                              // Clear search when entering a folder
-                              setSearchQuery('');
-                              onFolderChange(folder.id);
-                            }}
-                          >
-                            <div className="col-span-7 flex items-center min-w-0">
-                              <HeroFolderIcon style={{ width: 28, height: 28, color: '#fbbf24' }} />
-                              <div className="ml-3 flex-1 min-w-0">
+                                setFolderMenuId(folderMenuId === folder.id ? null : folder.id);
+                              }}
+                            >
+                              <div className="relative">
+                                <HeroFolderIcon style={{ width: isMobile ? 48 : 56, height: isMobile ? 48 : 56, color: '#3b82f6' }} />
+                                {/* Context menu trigger for mobile */}
+                                <button
+                                  className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-white shadow-md border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setFileMenuId(null);
+                                    setFolderMenuId(folderMenuId === folder.id ? null : folder.id);
+                                  }}
+                                >
+                                  <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                                  </svg>
+                                </button>
+                                {folderMenuId === folder.id && (
+                                  <div ref={folderMenuRef} className="absolute top-8 right-0 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setRenamingFileId(folder.id);
+                                        setRenamingFileName(folder.name);
+                                        setFolderMenuId(null);
+                                      }}
+                                    >Rename</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        onFolderDelete(folder);
+                                        setFolderMenuId(null);
+                                      }}
+                                    >Delete</button>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="mt-2 text-center w-full">
                                 {renamingFileId === folder.id ? (
                                   <input
-                                    className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-1 py-0.5 text-sm w-40"
+                                    className="w-full text-center bg-white border border-blue-300 rounded px-1 py-0.5 text-xs font-medium"
                                     value={renamingFileName}
                                     autoFocus
                                     onClick={e => e.stopPropagation()}
@@ -1151,437 +1711,152 @@ export const PropertyDetailsModal = ({
                                     }}
                                   />
                                 ) : (
-                                  <div className="text-gray-900 font-medium truncate">
-                                    {folder.name}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="col-span-3 text-xs text-gray-500">
-                              {formatDate(folder.created_at)}
-                            </div>
-                            <div className="col-span-2 flex items-center justify-end relative">
-                              <button
-                                className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
-                                style={{ minWidth: 24, minHeight: 24 }}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setFileMenuId(null);
-                                  setFolderMenuId(folderMenuId === folder.id ? null : folder.id);
-                                }}
-                                title="Folder actions"
-                              >
-                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
-                                </svg>
-                              </button>
-                              {folderMenuId === folder.id && (
-                                <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      setRenamingFileId(folder.id);
-                                      setRenamingFileName(folder.name);
-                                      setFolderMenuId(null);
-                                    }}
-                                  >Rename</button>
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-red-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      onFolderDelete(folder);
-                                    }}
-                                  >Delete</button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Mobile Folder Layout */}
-                          <div
-                            className={`sm:hidden flex items-center justify-between ${isMobile ? 'px-4 py-2.5' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
-                            style={{ cursor: 'pointer', minHeight: isMobile ? '56px' : '56px' }}
-                            onClick={() => {
-                              // If any menu is open, close it instead of navigating to folder
-                              if (fileMenuId || folderMenuId) {
-                                setFileMenuId(null);
-                                setFolderMenuId(null);
-                                return;
-                              }
-                              
-                              // Clear search when entering a folder
-                              setSearchQuery('');
-                              onFolderChange(folder.id);
-                            }}
-                          >
-                            <div className="flex items-center min-w-0 flex-1">
-                              <HeroFolderIcon style={{ width: 32, height: 32, color: '#fbbf24' }} />
-                              <div className={`${isMobile ? 'ml-3' : 'ml-3'} flex-1 min-w-0`}>
-                                {renamingFileId === folder.id ? (
-                                  <div className="flex items-center w-full">
-                                    <input
-                                      className={`font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 ${isMobile ? 'text-base' : 'text-base'} flex-1`}
-                                      value={renamingFileName}
-                                      autoFocus
-                                      onClick={e => e.stopPropagation()}
-                                      onFocus={e => {
-                                        const input = e.target as HTMLInputElement;
-                                        input.setSelectionRange(0, renamingFileName.length);
-                                      }}
-                                      onChange={e => setRenamingFileName(e.target.value)}
-                                      onBlur={async () => {
-                                        const trimmed = renamingFileName.trim();
-                                        if (trimmed) {
-                                          await handleRename(folder, trimmed);
-                                        } else {
-                                          setRenamingFileId(null);
-                                          setRenamingFileName('');
-                                        }
-                                      }}
-                                      onKeyDown={e => {
-                                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                        if (e.key === 'Escape') {
-                                          setRenamingFileId(null);
-                                          setRenamingFileName('');
-                                        }
-                                      }}
-                                    />
-                                    <span className={`text-gray-400 ${isMobile ? 'text-sm ml-2' : 'text-sm ml-2'}`}>{folder.name}</span>
-                                  </div>
-                                ) : (
                                   <>
-                                    <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-base' : 'text-base'}`}>
+                                    <div className={`font-medium text-gray-900 truncate ${isMobile ? 'text-xs' : 'text-sm'} leading-tight`}>
                                       {folder.name}
                                     </div>
-                                    <div className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500 mt-0.5 flex items-center gap-2`}>
-                                      <span>{formatDate(folder.created_at)}</span>
+                                    <div className={`text-gray-500 mt-0.5 ${isMobile ? 'text-xs' : 'text-xs'}`}>
+                                      {formatDate(folder.created_at)}
                                     </div>
                                   </>
                                 )}
                               </div>
                             </div>
-                            <div className="relative">
-                              <button
-                                className={`${isMobile ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setFolderMenuId(null);
-                                  setFileMenuId(folderMenuId === folder.id ? null : folder.id);
-                                }}
-                                title="Folder actions"
-                              >
-                                <svg className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
-                                </svg>
-                              </button>
-                              {folderMenuId === folder.id && (
-                                <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      setRenamingFileId(folder.id);
-                                      setRenamingFileName(folder.name);
-                                      setFolderMenuId(null);
-                                    }}
-                                  >Rename</button>
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-red-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      onFolderDelete(folder);
-                                    }}
-                                  >Delete</button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    } else {
-                      // Render file
-                      const file = item;
-                      const [, ext] = splitFileNameAndExt(file.file_name);
-                      return (
-                        <div key={`file-${file.id}`}>
-                          {/* Desktop File Layout */}
-                          <div
-                            className="hidden sm:grid grid-cols-12 gap-4 items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
-                            style={{ cursor: 'pointer', minHeight: 40 }}
-                            onClick={async (e) => {
-                              if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
-                                return;
-                              }
-                              
-                              // If any menu is open, close it instead of opening the file
-                              if (fileMenuId || folderMenuId) {
-                                setFileMenuId(null);
+                          );
+                        } else {
+                          // Grid File Item
+                          const file = item;
+                          return (
+                            <div
+                              key={`grid-file-${file.id}`}
+                              className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition cursor-pointer group"
+                              onClick={async (e) => {
+                                if ((e.target as HTMLElement).closest('button')) {
+                                  return;
+                                }
+                                
+                                try {
+                                  await openFileInline(file);
+                                } catch (error) {
+                                  console.error('Error opening file:', error);
+                                  alert('Unable to open file. Please try again.');
+                                }
+                              }}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
                                 setFolderMenuId(null);
-                                return;
-                              }
-                              
-                              try {
-                                await openFileInline(file);
-                              } catch (error) {
-                                console.error('Error opening file:', error);
-                                alert('Unable to open file. Please try again.');
-                              }
-                            }}
-                          >
-                            <div className="col-span-7 flex items-center min-w-0">
-                              <FileIcon
-                                type={file.file_name.split('.').pop() || 'file'}
-                                size={28}
-                              />
-                              <div className="ml-3 flex-1 min-w-0 text-gray-900 font-medium truncate">
-                                {renamingFileId === file.id ? (
-                                  <div className="flex items-center w-full">
-                                    <input
-                                      className="font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 text-base flex-1"
-                                      value={renamingFileName}
-                                      autoFocus
-                                      onClick={e => e.stopPropagation()}
-                                      onFocus={e => {
-                                        const input = e.target as HTMLInputElement;
-                                        input.setSelectionRange(0, renamingFileName.length);
+                                setFileMenuId(fileMenuId === file.id ? null : file.id);
+                              }}
+                            >
+                              <div className="relative">
+                                <FileIcon
+                                  type={file.file_name.split('.').pop() || 'file'}
+                                  size={isMobile ? 48 : 56}
+                                />
+                                {/* Context menu trigger for mobile */}
+                                <button
+                                  className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-white shadow-md border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setFolderMenuId(null);
+                                    setFileMenuId(fileMenuId === file.id ? null : file.id);
+                                  }}
+                                >
+                                  <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                                  </svg>
+                                </button>
+                                {fileMenuId === file.id && (
+                                  <div ref={fileMenuRef} className="absolute top-8 right-0 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setRenamingFileId(file.id);
+                                        setRenamingFileName(getFileNameWithoutExtension(file.file_name));
+                                        setFileMenuId(null);
                                       }}
-                                      onChange={e => setRenamingFileName(e.target.value)}
-                                      onBlur={async () => {
-                                        const trimmed = renamingFileName.trim();
-                                        if (trimmed) {
-                                          await handleRename(file, trimmed);
-                                        } else {
-                                          setRenamingFileId(null);
-                                          setRenamingFileName('');
+                                    >Rename</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setMoveFileTarget(file);
+                                        setShowMoveModal(true);
+                                        setFileMenuId(null);
+                                      }}
+                                    >Move</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-green-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
+                                          window.open(fileUrl, '_blank');
+                                        } catch (error) {
+                                          console.error('Error downloading file:', error);
+                                          alert('Unable to download file. Please try again.');
                                         }
                                       }}
-                                      onKeyDown={e => {
-                                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                        if (e.key === 'Escape') {
-                                          setRenamingFileId(null);
-                                          setRenamingFileName('');
-                                        }
+                                    >Download</button>
+                                    <button
+                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        onFileDelete(file);
+                                        setFileMenuId(null);
                                       }}
-                                    />
-                                    <span className="text-gray-400 text-sm ml-2">{ext}</span>
+                                    >Delete</button>
                                   </div>
-                                ) : (
-                                  <span className="text-gray-900 font-medium truncate">
-                                    {getFileNameWithoutExtension(file.file_name)}
-                                  </span>
                                 )}
                               </div>
-                            </div>
-                            <div className="col-span-3 text-xs text-gray-500">
-                              {formatDate(file.modified_at || file.uploaded_at)}
-                            </div>
-                            <div className="col-span-2 flex items-center justify-end relative">
-                              <span className="hidden sm:inline-block text-xs text-gray-500 mr-2">{formatFileSize(file.file_size)}</span>
-                              <button
-                                className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
-                                style={{ minWidth: 24, minHeight: 24 }}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setFolderMenuId(null);
-                                  setFileMenuId(fileMenuId === file.id ? null : file.id);
-                                }}
-                                title="File actions"
-                              >
-                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
-                                </svg>
-                              </button>
-                              {fileMenuId === file.id && (
-                                <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      setRenamingFileId(file.id);
-                                      setRenamingFileName(getFileNameWithoutExtension(file.file_name));
-                                      setTimeout(() => {
-                                        setFileMenuId(null);
-                                        setFolderMenuId(null);
-                                      }, 50);
+                              <div className="mt-2 text-center w-full">
+                                {renamingFileId === file.id ? (
+                                  <input
+                                    className="w-full text-center bg-white border border-blue-300 rounded px-1 py-0.5 text-xs font-medium"
+                                    value={renamingFileName}
+                                    autoFocus
+                                    onClick={e => e.stopPropagation()}
+                                    onFocus={e => {
+                                      const input = e.target as HTMLInputElement;
+                                      input.setSelectionRange(0, renamingFileName.length);
                                     }}
-                                  >Rename</button>
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-blue-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      setMoveFileTarget(file);
-                                      setShowMoveModal(true);
-                                      setFileMenuId(null);
-                                    }}
-                                  >Move</button>
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-green-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      try {
-                                        const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
-                                        window.open(fileUrl, '_blank');
-                                      } catch (error) {
-                                        console.error('Error downloading file:', error);
-                                        alert('Unable to download file. Please try again.');
+                                    onChange={e => setRenamingFileName(e.target.value)}
+                                    onBlur={async () => {
+                                      const trimmed = renamingFileName.trim();
+                                      if (trimmed) {
+                                        await handleRename(file, trimmed);
+                                      } else {
+                                        setRenamingFileId(null);
+                                        setRenamingFileName('');
                                       }
                                     }}
-                                  >Download</button>
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      onFileDelete(file);
-                                      setFileMenuId(null);
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                      if (e.key === 'Escape') {
+                                        setRenamingFileId(null);
+                                        setRenamingFileName('');
+                                      }
                                     }}
-                                  >Delete</button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Mobile File Layout */}
-                          <div
-                            className={`sm:hidden flex items-center justify-between ${isMobile ? 'px-4 py-2.5' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
-                            style={{ cursor: 'pointer', minHeight: isMobile ? '56px' : '56px' }}
-                            onClick={async (e) => {
-                              if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
-                                return;
-                              }
-                              
-                              // If any menu is open, close it instead of opening the file
-                              if (fileMenuId || folderMenuId) {
-                                setFileMenuId(null);
-                                setFolderMenuId(null);
-                                return;
-                              }
-                              
-                              try {
-                                await openFileInline(file);
-                              } catch (error) {
-                                console.error('Error opening file:', error);
-                                alert('Unable to open file. Please try again.');
-                              }
-                            }}
-                          >
-                            <div className="flex items-center min-w-0 flex-1">
-                              <FileIcon
-                                type={file.file_name.split('.').pop() || 'file'}
-                                size={isMobile ? 32 : 32}
-                              />
-                              <div className={`${isMobile ? 'ml-3' : 'ml-3'} flex-1 min-w-0`}>
-                                {renamingFileId === file.id ? (
-                                  <div className="flex items-center w-full">
-                                    <input
-                                      className={`font-semibold text-gray-900 bg-white border border-blue-300 rounded px-2 py-1 ${isMobile ? 'text-base' : 'text-base'} flex-1`}
-                                      value={renamingFileName}
-                                      autoFocus
-                                      onClick={e => e.stopPropagation()}
-                                      onFocus={e => {
-                                        const input = e.target as HTMLInputElement;
-                                        input.setSelectionRange(0, renamingFileName.length);
-                                      }}
-                                      onChange={e => setRenamingFileName(e.target.value)}
-                                      onBlur={async () => {
-                                        const trimmed = renamingFileName.trim();
-                                        if (trimmed) {
-                                          await handleRename(file, trimmed);
-                                        } else {
-                                          setRenamingFileId(null);
-                                          setRenamingFileName('');
-                                        }
-                                      }}
-                                      onKeyDown={e => {
-                                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                        if (e.key === 'Escape') {
-                                          setRenamingFileId(null);
-                                          setRenamingFileName('');
-                                        }
-                                      }}
-                                    />
-                                    <span className={`text-gray-400 ${isMobile ? 'text-sm ml-2' : 'text-sm ml-2'}`}>{ext}</span>
-                                  </div>
+                                  />
                                 ) : (
                                   <>
-                                    <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-base' : 'text-base'}`}>
+                                    <div className={`font-medium text-gray-900 truncate ${isMobile ? 'text-xs' : 'text-sm'} leading-tight`}>
                                       {getFileNameWithoutExtension(file.file_name)}
                                     </div>
-                                    <div className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500 mt-0.5 flex items-center gap-2`}>
-                                      <span>{formatDate(file.modified_at || file.uploaded_at)}</span>
-                                      <span>•</span>
-                                      <span>{formatFileSize(file.file_size)}</span>
+                                    <div className={`text-gray-500 mt-0.5 ${isMobile ? 'text-xs' : 'text-xs'} space-y-0.5`}>
+                                      <div>{formatFileSize(file.file_size)}</div>
+                                      <div>{formatDate(file.modified_at || file.uploaded_at)}</div>
                                     </div>
                                   </>
                                 )}
                               </div>
                             </div>
-                            <div className="relative">
-                              <button
-                                className={`${isMobile ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setFolderMenuId(null);
-                                  setFileMenuId(fileMenuId === file.id ? null : file.id);
-                                }}
-                                title="File actions"
-                              >
-                                <svg className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
-                                </svg>
-                              </button>
-                              {fileMenuId === file.id && (
-                                <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      setRenamingFileId(file.id);
-                                      setRenamingFileName(getFileNameWithoutExtension(file.file_name));
-                                      setTimeout(() => {
-                                        setFileMenuId(null);
-                                        setFolderMenuId(null);
-                                      }, 50);
-                                    }}
-                                  >Rename</button>
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      setMoveFileTarget(file);
-                                      setShowMoveModal(true);
-                                      setFileMenuId(null);
-                                    }}
-                                  >Move</button>
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-green-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      try {
-                                        const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
-                                        window.open(fileUrl, '_blank');
-                                      } catch (error) {
-                                        console.error('Error downloading file:', error);
-                                        alert('Unable to download file. Please try again.');
-                                      }
-                                    }}
-                                  >Download</button>
-                                  <button
-                                    className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      onFileDelete(file);
-                                      setFileMenuId(null);
-                                    }}
-                                  >Delete</button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-                  })}
+                          );
+                        }
+                      })}
+                    </div>
+                  )}
                 </div>
               </>
             )}
