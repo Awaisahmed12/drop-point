@@ -124,8 +124,8 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
   }, []);
 
   const refreshProperties = useCallback(async () => {
-    await fetchProperties();
-  }, [fetchProperties]);
+    await fetchFreshProperties();
+  }, [fetchFreshProperties]);
 
   useEffect(() => {
     fetchProperties();

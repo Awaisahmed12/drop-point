@@ -520,22 +520,43 @@ export default function MapPage() {
   };
 
   async function fetchPredictions(input: string): Promise<Prediction[]> {
-    if (!input) return [];
-    const url = `/api/autocomplete?input=${encodeURIComponent(input)}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    return data.predictions || [];
+    try {
+      const response = await fetch(`/api/autocomplete?input=${encodeURIComponent(input)}`, {
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.predictions || [];
+      }
+    } catch (error) {
+      console.error('Error fetching predictions:', error);
+    }
+    return [];
   }
 
   async function geocodePlaceId(placeId: string): Promise<{ lat: number; lng: number } | null> {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?place_id=${placeId}&key=${GOOGLE_MAPS_API_KEY}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.results && data.results[0]) {
-      const loc = data.results[0].geometry.location;
-      return { lat: loc.lat, lng: loc.lng };
+    try {
+      const service = new google.maps.places.PlacesService(document.createElement('div'));
+      
+      return new Promise((resolve) => {
+        service.getDetails({ placeId }, (place, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
+            resolve({
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+            });
+          } else {
+            resolve(null);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Error geocoding place ID:', error);
+      return null;
     }
-    return null;
   }
 
   // handleSearch removed - search handled by MapSearch component

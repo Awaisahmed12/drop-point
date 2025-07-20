@@ -17,7 +17,7 @@ export const ListView = ({
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  const { isMobile, getModalDimensions, getMobileStyles, mobileClasses } = useMobileViewport();
+  const { isMobile, getModalDimensions, mobileClasses } = useMobileViewport();
   const { properties, loading, error } = useUserProperties();
 
   // Parse address for clean display (same as PropertyDetailsModal)

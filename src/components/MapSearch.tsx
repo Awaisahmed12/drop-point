@@ -37,29 +37,25 @@ export const MapSearch = ({
     
     try {
       // Get the current session to include auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      // Add auth token if available
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-      }
-      
       const response = await fetch(`/api/autocomplete?input=${encodeURIComponent(input)}`, {
-        headers
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        }
       });
       
-      if (!response.ok) throw new Error('Failed to fetch predictions');
-      
-      const data = await response.json();
-      return data.predictions || [];
+      if (response.ok) {
+        const data = await response.json();
+        const predictions: Prediction[] = data.predictions.map((p: google.maps.places.AutocompletePrediction) => ({
+          description: p.description,
+          place_id: p.place_id,
+          isUserProperty: p.structured_formatting?.main_text?.includes('[Saved]') || false,
+        }));
+        return predictions;
+      }
     } catch (error) {
       console.error('Error fetching predictions:', error);
-      return [];
     }
+    return [];
   };
 
   // Handle input changes and fetch predictions
