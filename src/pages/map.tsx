@@ -26,6 +26,7 @@ import { MapSearch } from '../components/MapSearch';
 import { MapControls } from '../components/MapControls';
 import { PropertyInfoCard } from '../components/PropertyInfoCard';
 import { MoveModal } from '../components/MoveModal';
+import { ListView } from '../components/ListView';
 import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
 
 // Constants moved to constants/index.ts
@@ -180,6 +181,99 @@ export default function MapPage() {
     };
     getUser();
   }, [router]);
+
+  // Background preload user properties for instant list view
+  useEffect(() => {
+    const preloadUserProperties = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          console.log('🚀 [PRELOAD] Starting background property preload...');
+          
+          // Preload properties with file counts
+          const { data: propertiesData } = await supabase
+            .from('properties')
+            .select(`
+              id, address, lat, lng, label, notes, created_at, updated_at,
+              property_files!inner(id)
+            `)
+            .eq('user_id', user.id)
+            .order('updated_at', { ascending: false });
+
+          if (propertiesData) {
+            // Transform to PropertyWithFileCount format and cache
+            const propertiesWithCount = propertiesData.map(property => ({
+              ...property,
+              file_count: property.property_files?.length || 0,
+              last_accessed: property.updated_at,
+              property_files: undefined // Remove the nested data
+            }));
+
+            // Store in sessionStorage for instant access
+            sessionStorage.setItem('droppoint-properties-cache', JSON.stringify({
+              properties: propertiesWithCount,
+              timestamp: Date.now()
+            }));
+
+            console.log('🚀 [PRELOAD] Properties cached:', propertiesWithCount.length);
+          }
+        }
+      } catch (error) {
+        console.error('🚀 [PRELOAD] Error preloading properties:', error);
+      }
+    };
+
+    // Start preloading after a short delay to not block initial map load
+    const timer = setTimeout(preloadUserProperties, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Restore map position and selected property from session storage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Restore map position
+      const savedPosition = sessionStorage.getItem('droppoint-map-position');
+      if (savedPosition) {
+        try {
+          const position = JSON.parse(savedPosition);
+          setMapCenter({ lat: position.lat, lng: position.lng });
+          if (position.zoom) {
+            setZoom(position.zoom);
+          }
+          // Clear after using
+          sessionStorage.removeItem('droppoint-map-position');
+        } catch (error) {
+          console.error('Error parsing saved map position:', error);
+        }
+      }
+
+      // Restore selected property
+      const savedProperty = sessionStorage.getItem('droppoint-selected-property');
+      if (savedProperty) {
+        try {
+          const propertyData = JSON.parse(savedProperty);
+          setSavedProperty(propertyData.property);
+          setPropertyFiles(propertyData.files || []);
+          setFolders(propertyData.folders || []);
+          setSelectedFolder('master');
+          setFoldersLoading(false);
+          setFilesLoading(false);
+          setAddress(propertyData.property.address);
+          setSnappedLatLng({ lat: propertyData.property.lat, lng: propertyData.property.lng });
+          setHasInteracted(true);
+          lastFetchedCenter.current = { lat: propertyData.property.lat, lng: propertyData.property.lng };
+          
+          // Open the modal
+          setShowDetailsModal(true);
+          
+          // Clear after using
+          sessionStorage.removeItem('droppoint-selected-property');
+        } catch (error) {
+          console.error('Error parsing saved property data:', error);
+        }
+      }
+    }
+  }, []);
 
   // Try to get user's geolocation on mount
   useEffect(() => {
@@ -1390,6 +1484,24 @@ export default function MapPage() {
   // Add state for current location loading
   const [currentLocationLoading, setCurrentLocationLoading] = useState(false);
 
+  // Add state for ListView modal
+  const [showListView, setShowListView] = useState(false);
+  const [cameFromListView, setCameFromListView] = useState(false);
+
+  // List view navigation handler
+  const handleListViewClick = useCallback(() => {
+    setShowListView(true);
+  }, []);
+
+  // Enhanced close handler that returns to list view if needed
+  const handleDetailsModalClose = useCallback(() => {
+    setShowDetailsModal(false);
+    if (cameFromListView) {
+      setCameFromListView(false);
+      setShowListView(true);
+    }
+  }, [cameFromListView]);
+
   // Current location handler
   const handleCurrentLocationClick = useCallback(() => {
     console.log('🌍 [GEOLOCATION] Current location button clicked');
@@ -1616,6 +1728,7 @@ export default function MapPage() {
           onCurrentLocationClick={handleCurrentLocationClick}
           currentLocationLoading={currentLocationLoading}
           showPropertyInfoCard={hasInteracted && !!address && zoom >= PROPERTY_SELECTION_MIN_ZOOM}
+          onListViewClick={handleListViewClick}
         />
         {hasInteracted && address && zoom >= PROPERTY_SELECTION_MIN_ZOOM && (
           <PropertyInfoCard
@@ -1717,7 +1830,7 @@ export default function MapPage() {
           isOpen={showDetailsModal}
           property={savedProperty}
           snappedLatLng={snappedLatLng}
-          onClose={() => setShowDetailsModal(false)}
+          onClose={handleDetailsModalClose}
           folders={folders}
           files={propertyFiles}
           foldersLoading={foldersLoading}
@@ -1824,6 +1937,91 @@ export default function MapPage() {
           }}
         />
       )}
+      {/* ListView Modal */}
+      <ListView
+        isOpen={showListView}
+        onClose={() => setShowListView(false)}
+        onPropertySelect={async (property) => {
+          // Close the modal first
+          setShowListView(false);
+          
+          // Set the property data for immediate use (like PropertySwitcher)
+          setSavedProperty(property);
+          setAddress(property.address);
+          setSnappedLatLng({ lat: property.lat, lng: property.lng });
+          setHasInteracted(true);
+          lastFetchedCenter.current = { lat: property.lat, lng: property.lng };
+          
+          // Background map updates (silent, no UI disruption)
+          setMapCenter({ lat: property.lat, lng: property.lng });
+          setZoom(SEARCH_ZOOM);
+          if (map) {
+            map.panTo({ lat: property.lat, lng: property.lng });
+            map.setZoom(SEARCH_ZOOM);
+          }
+          
+          // Load property data and open modal immediately (like PropertySwitcher)
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              setFoldersLoading(true);
+              setFilesLoading(true);
+              
+              // Open modal immediately with loading state
+              setCameFromListView(true);
+              setShowDetailsModal(true);
+              
+              // Check cache first
+              const cached = await getCachedPropertyData(property.address);
+              if (cached) {
+                setFolders(cached.folders);
+                setPropertyFiles(cached.files);
+                setFoldersLoading(false);
+                setFilesLoading(false);
+              } else {
+                // Fetch fresh data in background
+                const [folderResult, filesResult] = await Promise.all([
+                  supabase
+                    .from('property_folders')
+                    .select('*')
+                    .eq('property_id', property.id)
+                    .eq('user_id', user.id)
+                    .is('deleted_at', null)
+                    .order('created_at', { ascending: true }),
+                  supabase
+                    .from('property_files')
+                    .select('*')
+                    .eq('property_id', property.id)
+                    .order('uploaded_at', { ascending: false })
+                ]);
+
+                if (folderResult.data) {
+                  setFolders(folderResult.data);
+                }
+                if (filesResult.data) {
+                  setPropertyFiles(filesResult.data);
+                }
+                
+                // Cache the data
+                if (folderResult.data && filesResult.data) {
+                  await cachePropertyData(property.address, filesResult.data, folderResult.data);
+                }
+                
+                setFoldersLoading(false);
+                setFilesLoading(false);
+              }
+              
+              // Reset folder selection
+              setSelectedFolder('master');
+            }
+          } catch (error) {
+            console.error('Error loading property data:', error);
+            setFoldersLoading(false);
+            setFilesLoading(false);
+          }
+        }}
+      />
+
     </div>
   );
 }

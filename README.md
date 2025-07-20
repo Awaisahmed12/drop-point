@@ -12,6 +12,7 @@ DropPoint is a map-based document management platform for real estate profession
 - POI-free experience (no distracting business markers)
 - Current location button for instant navigation to user's position
 - **Priority Search**: User's saved properties appear first in search results, even from different locations
+- **List View**: Glassmorphic modal overlay for browsing properties (accessible via List button)
 
 ### **Property Management**
 - One-click property saving from map coordinates
@@ -57,6 +58,19 @@ DropPoint is a map-based document management platform for real estate profession
 - **FIXED**: Critical race condition bug where files disappeared during property switching
 - Intuitive property dropdown that shows all properties with proper "Current" marking
 - Resolved useEffect conflict that was clearing file state immediately after property switches
+
+### **List View Experience** 🎯
+- **Steve Jobs-inspired design**: Minimal, intuitive, and lightning-fast modal overlay
+- **Glassmorphic integration**: Matches PropertyDetailsModal aesthetic perfectly
+- **Instant search**: Real-time filtering with smart keyboard handling
+- **Modal experience**: Stays within map context, no page navigation
+- **Property icons**: Blue-accented house icons matching app theme
+- **Smart states**: Loading, empty, error, and no-results states
+- **PropertySwitcher-like navigation**: Instant modal opening with background map updates
+- **Smart return flow**: Returns to list view when closing property accessed from list
+- **Performance optimized**: Background preloading for instant access
+- **Mobile-first**: Touch-friendly interactions with proper modal sizing
+- **Context preservation**: Maintains map position and state throughout
 
 ## 🏗️ Architecture
 
@@ -263,10 +277,10 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 
 ### **Google Maps-Style Map Controls**
 - **Circular toggle button**: Redesigned mobile map controls to match Google Maps UX
-- **Smart positioning**: Button positioned on right side, avoids search dropdown interference
+- **Clean positioning**: Controls positioned below search bar to avoid interference
 - **Layers icon**: Professional layers icon instead of text labels
-- **Improved visibility**: Shows when user finishes typing, stays accessible during navigation
-- **Enhanced mobile experience**: 44px touch target, proper shadows and hover states
+- **Smart visibility**: Controls hide during search, reappear when done typing
+- **Non-overlapping layout**: All controls positioned to avoid blocking search or other UI elements
 
 ### **Race Condition Fix - PropertyDetailsModal**
 - **Fixed mobile race condition**: Property details modal now loads data immediately on first click

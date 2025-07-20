@@ -6,6 +6,7 @@ interface MapControlsProps {
   onCurrentLocationClick?: () => void;
   currentLocationLoading?: boolean;
   showPropertyInfoCard?: boolean;
+  onListViewClick?: () => void;
 }
 
 export const MapControls = ({ 
@@ -14,7 +15,8 @@ export const MapControls = ({
   showDropdown = false,
   onCurrentLocationClick,
   currentLocationLoading = false,
-  showPropertyInfoCard = false
+  showPropertyInfoCard = false,
+  onListViewClick
 }: MapControlsProps) => {
   // Desktop map type controls (left side)
   const desktopMapControls = (
@@ -46,7 +48,38 @@ export const MapControls = ({
 
   // Desktop current location button (positioned after search bar)
   const desktopCurrentLocationButton = onCurrentLocationClick && (
-    <div className="hidden sm:flex absolute top-6 right-6 z-30">
+    <div className="hidden sm:flex absolute top-6 right-6 z-30 gap-2">
+      {/* List View Button */}
+      {onListViewClick && (
+        <button
+          className="px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm"
+          onClick={onListViewClick}
+          style={{ 
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+          }}
+        >
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          List
+        </button>
+      )}
+      
+      {/* Current Location Button */}
       <button
         className={`px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm ${
           currentLocationLoading ? 'opacity-75' : ''
@@ -98,35 +131,79 @@ export const MapControls = ({
   const shouldShowMobileControls = !showDropdown;
   
   const mobileControls = shouldShowMobileControls && (
-    <div className="absolute top-20 right-4 z-40 sm:hidden flex flex-col gap-2">
-      {/* Map type toggle button */}
+    <div className="absolute right-4 top-20 z-30 sm:hidden flex flex-col gap-2">
+      {/* Map Type Toggle */}
       <button
-        className={`w-11 h-11 rounded-full shadow-lg border-2 flex items-center justify-center transition-all duration-200 hover:shadow-xl ${
-          mapType === 'satellite' 
-            ? 'bg-blue-600 text-white border-blue-600' 
-            : 'bg-white text-gray-700 border-gray-300'
-        } cursor-pointer`}
+        className="w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl cursor-pointer"
         onClick={() => onMapTypeChange(mapType === 'satellite' ? 'roadmap' : 'satellite')}
         style={{ 
           boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
         }}
       >
-        {/* Layers icon similar to Google Maps */}
-        <svg 
-          width="16" 
-          height="16" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="2" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-        >
-          <polygon points="12,2 22,8.5 12,15 2,8.5"></polygon>
-          <polyline points="2,17.5 12,24 22,17.5"></polyline>
-          <polyline points="2,12.5 12,19 22,12.5"></polyline>
-        </svg>
+        {mapType === 'satellite' ? (
+          /* Map icon for when in satellite mode */
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <polygon points="3 6 9 1 15 6 21 4 21 14 15 16 9 21 3 18"></polygon>
+            <line x1="9" y1="1" x2="9" y2="21"></line>
+            <line x1="15" y1="6" x2="15" y2="16"></line>
+          </svg>
+        ) : (
+          /* Satellite icon for when in map mode */
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <path d="M4.93 4.93l14.14 14.14"></path>
+            <path d="m18.5 12.5-1.8-1.8a4 4 0 0 0-5.5-5.5l-1.8-1.8"></path>
+            <path d="M8.5 8.5 7 7a4 4 0 0 0-5 5l1.5 1.5"></path>
+            <path d="m16 16 1.5 1.5a4 4 0 0 0 5-5L21 11"></path>
+          </svg>
+        )}
       </button>
+
+      {/* List View Button */}
+      {onListViewClick && (
+        <button
+          className="w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl cursor-pointer"
+          onClick={onListViewClick}
+          style={{ 
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+          }}
+        >
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+        </button>
+      )}
     </div>
   );
 
@@ -138,7 +215,7 @@ export const MapControls = ({
     <div className="absolute right-4 z-40 sm:hidden" 
          style={{
            // Dynamic positioning: ensure button is always above PropertyInfoCard with proper spacing
-           bottom: showPropertyInfoCard ? '220px' : '128px' // 220px = card height + comfortable spacing, 128px = normal position
+           bottom: showPropertyInfoCard ? '220px' : '110px' // Reduced normal position from 128px to 110px
          }}>
       <button
         className={`w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl cursor-pointer ${

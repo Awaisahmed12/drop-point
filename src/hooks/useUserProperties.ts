@@ -27,16 +27,55 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
       setLoading(true);
       setError(null);
 
+      // Check for cached data first for instant loading
+      const cached = sessionStorage.getItem('droppoint-properties-cache');
+      if (cached) {
+        try {
+          const cacheData = JSON.parse(cached);
+          const cacheAge = Date.now() - cacheData.timestamp;
+          
+          // Use cache if less than 5 minutes old
+          if (cacheAge < 5 * 60 * 1000) {
+            console.log('📋 [PROPERTIES] Using cached data for instant load');
+            setProperties(cacheData.properties);
+            setLoading(false);
+            
+            // Fetch fresh data in background to update cache
+            setTimeout(() => fetchFreshProperties(), 100);
+            return;
+          }
+        } catch (error) {
+          console.error('Error parsing cached properties:', error);
+        }
+      }
+
+      // No valid cache, fetch fresh data
+      await fetchFreshProperties();
+    } catch (error) {
+      console.error('Error in fetchProperties:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load properties');
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchFreshProperties = useCallback(async () => {
+    try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setError('User not authenticated');
+        setProperties([]);
+        setLoading(false);
         return;
       }
 
-      // First, get all properties for the user
+      console.log('📋 [PROPERTIES] Fetching fresh properties data...');
+
+      // Fetch properties with file counts using a more efficient query
       const { data: propertiesData, error: propertiesError } = await supabase
         .from('properties')
-        .select('*')
+        .select(`
+          id, address, lat, lng, label, notes, created_at, updated_at,
+          property_files!left(id)
+        `)
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
@@ -44,42 +83,26 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
         throw propertiesError;
       }
 
-      if (!propertiesData || propertiesData.length === 0) {
-        setProperties([]);
-        return;
-      }
+      // Transform to PropertyWithFileCount format
+      const propertiesWithCount: PropertyWithFileCount[] = (propertiesData || []).map(property => ({
+        ...property,
+        file_count: property.property_files?.length || 0,
+        last_accessed: property.updated_at,
+        user_id: user.id
+      }));
 
-      // Get file counts for each property
-      const propertiesWithCounts: PropertyWithFileCount[] = await Promise.all(
-        propertiesData.map(async (property) => {
-          const { count, error: countError } = await supabase
-            .from('property_files')
-            .select('*', { count: 'exact', head: true })
-            .eq('property_id', property.id);
+      setProperties(propertiesWithCount);
+      
+      // Update cache with fresh data
+      sessionStorage.setItem('droppoint-properties-cache', JSON.stringify({
+        properties: propertiesWithCount,
+        timestamp: Date.now()
+      }));
 
-          if (countError) {
-            console.error('Error counting files for property', property.id, countError);
-          }
-
-          return {
-            ...property,
-            file_count: count || 0,
-            last_accessed: property.updated_at || property.created_at
-          };
-        })
-      );
-
-      // Sort by last accessed (most recent first), then by created date
-      const sortedProperties = propertiesWithCounts.sort((a, b) => {
-        const aDate = new Date(a.last_accessed || a.created_at || '1970-01-01');
-        const bDate = new Date(b.last_accessed || b.created_at || '1970-01-01');
-        return bDate.getTime() - aDate.getTime();
-      });
-
-      setProperties(sortedProperties);
-    } catch (err) {
-      console.error('Error fetching user properties:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch properties');
+      console.log('📋 [PROPERTIES] Fresh data loaded and cached:', propertiesWithCount.length);
+    } catch (error) {
+      console.error('Error fetching fresh properties:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load properties');
     } finally {
       setLoading(false);
     }
