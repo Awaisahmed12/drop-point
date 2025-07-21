@@ -445,6 +445,54 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 
 **Impact**: Addresses now display more completely without truncation, and the interface feels cleaner without the unnecessary "Current" badge visual clutter.
 
+### **Completely Redesigned Rename Experience ✅ COMPLETED**
+
+**Status**: Transformed the poor rename UX into a modern, intuitive interface
+
+**Problems Fixed**:
+- **Poor Text Contrast**: White/unclear text that was hard to read
+- **Tiny Input Fields**: Cramped, difficult-to-use input boxes
+- **No Visual Feedback**: Unclear when rename mode was active
+- **Missing Actions**: No clear Cancel/Save options
+- **Mobile Unfriendly**: Small touch targets and zoom issues
+
+**New Rename UX Features**:
+- **Blue Highlight Container**: Clear visual indication when renaming with `bg-blue-50` and `border-blue-400`
+- **Large, Touch-Friendly Inputs**: Proper padding (`px-3 py-2` desktop, `px-4 py-3` mobile) with focus rings
+- **Explicit Action Buttons**: Clear "Cancel" and "Save" buttons instead of relying on blur/enter
+- **File Extension Display**: Clean extension preview (`.pdf`, `.jpg`) shown separately
+- **iOS Optimization**: `fontSize: '16px'` prevents unwanted zoom on mobile
+- **Consistent Styling**: Same experience across List view, Mobile view, and Grid view
+
+**Technical Implementation**:
+- **Desktop List/Mobile**: Full-width containers with action buttons at bottom
+- **Grid View**: Centered inputs with centered action buttons for compact display
+- **Input Styling**: `text-gray-900 bg-white border-gray-300` for excellent contrast
+- **Focus States**: `focus:ring-2 focus:ring-blue-500` for clear interaction feedback
+- **Responsive Design**: Different padding and sizing for mobile vs desktop
+
+**Impact**: Renaming files and folders is now a pleasure instead of a frustration - clear visual feedback, readable text, large touch targets, and intuitive save/cancel actions.
+
+### **Fixed Grid View Rename Overlap Issue ✅ COMPLETED**
+
+**Status**: Resolved awful overlapping rename interface in grid view
+
+**Problem**: The full rename interface (with blue container and action buttons) was overlapping other grid items, creating visual chaos and making it impossible to see or interact with other files during rename.
+
+**Solution**: 
+- **Grid View**: Simplified to compact input-only interface that fits within grid item bounds
+- **List/Mobile View**: Retained full-featured interface with action buttons (where there's space)
+- **Clean Visual Design**: Blue border (`border-2 border-blue-400`) indicates rename mode without bulk
+- **Layout Preservation**: Grid structure remains intact during rename operations
+
+**Technical Details**:
+- **Grid View Rename**: Just `input` with blue border, fits in existing space
+- **List View Rename**: Full container with `Cancel`/`Save` buttons for feature-rich experience  
+- **Responsive Strategy**: Different rename UX based on available space and context
+- **Keyboard Shortcuts**: Enter/Escape work consistently across all view modes
+
+**Impact**: Grid view rename is now clean and non-disruptive, while list view retains the full-featured rename experience where space allows.
+
 ### **Mobile Map Improvements**
 - Clean satellite/map toggle (hidden during search)
 - POI-free experience (no distracting business markers)
