@@ -463,7 +463,7 @@ export default function MapPage() {
   // On mount, read map type from localStorage
   useEffect(() => {
     const storedType = typeof window !== 'undefined' ? localStorage.getItem(MAP_TYPE_KEY) : null;
-    if (storedType === 'roadmap' || storedType === 'satellite') {
+    if (storedType === 'roadmap' || storedType === 'satellite' || storedType === 'hybrid') {
       setMapType(storedType);
     } else {
       setMapType(DEFAULT_MAP_TYPE);

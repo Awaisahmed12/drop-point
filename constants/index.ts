@@ -17,8 +17,9 @@ export const GOOGLE_MAP_LIBRARIES = ["places"] as Libraries;
 export const DEFAULT_ZOOM = 12;
 export const SEARCH_ZOOM = 19;
 export const PROPERTY_SELECTION_MIN_ZOOM = 18; // Minimum zoom to show property selection card
-export const MAP_TYPE_KEY = 'drop-point-map-type';
-export const DEFAULT_MAP_TYPE = 'satellite';
+// Map configuration
+export const MAP_TYPE_KEY = 'droppoint-map-type';
+export const DEFAULT_MAP_TYPE = 'hybrid';
 
 // Coordinate comparison threshold
 export const COORDINATE_THRESHOLD = 0.00001;

@@ -6,7 +6,7 @@ DropPoint is a map-based document management platform for real estate profession
 
 ### **Interactive Map System**
 - LandGlide-style crosshair cursor for precise property selection
-- Satellite and roadmap views with toggle
+- Three map views: Hybrid (default), Satellite, and Roadmap with seamless toggle
 - Smart address detection using reverse geocoding
 - User geolocation with fallback to US center
 - POI-free experience (no distracting business markers)
@@ -280,9 +280,10 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 - **Responsive design**: Separate positioning for mobile (bottom-right) and desktop (left sidebar) layouts
 
 ### **Google Maps-Style Map Controls**
-- **Circular toggle button**: Redesigned mobile map controls to match Google Maps UX
+- **Three-way toggle**: Circular button cycles through Hybrid (default) → Satellite → Roadmap
 - **Clean positioning**: Controls positioned below search bar to avoid interference
-- **Layers icon**: Professional layers icon instead of text labels
+- **Smart icons**: Context-aware icons showing next map type in cycle
+- **Desktop controls**: Three-button layout for direct access to any map type
 - **Smart visibility**: Controls hide during search, reappear when done typing
 - **Non-overlapping layout**: All controls positioned to avoid blocking search or other UI elements
 

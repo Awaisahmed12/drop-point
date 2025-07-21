@@ -1,6 +1,6 @@
 interface MapControlsProps {
   mapType: string;
-  onMapTypeChange: (type: 'roadmap' | 'satellite') => void;
+  onMapTypeChange: (type: 'roadmap' | 'satellite' | 'hybrid') => void;
   isMobile?: boolean;
   showDropdown?: boolean;
   onCurrentLocationClick?: () => void;
@@ -18,7 +18,7 @@ export const MapControls = ({
   showPropertyInfoCard = false,
   onListViewClick
 }: MapControlsProps) => {
-  // Desktop map type controls (left side)
+  // Desktop map type controls (left side) - now with 3 options
   const desktopMapControls = (
     <div className="hidden sm:flex absolute top-6 left-6 z-30">
       <div className="flex gap-2 bg-white rounded-lg shadow-lg p-2">
@@ -31,6 +31,16 @@ export const MapControls = ({
           onClick={() => onMapTypeChange('roadmap')}
         >
           Map
+        </button>
+        <button
+          className={`px-3 py-1 rounded font-semibold text-sm ${
+            mapType === 'hybrid' 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-white text-gray-800 border border-gray-300'
+          } cursor-pointer`}
+          onClick={() => onMapTypeChange('hybrid')}
+        >
+          Hybrid
         </button>
         <button
           className={`px-3 py-1 rounded font-semibold text-sm ${
@@ -132,16 +142,25 @@ export const MapControls = ({
   
   const mobileControls = shouldShowMobileControls && (
     <div className="absolute right-4 top-20 z-30 sm:hidden flex flex-col gap-2">
-      {/* Map Type Toggle */}
+      {/* Map Type Toggle - cycles through all 3 types */}
       <button
         className="w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl cursor-pointer"
-        onClick={() => onMapTypeChange(mapType === 'satellite' ? 'roadmap' : 'satellite')}
+        onClick={() => {
+          // Cycle through the three map types
+          if (mapType === 'roadmap') {
+            onMapTypeChange('hybrid');
+          } else if (mapType === 'hybrid') {
+            onMapTypeChange('satellite');
+          } else {
+            onMapTypeChange('roadmap');
+          }
+        }}
         style={{ 
           boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
         }}
       >
-        {mapType === 'satellite' ? (
-          /* Map icon for when in satellite mode */
+        {mapType === 'roadmap' ? (
+          /* Hybrid icon for when in roadmap mode (next is hybrid) */
           <svg 
             width="16" 
             height="16" 
@@ -152,12 +171,11 @@ export const MapControls = ({
             strokeLinecap="round" 
             strokeLinejoin="round"
           >
-            <polygon points="3 6 9 1 15 6 21 4 21 14 15 16 9 21 3 18"></polygon>
-            <line x1="9" y1="1" x2="9" y2="21"></line>
-            <line x1="15" y1="6" x2="15" y2="16"></line>
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
           </svg>
-        ) : (
-          /* Satellite icon for when in map mode */
+        ) : mapType === 'hybrid' ? (
+          /* Satellite icon for when in hybrid mode (next is satellite) */
           <svg 
             width="16" 
             height="16" 
@@ -172,6 +190,22 @@ export const MapControls = ({
             <path d="m18.5 12.5-1.8-1.8a4 4 0 0 0-5.5-5.5l-1.8-1.8"></path>
             <path d="M8.5 8.5 7 7a4 4 0 0 0-5 5l1.5 1.5"></path>
             <path d="m16 16 1.5 1.5a4 4 0 0 0 5-5L21 11"></path>
+          </svg>
+        ) : (
+          /* Map icon for when in satellite mode (next is roadmap) */
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <polygon points="3 6 9 1 15 6 21 4 21 14 15 16 9 21 3 18"></polygon>
+            <line x1="9" y1="1" x2="9" y2="21"></line>
+            <line x1="15" y1="6" x2="15" y2="16"></line>
           </svg>
         )}
       </button>
