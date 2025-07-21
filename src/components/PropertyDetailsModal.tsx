@@ -927,20 +927,33 @@ export const PropertyDetailsModal = ({
         
         {/* Header */}
         <div className="modal-header-refined flex items-center justify-between px-5 py-3 rounded-t-3xl flex-shrink-0">
-          <div className="flex flex-col min-w-0 flex-1 mr-4">
-            {/* Street Address - Primary */}
-            <h1 className={`property-title ${isMobile ? 'text-base' : 'text-xl'} font-semibold leading-tight mb-0.5`} 
-                style={{ letterSpacing: '-0.02em' }}
-                title={streetAddress}>
-              {streetAddress || property?.address}
-            </h1>
-            {/* Location Info - Secondary */}
-            {locationInfo && (
-              <p className={`property-location ${isMobile ? 'text-xs' : 'text-base'} font-medium leading-snug`} 
-                 style={{ letterSpacing: '-0.005em' }}
-                 title={locationInfo}>
-                {locationInfo}
-              </p>
+          <div className="flex items-center min-w-0 flex-1 mr-4">
+            <div className="flex flex-col min-w-0 flex-1">
+              {/* Street Address - Primary */}
+              <h1 className={`property-title ${isMobile ? 'text-base' : 'text-xl'} font-semibold leading-tight mb-0.5`} 
+                  style={{ letterSpacing: '-0.02em' }}
+                  title={streetAddress}>
+                {streetAddress || property?.address}
+              </h1>
+              {/* Location Info - Secondary */}
+              {locationInfo && (
+                <p className={`property-location ${isMobile ? 'text-xs' : 'text-base'} font-medium leading-snug`} 
+                   style={{ letterSpacing: '-0.005em' }}
+                   title={locationInfo}>
+                  {locationInfo}
+                </p>
+              )}
+            </div>
+            
+            {/* Property Switcher - Right next to address for intuitive property switching */}
+            {currentPropertyWithFileCount && (
+              <div className="ml-3 flex-shrink-0">
+                <PropertySwitcher
+                  currentProperty={currentPropertyWithFileCount}
+                  onPropertySelect={switchToProperty}
+                  disabled={switchingProperty}
+                />
+              </div>
             )}
           </div>
           
@@ -972,15 +985,6 @@ export const PropertyDetailsModal = ({
                 </svg>
               )}
             </button>
-
-            {/* Property Switcher */}
-            {currentPropertyWithFileCount && (
-              <PropertySwitcher
-                currentProperty={currentPropertyWithFileCount}
-                onPropertySelect={switchToProperty}
-                disabled={switchingProperty}
-              />
-            )}
             
             {/* Close button with better spacing and styling */}
             <button

@@ -407,6 +407,44 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 
 **Impact**: Users can now browse the map freely without property selection interruptions until they zoom in to actually select properties.
 
+### **PropertyDetailsModal UI Improvements ✅ COMPLETED**
+
+**Status**: Enhanced header layout and property switcher UX with intuitive positioning
+
+**Key Improvements**:
+- **Intuitive Property Switcher Placement**: Moved property switcher right next to the property address for maximum user clarity
+- **Right-Aligned Dropdown**: Dropdown positioned to prevent cutoff issues while staying within viewport bounds  
+- **Optimized Dropdown Sizing**: Mobile `80vw` (max 350px), desktop `50vw` (max 400px) for better balance
+- **Balanced Heights**: Dropdown max height `50vh` mobile / `60vh` desktop with property list `max-h-60` / `max-h-72`
+- **Clear Visual Hierarchy**: Property switcher logically grouped with address, view controls separate on right
+- **Anti-Cutoff Protection**: Right-aligned positioning and conservative sizing prevent viewport overflow
+
+**Technical Details**:
+- **Inline Address Layout**: Property switcher integrated into address container with `flex items-center`
+- **Smart Responsive Sizing**: Uses viewport units with reasonable max-width constraints
+- **Right-Aligned Positioning**: `top-full right-0` positioning for dropdown to prevent cutoff
+- **Proper Spacing**: `ml-3 flex-shrink-0` wrapper prevents text overflow while maintaining button access
+
+**Impact**: Property switching is now instantly recognizable as being related to the property address, eliminating user confusion while preventing any dropdown cutoff issues.
+
+### **Property Switcher Text Optimization ✅ COMPLETED**
+
+**Status**: Improved readability and space utilization in property dropdown
+
+**Key Improvements**:
+- **Removed "Current" Badge**: Eliminated the disappearing "Current" button that wasn't helpful and took up valuable space
+- **Smaller Font Sizes**: Reduced to `text-sm` for property names and `text-xs` for location info to prevent address truncation
+- **Better Text Wrapping**: Removed unnecessary `truncate` classes to allow full address display when space permits
+- **Consistent Styling**: Applied same font sizing across both mobile and desktop dropdowns
+
+**Technical Details**:
+- **Mobile Property Names**: Changed from `text-base` to `text-sm` with `font-semibold`
+- **Desktop Property Names**: Maintained `text-sm` with `font-medium` for desktop density
+- **Location Info**: Standardized to `text-xs` on both mobile and desktop
+- **Space Optimization**: Removed badge reduces horizontal space competition for longer addresses
+
+**Impact**: Addresses now display more completely without truncation, and the interface feels cleaner without the unnecessary "Current" badge visual clutter.
+
 ### **Mobile Map Improvements**
 - Clean satellite/map toggle (hidden during search)
 - POI-free experience (no distracting business markers)

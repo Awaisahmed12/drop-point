@@ -124,18 +124,123 @@ export const PropertySwitcher = ({
         />
       </button>
 
-      {/* Dropdown Menu */}
-      {isOpen && (
-        <div className={`absolute bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] ${
-          isMobile 
-            ? 'top-full right-0 mt-2 w-72 max-w-[calc(100vw-3rem)]' 
-            : 'top-full right-0 mt-2 w-96'
-        }`} style={{ 
+      {/* Mobile: Large Centered Dropdown */}
+      {isOpen && isMobile && (
+        <div className="fixed inset-4 z-[9999] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col" style={{ 
+          top: '10vh',
+          bottom: '10vh',
+          left: '5vw',
+          right: '5vw',
+          maxHeight: '80vh'
+        }}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-4 bg-white border-b border-gray-200 flex-shrink-0 rounded-t-2xl">
+            <h2 className="text-lg font-semibold text-gray-900">Switch Property</h2>
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setSearchQuery('');
+              }}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Close"
+            >
+              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Search Input */}
+          <div className="p-4 border-b border-gray-100 flex-shrink-0">
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search properties..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base placeholder-gray-600"
+                style={{ fontSize: '16px' }} // Prevent zoom on iOS
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+          </div>
+
+          {/* Properties List */}
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="p-6 text-center text-gray-500">
+                Loading properties...
+              </div>
+            ) : displayProperties.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">
+                {searchQuery ? 'No properties match your search' : 'No other properties found'}
+              </div>
+            ) : (
+              displayProperties.map((property) => {
+                const { streetAddress, locationInfo } = parseAddress(property.address);
+                const isCurrentProperty = currentProperty && property.id === currentProperty.id;
+                
+                return (
+                  <button
+                    key={property.id}
+                    onClick={() => !isCurrentProperty && handlePropertySelect(property)}
+                    disabled={isCurrentProperty}
+                    className={`w-full px-4 py-4 text-left transition-colors border-b border-gray-100 last:border-b-0 ${
+                      isCurrentProperty 
+                        ? 'bg-blue-50 cursor-not-allowed opacity-75' 
+                        : 'hover:bg-gray-50 cursor-pointer active:bg-gray-100'
+                    }`}
+                    style={{ minHeight: '64px' }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-semibold text-sm ${
+                          isCurrentProperty ? 'text-blue-700' : 'text-gray-900'
+                        }`}>
+                          {streetAddress || property.address}
+                        </div>
+                        {locationInfo && (
+                          <div className={`text-xs mt-1 ${
+                            isCurrentProperty ? 'text-blue-600' : 'text-gray-500'
+                          }`}>
+                            {locationInfo}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0 ml-4">
+                        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${
+                          isCurrentProperty 
+                            ? 'bg-blue-200 text-blue-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {property.file_count} file{property.file_count !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+            
+            {/* Show more indicator if there are more than 20 properties */}
+            {sortedProperties.length > 20 && (
+              <div className="p-4 text-center text-sm text-gray-500 bg-gray-50 rounded-b-2xl">
+                Showing first 20 properties. Use search to find more.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Desktop: Dropdown Menu */}
+      {isOpen && !isMobile && (
+        <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{ 
           zIndex: 9999,
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
-          ...(isMobile ? { 
-            maxHeight: '50vh'
-          } : {})
+          width: 'min(50vw, 400px)',
+          maxHeight: '60vh'
         }}>
           {/* Search Input */}
           <div className="p-3 border-b border-gray-100">
@@ -154,7 +259,7 @@ export const PropertySwitcher = ({
           </div>
 
           {/* Properties List */}
-          <div className="max-h-64 overflow-y-auto">
+          <div className="overflow-y-auto max-h-72">
             {loading ? (
               <div className="p-4 text-center text-gray-500 text-sm">
                 Loading properties...
@@ -181,13 +286,13 @@ export const PropertySwitcher = ({
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <div className={`font-medium truncate text-sm flex items-center gap-2 ${
+                        <div className={`font-medium text-sm ${
                           isCurrentProperty ? 'text-blue-700' : 'text-gray-900'
                         }`}>
                           {streetAddress || property.address}
                         </div>
                         {locationInfo && (
-                          <div className={`text-xs truncate mt-0.5 ${
+                          <div className={`text-xs mt-0.5 ${
                             isCurrentProperty ? 'text-blue-600' : 'text-gray-500'
                           }`}>
                             {locationInfo}
