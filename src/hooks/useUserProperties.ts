@@ -22,42 +22,6 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProperties = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Check for cached data first for instant loading
-      const cached = sessionStorage.getItem('droppoint-properties-cache');
-      if (cached) {
-        try {
-          const cacheData = JSON.parse(cached);
-          const cacheAge = Date.now() - cacheData.timestamp;
-          
-          // Use cache if less than 5 minutes old
-          if (cacheAge < 5 * 60 * 1000) {
-            console.log('📋 [PROPERTIES] Using cached data for instant load');
-            setProperties(cacheData.properties);
-            setLoading(false);
-            
-            // Fetch fresh data in background to update cache
-            setTimeout(() => fetchFreshProperties(), 100);
-            return;
-          }
-        } catch (error) {
-          console.error('Error parsing cached properties:', error);
-        }
-      }
-
-      // No valid cache, fetch fresh data
-      await fetchFreshProperties();
-    } catch (error) {
-      console.error('Error in fetchProperties:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load properties');
-      setLoading(false);
-    }
-  }, []);
-
   const fetchFreshProperties = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -107,6 +71,42 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
       setLoading(false);
     }
   }, []);
+
+  const fetchProperties = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Check for cached data first for instant loading
+      const cached = sessionStorage.getItem('droppoint-properties-cache');
+      if (cached) {
+        try {
+          const cacheData = JSON.parse(cached);
+          const cacheAge = Date.now() - cacheData.timestamp;
+          
+          // Use cache if less than 5 minutes old
+          if (cacheAge < 5 * 60 * 1000) {
+            console.log('📋 [PROPERTIES] Using cached data for instant load');
+            setProperties(cacheData.properties);
+            setLoading(false);
+            
+            // Fetch fresh data in background to update cache
+            setTimeout(() => fetchFreshProperties(), 100);
+            return;
+          }
+        } catch (error) {
+          console.error('Error parsing cached properties:', error);
+        }
+      }
+
+      // No valid cache, fetch fresh data
+      await fetchFreshProperties();
+    } catch (error) {
+      console.error('Error in fetchProperties:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load properties');
+      setLoading(false);
+    }
+  }, [fetchFreshProperties]);
 
   const updateLastAccessed = useCallback(async (propertyId: string) => {
     try {

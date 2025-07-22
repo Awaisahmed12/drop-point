@@ -254,7 +254,7 @@ export const PropertyDetailsModal = ({
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
     
-    let position: {top?: number, bottom?: number, left?: number, right?: number} = {};
+    const position: {top?: number, bottom?: number, left?: number, right?: number} = {};
     
     // Vertical positioning - prefer below, but use above if not enough space
     const spaceBelow = viewportHeight - rect.bottom;
