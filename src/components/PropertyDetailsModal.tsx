@@ -253,6 +253,7 @@ export const PropertyDetailsModal = ({
     const menuWidth = 176; // 44 * 4 (w-44)
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
+    const padding = 8; // Minimum distance from screen edge
     
     const position: {top?: number, bottom?: number, left?: number, right?: number} = {};
     
@@ -260,23 +261,53 @@ export const PropertyDetailsModal = ({
     const spaceBelow = viewportHeight - rect.bottom;
     const spaceAbove = rect.top;
     
-    if (spaceBelow >= menuHeight || spaceBelow > spaceAbove) {
-      position.top = rect.bottom + 8; // 8px gap
+    if (spaceBelow >= menuHeight + padding) {
+      // Enough space below
+      position.top = rect.bottom + padding;
+    } else if (spaceAbove >= menuHeight + padding) {
+      // Not enough space below, but enough above
+      position.bottom = viewportHeight - rect.top + padding;
     } else {
-      position.bottom = viewportHeight - rect.top + 8; // 8px gap
+      // Not enough space above or below, position in the middle of available space
+      if (spaceBelow > spaceAbove) {
+        // More space below
+        position.top = Math.max(padding, rect.bottom + padding);
+      } else {
+        // More space above
+        position.bottom = Math.max(padding, viewportHeight - rect.top + padding);
+      }
     }
     
-    // Horizontal positioning - prefer right-aligned, but adjust if would go off-screen
+    // Horizontal positioning - prefer right-aligned with button, but adjust if would go off-screen
     const spaceRight = viewportWidth - rect.right;
     const spaceLeft = rect.left;
     
-    if (spaceRight >= menuWidth) {
+    if (spaceRight >= menuWidth + padding) {
+      // Enough space to the right of button (right-aligned)
       position.right = viewportWidth - rect.right;
-    } else if (spaceLeft >= menuWidth) {
+    } else if (spaceLeft >= menuWidth + padding) {
+      // Not enough space right-aligned, try left-aligned with button
+      position.left = rect.left - menuWidth + rect.width;
+    } else if (rect.left + menuWidth + padding <= viewportWidth) {
+      // Try left edge of button
       position.left = rect.left;
     } else {
-      // Center the menu if it doesn't fit on either side
-      position.left = Math.max(8, rect.left - (menuWidth - rect.width) / 2);
+      // Force fit - position as far right as possible while staying on screen
+      position.right = padding;
+    }
+    
+    // Final safety check - ensure we don't go off any edge
+    if (position.left !== undefined) {
+      position.left = Math.max(padding, Math.min(position.left, viewportWidth - menuWidth - padding));
+    }
+    if (position.right !== undefined) {
+      position.right = Math.max(padding, Math.min(position.right, viewportWidth - menuWidth - padding));
+    }
+    if (position.top !== undefined) {
+      position.top = Math.max(padding, Math.min(position.top, viewportHeight - menuHeight - padding));
+    }
+    if (position.bottom !== undefined) {
+      position.bottom = Math.max(padding, Math.min(position.bottom, viewportHeight - menuHeight - padding));
     }
     
     setMenuPosition(prev => ({...prev, [menuId]: position}));
@@ -1318,7 +1349,10 @@ export const PropertyDetailsModal = ({
                                     className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
                                     style={{
                                       zIndex: 999999,
+                                      position: 'fixed',
                                       boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                                      maxWidth: 'calc(100vw - 16px)',
+                                      maxHeight: 'calc(100vh - 16px)',
                                       ...menuPosition[folder.id]
                                     }}
                                   >
@@ -1465,7 +1499,10 @@ export const PropertyDetailsModal = ({
                                     className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
                                     style={{
                                       zIndex: 999999,
+                                      position: 'fixed',
                                       boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                                      maxWidth: 'calc(100vw - 16px)',
+                                      maxHeight: 'calc(100vh - 16px)',
                                       ...menuPosition[folder.id]
                                     }}
                                   >
@@ -1977,7 +2014,10 @@ export const PropertyDetailsModal = ({
                                     className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
                                     style={{
                                       zIndex: 999999,
+                                      position: 'fixed',
                                       boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                                      maxWidth: 'calc(100vw - 16px)',
+                                      maxHeight: 'calc(100vh - 16px)',
                                       ...menuPosition[folder.id]
                                     }}
                                   >
