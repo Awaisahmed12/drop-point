@@ -79,6 +79,7 @@ export const PropertyDetailsModal = ({
   const [renamingFileName, setRenamingFileName] = useState('');
   const [fileMenuId, setFileMenuId] = useState<string | null>(null);
   const [folderMenuId, setFolderMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{[key: string]: {top?: number, bottom?: number, left?: number, right?: number}}>({});
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [moveFileTarget, setMoveFileTarget] = useState<PropertyFile | null>(null);
   const [sortField, setSortField] = useState<SortField>('date');
@@ -244,6 +245,42 @@ export const PropertyDetailsModal = ({
   const folderInputRef = useRef<HTMLInputElement>(null);
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const folderMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Smart menu positioning function
+  const calculateMenuPosition = (buttonElement: HTMLElement, menuId: string) => {
+    const rect = buttonElement.getBoundingClientRect();
+    const menuHeight = 200; // Approximate menu height
+    const menuWidth = 176; // 44 * 4 (w-44)
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    let position: {top?: number, bottom?: number, left?: number, right?: number} = {};
+    
+    // Vertical positioning - prefer below, but use above if not enough space
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    if (spaceBelow >= menuHeight || spaceBelow > spaceAbove) {
+      position.top = rect.bottom + 8; // 8px gap
+    } else {
+      position.bottom = viewportHeight - rect.top + 8; // 8px gap
+    }
+    
+    // Horizontal positioning - prefer right-aligned, but adjust if would go off-screen
+    const spaceRight = viewportWidth - rect.right;
+    const spaceLeft = rect.left;
+    
+    if (spaceRight >= menuWidth) {
+      position.right = viewportWidth - rect.right;
+    } else if (spaceLeft >= menuWidth) {
+      position.left = rect.left;
+    } else {
+      // Center the menu if it doesn't fit on either side
+      position.left = Math.max(8, rect.left - (menuWidth - rect.width) / 2);
+    }
+    
+    setMenuPosition(prev => ({...prev, [menuId]: position}));
+  };
 
   // Folder validation
   const forbiddenFolderChars = /[:;\/\\*?"<>|]/;
@@ -363,24 +400,37 @@ export const PropertyDetailsModal = ({
     }
   };
 
-  // Click outside handler
+  // Enhanced click outside handler - prevents accidental clicks
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       
+      // Check if any menu is currently open
+      const anyMenuOpen = fileMenuId || folderMenuId;
+      
       if (!target.closest('button[title="Folder actions"]') && !target.closest('button[title="File actions"]')) {
+        let menuClosed = false;
+        
         if (folderMenuRef.current && !folderMenuRef.current.contains(target)) {
           setFolderMenuId(null);
+          menuClosed = true;
         }
         if (fileMenuRef.current && !fileMenuRef.current.contains(target)) {
           setFileMenuId(null);
+          menuClosed = true;
+        }
+        
+        // If we just closed a menu, prevent the click from propagating to other elements
+        if (anyMenuOpen && menuClosed) {
+          e.stopPropagation();
+          e.preventDefault();
         }
       }
     };
 
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, []);
+    document.addEventListener('click', handleClick, true); // Use capture phase
+    return () => document.removeEventListener('click', handleClick, true);
+  }, [fileMenuId, folderMenuId]);
 
   // Enhanced mobile-first file opening function
   const openFileInline = async (file: PropertyFile) => {
@@ -1250,7 +1300,11 @@ export const PropertyDetailsModal = ({
                                   onClick={e => {
                                     e.stopPropagation();
                                     setFileMenuId(null);
-                                    setFolderMenuId(folderMenuId === folder.id ? null : folder.id);
+                                    const newMenuId = folderMenuId === folder.id ? null : folder.id;
+                                    setFolderMenuId(newMenuId);
+                                    if (newMenuId) {
+                                      calculateMenuPosition(e.currentTarget, folder.id);
+                                    }
                                   }}
                                   title="Folder actions"
                                 >
@@ -1259,23 +1313,45 @@ export const PropertyDetailsModal = ({
                                   </svg>
                                 </button>
                                 {folderMenuId === folder.id && (
-                                  <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                  <div 
+                                    ref={folderMenuRef} 
+                                    className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
+                                    style={{
+                                      zIndex: 999999,
+                                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                                      ...menuPosition[folder.id]
+                                    }}
+                                  >
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={e => {
                                         e.stopPropagation();
                                         setRenamingFileId(folder.id);
                                         setRenamingFileName(folder.name);
                                         setFolderMenuId(null);
                                       }}
-                                    >Rename</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Rename
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
                                       onClick={e => {
                                         e.stopPropagation();
                                         onFolderDelete(folder);
                                       }}
-                                    >Delete</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Delete
+                                      </div>
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -1384,23 +1460,46 @@ export const PropertyDetailsModal = ({
                                   </svg>
                                 </button>
                                 {folderMenuId === folder.id && (
-                                  <div ref={folderMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                  <div 
+                                    ref={folderMenuRef} 
+                                    className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
+                                    style={{
+                                      zIndex: 999999,
+                                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                                      ...menuPosition[folder.id]
+                                    }}
+                                  >
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={e => {
                                         e.stopPropagation();
                                         setRenamingFileId(folder.id);
                                         setRenamingFileName(folder.name);
                                         setFolderMenuId(null);
                                       }}
-                                    >Rename</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Rename
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
                                       onClick={e => {
                                         e.stopPropagation();
                                         onFolderDelete(folder);
+                                        setFolderMenuId(null);
                                       }}
-                                    >Delete</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Delete
+                                      </div>
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -1519,7 +1618,11 @@ export const PropertyDetailsModal = ({
                                   onClick={e => {
                                     e.stopPropagation();
                                     setFolderMenuId(null);
-                                    setFileMenuId(fileMenuId === file.id ? null : file.id);
+                                    const newMenuId = fileMenuId === file.id ? null : file.id;
+                                    setFileMenuId(newMenuId);
+                                    if (newMenuId) {
+                                      calculateMenuPosition(e.currentTarget, file.id);
+                                    }
                                   }}
                                   title="File actions"
                                 >
@@ -1528,9 +1631,17 @@ export const PropertyDetailsModal = ({
                                   </svg>
                                 </button>
                                 {fileMenuId === file.id && (
-                                  <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                  <div 
+                                    ref={fileMenuRef} 
+                                    className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
+                                    style={{
+                                      zIndex: 999999,
+                                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                                      ...menuPosition[file.id]
+                                    }}
+                                  >
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={e => {
                                         e.stopPropagation();
                                         setRenamingFileId(file.id);
@@ -1540,18 +1651,32 @@ export const PropertyDetailsModal = ({
                                           setFolderMenuId(null);
                                         }, 50);
                                       }}
-                                    >Rename</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Rename
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={e => {
                                         e.stopPropagation();
                                         setMoveFileTarget(file);
                                         setShowMoveModal(true);
                                         setFileMenuId(null);
                                       }}
-                                    >Move</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                        </svg>
+                                        Move
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-green-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={async (e) => {
                                         e.stopPropagation();
                                         try {
@@ -1561,16 +1686,31 @@ export const PropertyDetailsModal = ({
                                           console.error('Error downloading file:', error);
                                           alert('Unable to download file. Please try again.');
                                         }
+                                        setFileMenuId(null);
                                       }}
-                                    >Download</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Download
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
                                       onClick={e => {
                                         e.stopPropagation();
                                         onFileDelete(file);
                                         setFileMenuId(null);
                                       }}
-                                    >Delete</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Delete
+                                      </div>
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -1685,7 +1825,11 @@ export const PropertyDetailsModal = ({
                                   onClick={e => {
                                     e.stopPropagation();
                                     setFolderMenuId(null);
-                                    setFileMenuId(fileMenuId === file.id ? null : file.id);
+                                    const newMenuId = fileMenuId === file.id ? null : file.id;
+                                    setFileMenuId(newMenuId);
+                                    if (newMenuId) {
+                                      calculateMenuPosition(e.currentTarget, file.id);
+                                    }
                                   }}
                                   title="File actions"
                                 >
@@ -1694,9 +1838,17 @@ export const PropertyDetailsModal = ({
                                   </svg>
                                 </button>
                                 {fileMenuId === file.id && (
-                                  <div ref={fileMenuRef} className="absolute right-0 bottom-full mb-1 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                  <div 
+                                    ref={fileMenuRef} 
+                                    className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
+                                    style={{
+                                      zIndex: 999999,
+                                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                                      ...menuPosition[file.id]
+                                    }}
+                                  >
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={e => {
                                         e.stopPropagation();
                                         setRenamingFileId(file.id);
@@ -1706,18 +1858,32 @@ export const PropertyDetailsModal = ({
                                           setFolderMenuId(null);
                                         }, 50);
                                       }}
-                                    >Rename</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Rename
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={e => {
                                         e.stopPropagation();
                                         setMoveFileTarget(file);
                                         setShowMoveModal(true);
                                         setFileMenuId(null);
                                       }}
-                                    >Move</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                        </svg>
+                                        Move
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-green-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={async (e) => {
                                         e.stopPropagation();
                                         try {
@@ -1727,16 +1893,31 @@ export const PropertyDetailsModal = ({
                                           console.error('Error downloading file:', error);
                                           alert('Unable to download file. Please try again.');
                                         }
+                                        setFileMenuId(null);
                                       }}
-                                    >Download</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Download
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
                                       onClick={e => {
                                         e.stopPropagation();
                                         onFileDelete(file);
                                         setFileMenuId(null);
                                       }}
-                                    >Delete</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Delete
+                                      </div>
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -1755,52 +1936,82 @@ export const PropertyDetailsModal = ({
                           return (
                             <div
                               key={`grid-folder-${folder.id}`}
-                              className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition cursor-pointer group"
+                              className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition cursor-pointer group relative"
                               onClick={() => {
                                 // Clear search when entering a folder
                                 setSearchQuery('');
                                 onFolderChange(folder.id);
                               }}
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                setFileMenuId(null);
-                                setFolderMenuId(folderMenuId === folder.id ? null : folder.id);
-                              }}
                             >
                               <div className="relative">
                                 <HeroFolderIcon style={{ width: isMobile ? 48 : 56, height: isMobile ? 48 : 56, color: '#3b82f6' }} />
-                                {/* Context menu trigger for mobile */}
+                                {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-white shadow-md border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                  className={`absolute ${isMobile ? '-top-2 -right-2' : '-top-2 -right-2'} rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl ${
+                                    isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                  }`}
                                   onClick={e => {
                                     e.stopPropagation();
                                     setFileMenuId(null);
-                                    setFolderMenuId(folderMenuId === folder.id ? null : folder.id);
+                                    const newMenuId = folderMenuId === folder.id ? null : folder.id;
+                                    setFolderMenuId(newMenuId);
+                                    if (newMenuId) {
+                                      calculateMenuPosition(e.currentTarget, folder.id);
+                                    }
+                                  }}
+                                  style={{ 
+                                    zIndex: 10,
+                                    width: isMobile ? '20px' : '28px',
+                                    height: isMobile ? '20px' : '28px',
+                                    minWidth: isMobile ? '20px' : '28px',
+                                    minHeight: isMobile ? '20px' : '28px'
                                   }}
                                 >
-                                  <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <svg className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} text-gray-700`} fill="currentColor" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
                                 {folderMenuId === folder.id && (
-                                  <div ref={folderMenuRef} className="absolute top-8 right-0 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                  <div 
+                                    ref={folderMenuRef} 
+                                    className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
+                                    style={{
+                                      zIndex: 999999,
+                                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                                      ...menuPosition[folder.id]
+                                    }}
+                                  >
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={e => {
                                         e.stopPropagation();
                                         setRenamingFileId(folder.id);
                                         setRenamingFileName(folder.name);
                                         setFolderMenuId(null);
                                       }}
-                                    >Rename</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Rename
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
                                       onClick={e => {
                                         e.stopPropagation();
                                         onFolderDelete(folder);
                                         setFolderMenuId(null);
                                       }}
-                                    >Delete</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Delete
+                                      </div>
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -1854,7 +2065,7 @@ export const PropertyDetailsModal = ({
                           return (
                             <div
                               key={`grid-file-${file.id}`}
-                              className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition cursor-pointer group"
+                              className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition cursor-pointer group relative"
                               onClick={async (e) => {
                                 if ((e.target as HTMLElement).closest('button')) {
                                   return;
@@ -1867,52 +2078,82 @@ export const PropertyDetailsModal = ({
                                   alert('Unable to open file. Please try again.');
                                 }
                               }}
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                setFolderMenuId(null);
-                                setFileMenuId(fileMenuId === file.id ? null : file.id);
-                              }}
                             >
                               <div className="relative">
                                 <FileIcon
                                   type={file.file_name.split('.').pop() || 'file'}
                                   size={isMobile ? 48 : 56}
                                 />
-                                {/* Context menu trigger for mobile */}
+                                {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-white shadow-md border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                  className={`absolute ${isMobile ? '-top-2 -right-2' : '-top-2 -right-2'} rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl ${
+                                    isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                  }`}
                                   onClick={e => {
                                     e.stopPropagation();
                                     setFolderMenuId(null);
-                                    setFileMenuId(fileMenuId === file.id ? null : file.id);
+                                    const newMenuId = fileMenuId === file.id ? null : file.id;
+                                    setFileMenuId(newMenuId);
+                                    if (newMenuId) {
+                                      calculateMenuPosition(e.currentTarget, file.id);
+                                    }
+                                  }}
+                                  style={{ 
+                                    zIndex: 10,
+                                    width: isMobile ? '20px' : '28px',
+                                    height: isMobile ? '20px' : '28px',
+                                    minWidth: isMobile ? '20px' : '28px',
+                                    minHeight: isMobile ? '20px' : '28px'
                                   }}
                                 >
-                                  <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <svg className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} text-gray-700`} fill="currentColor" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
                                 {fileMenuId === file.id && (
-                                  <div ref={fileMenuRef} className="absolute top-8 right-0 w-40 bg-white border border-blue-200 rounded-lg shadow-2xl z-[99999] ring-1 ring-black/10">
+                                  <div 
+                                    ref={fileMenuRef} 
+                                    className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
+                                    style={{
+                                      zIndex: 999999,
+                                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                                      ...menuPosition[file.id]
+                                    }}
+                                  >
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-t-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={e => {
                                         e.stopPropagation();
                                         setRenamingFileId(file.id);
                                         setRenamingFileName(getFileNameWithoutExtension(file.file_name));
                                         setFileMenuId(null);
                                       }}
-                                    >Rename</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Rename
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-blue-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={e => {
                                         e.stopPropagation();
                                         setMoveFileTarget(file);
                                         setShowMoveModal(true);
                                         setFileMenuId(null);
                                       }}
-                                    >Move</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                        </svg>
+                                        Move
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-none transition-colors duration-100 text-gray-900 bg-green-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-150 border-b border-gray-100/50"
                                       onClick={async (e) => {
                                         e.stopPropagation();
                                         try {
@@ -1922,16 +2163,31 @@ export const PropertyDetailsModal = ({
                                           console.error('Error downloading file:', error);
                                           alert('Unable to download file. Please try again.');
                                         }
+                                        setFileMenuId(null);
                                       }}
-                                    >Download</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Download
+                                      </div>
+                                    </button>
                                     <button
-                                      className="block w-full text-left px-4 py-2 rounded-b-lg transition-colors duration-100 text-gray-900 bg-white hover:bg-red-600 hover:text-white font-medium cursor-pointer"
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
                                       onClick={e => {
                                         e.stopPropagation();
                                         onFileDelete(file);
                                         setFileMenuId(null);
                                       }}
-                                    >Delete</button>
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Delete
+                                      </div>
+                                    </button>
                                   </div>
                                 )}
                               </div>
