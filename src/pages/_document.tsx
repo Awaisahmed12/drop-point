@@ -37,11 +37,7 @@ export default function Document() {
         <meta name="language" content="English" />
         <meta name="category" content="Real Estate Technology" />
         
-        {/* Mobile viewport optimization */}
-        <meta 
-          name="viewport" 
-          content="width=device-width, initial-scale=1, shrink-to-fit=no, user-scalable=no, viewport-fit=cover" 
-        />
+
         
         {/* iOS-specific optimizations */}
         <meta name="apple-mobile-web-app-capable" content="yes" />

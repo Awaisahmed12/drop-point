@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FileIcon } from './FileIcon';
 import { getFileSignedUrl } from '../utils/supabaseClient';
 
@@ -9,13 +9,20 @@ interface FileThumbnailProps {
   className?: string;
 }
 
+// Cache for signed URLs to prevent re-fetching
+const urlCache = new Map<string, string>();
+
+// Cache for failed images to avoid retrying
+const failedImages = new Set<string>();
+
 export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' }: FileThumbnailProps) => {
+  const [stage, setStage] = useState<'icon' | 'loading' | 'image' | 'error'>('icon');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewType, setPreviewType] = useState<'image' | 'pdf' | 'text' | 'none'>('none');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+  const cacheKey = `${propertyId}:${fileName}`;
 
   // Determine what type of preview we can show
   const getPreviewType = (ext: string): 'image' | 'pdf' | 'text' | 'none' => {
@@ -31,90 +38,96 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
     return 'none';
   };
 
+  const previewType = getPreviewType(fileExtension);
+
+  // Intersection Observer for lazy loading
   useEffect(() => {
-    const loadPreview = async () => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { 
+        threshold: 0.1,
+        rootMargin: '50px' // Start loading 50px before coming into view
+      }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Load image when visible and it's an image type
+  useEffect(() => {
+    if (!isVisible || previewType !== 'image') return;
+    if (failedImages.has(cacheKey)) return; // Skip if we know it failed
+
+    const loadImage = async () => {
       try {
-        setLoading(true);
-        setError(false);
+        // Check cache first
+        let signedUrl = urlCache.get(cacheKey);
         
-        const type = getPreviewType(fileExtension);
-        setPreviewType(type);
-
-        if (type === 'none') {
-          setLoading(false);
-          return;
+        if (!signedUrl) {
+          setStage('loading');
+          signedUrl = await getFileSignedUrl(propertyId, fileName, false);
+          urlCache.set(cacheKey, signedUrl);
         }
 
-        // Get signed URL for the file
-        const signedUrl = await getFileSignedUrl(propertyId, fileName, false);
+        // Preload the image to check if it loads successfully
+        const img = new Image();
+        img.onload = () => {
+          setPreviewUrl(signedUrl!);
+          setStage('image');
+        };
+        img.onerror = () => {
+          failedImages.add(cacheKey);
+          setStage('error');
+        };
         
-        if (type === 'image') {
-          // For images, we can directly use the signed URL
-          setPreviewUrl(signedUrl);
-        } else if (type === 'pdf') {
-          // For PDFs, we'll show the first page using PDF.js or similar
-          // For now, we'll use a PDF icon but this could be enhanced
-          setPreviewUrl(null);
-        } else if (type === 'text') {
-          // For text files, we could fetch the content and show a preview
-          // For now, we'll use the file icon
-          setPreviewUrl(null);
-        }
+        // Add image optimization parameters for faster loading
+        const optimizedUrl = signedUrl.includes('?') 
+          ? `${signedUrl}&w=${size * 2}&h=${size * 2}&fit=cover&quality=80`
+          : `${signedUrl}?w=${size * 2}&h=${size * 2}&fit=cover&quality=80`;
         
-        setLoading(false);
+        img.src = optimizedUrl;
+        
       } catch (err) {
-        console.error('Error loading file preview:', err);
-        setError(true);
-        setLoading(false);
+        console.error('Error loading image preview:', err);
+        failedImages.add(cacheKey);
+        setStage('error');
       }
     };
 
-    loadPreview();
-  }, [fileName, propertyId, fileExtension]);
+    // Small delay to prioritize visible content first
+    const timer = setTimeout(loadImage, 100);
+    return () => clearTimeout(timer);
+  }, [isVisible, previewType, propertyId, fileName, size, cacheKey]);
 
-  // Show loading state
-  if (loading) {
-    return (
-      <div 
-        className={`flex items-center justify-center bg-gray-100 rounded-lg animate-pulse ${className}`}
-        style={{ width: size, height: size }}
-      >
-        <div className="w-6 h-6 bg-gray-300 rounded"></div>
-      </div>
-    );
-  }
+  // Always start with FileIcon for instant rendering
+  const iconComponent = (
+    <div className={className}>
+      <FileIcon
+        type={fileExtension}
+        size={size}
+      />
+    </div>
+  );
 
-  // Show image preview
-  if (previewType === 'image' && previewUrl && !error) {
-    return (
-      <div 
-        className={`relative overflow-hidden rounded-lg bg-gray-100 ${className}`}
-        style={{ width: size, height: size }}
-      >
-        <img
-          src={previewUrl}
-          alt={fileName}
-          className="w-full h-full object-cover"
-          onError={() => setError(true)}
-          style={{ imageRendering: 'auto' }}
-        />
-        {/* Subtle overlay to indicate it's a file */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-200"></div>
-      </div>
-    );
-  }
-
-  // For PDFs, show a document preview-style icon with page representation
+  // For non-image types, show enhanced previews immediately
   if (previewType === 'pdf') {
     return (
       <div 
+        ref={containerRef}
         className={`relative flex items-center justify-center bg-white border-2 border-gray-200 rounded-lg shadow-sm ${className}`}
         style={{ width: size, height: size }}
       >
-        {/* PDF page representation */}
         <div className="relative w-full h-full p-2">
           <div className="w-full h-full bg-gray-50 rounded border border-gray-200 flex flex-col">
-            {/* Header lines representing text */}
             <div className="p-1.5 space-y-1">
               <div className="h-1 bg-red-400 rounded w-3/4"></div>
               <div className="h-0.5 bg-gray-300 rounded w-full"></div>
@@ -123,7 +136,6 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
             </div>
           </div>
         </div>
-        {/* PDF indicator */}
         <div className="absolute bottom-0 right-0 bg-red-500 text-white text-xs px-1 rounded-tl text-center"
              style={{ fontSize: '8px', lineHeight: '12px' }}>
           PDF
@@ -132,17 +144,15 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
     );
   }
 
-  // For text files, show a document with text lines
   if (previewType === 'text') {
     return (
       <div 
+        ref={containerRef}
         className={`relative flex items-center justify-center bg-white border-2 border-gray-200 rounded-lg shadow-sm ${className}`}
         style={{ width: size, height: size }}
       >
-        {/* Text document representation */}
         <div className="relative w-full h-full p-2">
           <div className="w-full h-full bg-gray-50 rounded border border-gray-200 flex flex-col justify-start p-1.5 space-y-1">
-            {/* Text lines */}
             <div className="h-0.5 bg-blue-400 rounded w-2/3"></div>
             <div className="h-0.5 bg-gray-400 rounded w-full"></div>
             <div className="h-0.5 bg-gray-400 rounded w-5/6"></div>
@@ -152,7 +162,6 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
             <div className="h-0.5 bg-gray-400 rounded w-2/3"></div>
           </div>
         </div>
-        {/* File type indicator */}
         <div className="absolute bottom-0 right-0 bg-blue-500 text-white text-xs px-1 rounded-tl text-center"
              style={{ fontSize: '8px', lineHeight: '12px' }}>
           {fileExtension.toUpperCase()}
@@ -161,13 +170,50 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
     );
   }
 
-  // Fall back to original FileIcon for unsupported types or errors
+  // For images: Progressive loading experience
+  if (previewType === 'image') {
+    return (
+      <div 
+        ref={containerRef}
+        className={`relative overflow-hidden rounded-lg ${className}`}
+        style={{ width: size, height: size }}
+      >
+        {/* Always show icon first for instant feedback */}
+        <div className={`absolute inset-0 transition-opacity duration-300 ${
+          stage === 'image' ? 'opacity-0' : 'opacity-100'
+        }`}>
+          <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+            <FileIcon type={fileExtension} size={Math.floor(size * 0.6)} />
+          </div>
+        </div>
+
+        {/* Loading overlay */}
+        {stage === 'loading' && (
+          <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center">
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
+
+        {/* Actual image */}
+        {stage === 'image' && previewUrl && (
+          <img
+            src={previewUrl}
+            alt={fileName}
+            className="w-full h-full object-cover transition-opacity duration-300"
+            style={{ imageRendering: 'auto' }}
+          />
+        )}
+
+        {/* Subtle hover overlay for all stages */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-200"></div>
+      </div>
+    );
+  }
+
+  // Fallback for unsupported types
   return (
-    <div className={className}>
-      <FileIcon
-        type={fileExtension}
-        size={size}
-      />
+    <div ref={containerRef}>
+      {iconComponent}
     </div>
   );
 }; 
