@@ -42,6 +42,12 @@ DropPoint is a map-based document management platform for real estate profession
 - **Dual View Modes**: Toggle between Grid view (default, iOS Files-style icons) and List view (detailed)
 - **Persistent View Preferences**: User's preferred view mode saved across sessions
 - **iOS Files-inspired Grid View**: Beautiful icon-based layout with 3 columns on mobile, 4-6 on desktop (default view)
+- **Document Preview Thumbnails**: Real document previews instead of generic icons in grid view for enhanced file recognition
+  - **Image Previews**: Actual thumbnail images for photos, graphics, and visual documents
+  - **PDF Preview**: Stylized document representation with visual content preview indication
+  - **Text File Preview**: Mockup preview showing document structure and content type
+  - **Smart Fallback**: Graceful degradation to familiar file type icons for unsupported formats
+  - **Performance Optimized**: Lazy loading and caching for smooth browsing experience
 - Batch operations and smart file organization
 - In-app file viewer for mobile (no pop-up blockers)
 
@@ -202,7 +208,8 @@ src/
 │   ├── PropertyDetailsModal.tsx  # Main property file management
 │   ├── UserAuthForm.tsx          # Authentication UI
 │   ├── MoveModal.tsx            # File/folder moving
-│   └── FileIcon.tsx             # File type icons
+│   ├── FileIcon.tsx             # File type icons (fallback)
+│   └── FileThumbnail.tsx        # Document preview thumbnails
 ├── hooks/               # Custom React hooks
 │   └── useMobileViewport.ts     # Global mobile optimization
 ├── pages/               # Next.js pages

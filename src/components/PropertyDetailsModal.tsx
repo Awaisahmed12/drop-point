@@ -3,6 +3,7 @@ import Image from 'next/image';
 
 import { MoveModal } from './MoveModal';
 import { FileIcon } from './FileIcon';
+import { FileThumbnail } from './FileThumbnail';
 import { PropertySwitcher } from './PropertySwitcher';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
@@ -2120,8 +2121,9 @@ export const PropertyDetailsModal = ({
                               }}
                             >
                               <div className="relative">
-                                <FileIcon
-                                  type={file.file_name.split('.').pop() || 'file'}
+                                <FileThumbnail
+                                  fileName={file.file_name}
+                                  propertyId={file.property_id}
                                   size={isMobile ? 48 : 56}
                                 />
                                 {/* iOS-style perfectly circular menu button */}
