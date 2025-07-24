@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
-import { GoogleMap, LoadScript } from '@react-google-maps/api';
+import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
 import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
@@ -43,6 +43,28 @@ interface GlobalCache {
   }>;
 }
 
+// Custom pin icon for properties
+const createPropertyPinIcon = (selected: boolean = false) => ({
+  url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+    <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Shadow -->
+      <ellipse cx="16" cy="37" rx="6" ry="3" fill="rgba(0,0,0,0.2)"/>
+      <!-- Pin body -->
+      <path d="M16 2C9.925 2 5 6.925 5 13C5 21.5 16 36 16 36S27 21.5 27 13C27 6.925 22.075 2 16 2Z" 
+            fill="${selected ? '#1d4ed8' : '#2563eb'}" 
+            stroke="white" 
+            stroke-width="2"/>
+      <!-- House icon -->
+      <path d="M16 8L12 11.5V20H14V16H18V20H20V11.5L16 8Z" 
+            fill="white"/>
+      <path d="M11 12L16 8L21 12V21H19V15H13V21H11V12Z" 
+            fill="white"/>
+    </svg>
+  `)}`,
+  scaledSize: new google.maps.Size(32, 40),
+  anchor: new google.maps.Point(16, 38),
+});
+
 export default function MapPage() {
   const router = useRouter();
   const { getMobileStyles, mobileClasses } = useMobileViewport();
@@ -51,6 +73,11 @@ export default function MapPage() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [mapType, setMapType] = useState<string>(DEFAULT_MAP_TYPE);
+  
+  // Pin system state
+  const [userProperties, setUserProperties] = useState<Property[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  
   const [address, setAddress] = useState<string>('');
   const [addressLoading, setAddressLoading] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -194,6 +221,38 @@ export default function MapPage() {
     };
     getUser();
   }, [router]);
+
+  // Load user properties as pins
+  const loadUserProperties = useCallback(async () => {
+    console.log('📍 [PINS] Loading user properties as pins...');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    try {
+      const { data: properties, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('📍 [PINS] Error loading properties:', error);
+        return;
+      }
+
+      if (properties) {
+        setUserProperties(properties);
+        console.log('📍 [PINS] Loaded', properties.length, 'property pins');
+      }
+    } catch (error) {
+      console.error('📍 [PINS] Error loading user properties:', error);
+    }
+  }, []);
+
+  // Load user properties on mount
+  useEffect(() => {
+    loadUserProperties();
+  }, [loadUserProperties]);
 
   // Background preload user properties for instant list view
   useEffect(() => {
@@ -1630,6 +1689,143 @@ export default function MapPage() {
     );
   }, [map, isPropertyDataCached, cachePropertyData]);
 
+  // Handle map click to drop new pin
+  const handleMapClick = useCallback(async (event: google.maps.MapMouseEvent) => {
+    if (!event.latLng) return;
+    
+    const lat = event.latLng.lat();
+    const lng = event.latLng.lng();
+    
+    console.log('📍 [PINS] Map clicked at:', { lat, lng });
+    
+    // Check if clicked on existing property (prevent accidental drops)
+    const clickedNearExisting = userProperties.some(property => {
+      const distance = Math.sqrt(
+        Math.pow(property.lat - lat, 2) + Math.pow(property.lng - lng, 2)
+      );
+      return distance < 0.001; // ~100m threshold
+    });
+    
+    if (clickedNearExisting) {
+      console.log('📍 [PINS] Click too close to existing property, ignoring');
+      return;
+    }
+
+    setAddressLoading(true);
+    
+    try {
+      // Get address for the new pin location
+      const res = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
+      const data = await res.json();
+      
+      if (data.results && data.results[0]) {
+        const address = data.results[0].formatted_address;
+        const snapped = data.results[0].geometry.location;
+        const snappedLatLng = { lat: snapped.lat, lng: snapped.lng };
+        
+        console.log('📍 [PINS] New pin address:', address);
+        
+        // Create new property for pin
+        const newProperty: Property = {
+          id: null, // Will be assigned when saved
+          address,
+          lat: snappedLatLng.lat,
+          lng: snappedLatLng.lng,
+          label: null,
+          notes: null,
+        };
+        
+        // Set as current property and show info card
+        setSavedProperty(newProperty);
+        setAddress(address);
+        setSnappedLatLng(snappedLatLng);
+        setSelectedProperty(newProperty);
+        
+        // Cache the address
+        saveAddressToCache(lat, lng, address, snappedLatLng);
+        
+        // Clear file/folder state for new property
+        setFolders([]);
+        setPropertyFiles([]);
+        setFoldersLoading(false);
+        setFilesLoading(false);
+        
+        console.log('📍 [PINS] New pin ready for property creation');
+      } else {
+        console.log('📍 [PINS] No address found for pin location');
+        setAddress('Location not found');
+      }
+    } catch (error) {
+      console.error('📍 [PINS] Error creating pin:', error);
+      setAddress('Error getting location');
+    } finally {
+      setAddressLoading(false);
+    }
+  }, [userProperties]);
+
+  // Handle property pin click
+  const handlePropertyPinClick = useCallback(async (property: Property) => {
+    console.log('📍 [PINS] Property pin clicked:', property.address);
+    
+    setSelectedProperty(property);
+    setSavedProperty(property);
+    setAddress(property.address);
+    setSnappedLatLng({ lat: property.lat, lng: property.lng });
+    
+    // Check cache first for instant loading
+    const cached = await getCachedPropertyData(property.address);
+    if (cached) {
+      console.log('📍 [PINS] Using cached data for property');
+      setFolders(cached.folders);
+      setPropertyFiles(cached.files);
+      setFoldersLoading(false);
+      setFilesLoading(false);
+    } else {
+      console.log('📍 [PINS] Loading fresh data for property');
+      setFoldersLoading(true);
+      setFilesLoading(true);
+      
+      try {
+        if (property.id) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const [folderResult, filesResult] = await Promise.all([
+              supabase
+                .from('property_folders')
+                .select('*')
+                .eq('property_id', property.id)
+                .eq('user_id', user.id)
+                .is('deleted_at', null)
+                .order('created_at', { ascending: true }),
+              supabase
+                .from('property_files')
+                .select('*')
+                .eq('property_id', property.id)
+                .order('uploaded_at', { ascending: false })
+            ]);
+
+            if (folderResult.data) {
+              setFolders(folderResult.data);
+            }
+            if (filesResult.data) {
+              setPropertyFiles(filesResult.data);
+            }
+            
+            // Cache the data
+            if (folderResult.data && filesResult.data) {
+              await cachePropertyData(property.address, filesResult.data, folderResult.data);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('📍 [PINS] Error loading property data:', error);
+      } finally {
+        setFoldersLoading(false);
+        setFilesLoading(false);
+      }
+    }
+  }, [getCachedPropertyData, cachePropertyData]);
+
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center bg-gray-50 ${mobileClasses.fullScreen}`}
@@ -1664,7 +1860,7 @@ export default function MapPage() {
             console.log('🗺️ [MAP] Initial zoom:', zoom);
             setMap(mapInstance);
           }}
-          onDragEnd={handleUserInteraction}
+          onClick={handleMapClick}
           onZoomChanged={handleZoomChange}
           mapTypeId={mapType as google.maps.MapTypeId}
           options={{
@@ -1692,22 +1888,16 @@ export default function MapPage() {
             ]
           }}
         >
-          {/* Central cursor overlay */}
-          <div
-            className="pointer-events-none absolute left-1/2 top-1/2 z-30"
-            style={{ transform: 'translate(-50%, -50%)', pointerEvents: 'none' }}
-          >
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-              {/* White outline for contrast */}
-              <line x1="18" y1="6" x2="18" y2="30" stroke="white" strokeWidth="5" strokeLinecap="round" />
-              <line x1="6" y1="18" x2="30" y2="18" stroke="white" strokeWidth="5" strokeLinecap="round" />
-              {/* Blue crosshair */}
-              <line x1="18" y1="6" x2="18" y2="30" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" />
-              <line x1="6" y1="18" x2="30" y2="18" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" />
-              {/* Center dot */}
-              <circle cx="18" cy="18" r="3" fill="#2563eb" stroke="white" strokeWidth="2" />
-            </svg>
-          </div>
+          {/* Property pins */}
+          {userProperties.map((property) => (
+            <Marker
+              key={property.id || `temp-${property.lat}-${property.lng}`}
+              position={{ lat: property.lat, lng: property.lng }}
+              icon={createPropertyPinIcon(selectedProperty?.id === property.id)}
+              onClick={() => handlePropertyPinClick(property)}
+              title={property.address}
+            />
+          ))}
         </GoogleMap>
         <MapSearch
           onPlaceSelect={selectPredictionByPrediction}
@@ -1819,6 +2009,19 @@ export default function MapPage() {
                 // Open modal after all data is ready
                 setShowDetailsModal(true);
               }
+            }}
+          />
+        )}
+        {/* Show PropertyInfoCard only for newly dropped pins */}
+        {selectedProperty && !selectedProperty.id && address && (
+          <PropertyInfoCard
+            address={address}
+            addressLoading={addressLoading}
+            onMouseEnter={() => {}}
+            onMouseLeave={() => {}}
+            onSelect={() => {
+              // Open modal for new property
+              setShowDetailsModal(true);
             }}
           />
         )}
