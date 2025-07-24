@@ -6,6 +6,13 @@ import { useMobileViewport } from '../hooks/useMobileViewport';
 import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
 import { supabase } from '../utils/supabaseClient';
 import { useRouter } from 'next/router';
+import { ListView } from '../components/ListView';
+import { MoveModal } from '../components/MoveModal';
+import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
+import { getAddressFromCache, saveAddressToCache } from '../../utils/propertyCache';
+import { MapSearch } from '../components/MapSearch';
+import { MapControls } from '../components/MapControls';
+import { PropertyInfoCard } from '../components/PropertyInfoCard';
 
 import { 
   containerStyle, 
@@ -18,16 +25,6 @@ import {
   MAP_TYPE_KEY, 
   DEFAULT_MAP_TYPE 
 } from '../../constants';
-import { 
-  getAddressFromCache, 
-  saveAddressToCache
-} from '../../utils/propertyCache';
-import { MapSearch } from '../components/MapSearch';
-import { MapControls } from '../components/MapControls';
-import { PropertyInfoCard } from '../components/PropertyInfoCard';
-import { MoveModal } from '../components/MoveModal';
-import { ListView } from '../components/ListView';
-import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
 
 // Constants moved to constants/index.ts
 
@@ -36,6 +33,15 @@ import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement'
 // Duplicate components removed - now using extracted components
 
 // Row component moved to PropertyDetailsModal
+
+// Global cache interface
+interface GlobalCache {
+  __droppoint_property_cache?: Record<string, {
+    files: PropertyFile[];
+    folders: PropertyFolder[];
+    lastFetched: number;
+  }>;
+}
 
 export default function MapPage() {
   const router = useRouter();
@@ -102,6 +108,11 @@ export default function MapPage() {
     lastFetched: number;
   }>>({});
 
+  // Expose cache globally for property switcher
+  useEffect(() => {
+    (globalThis as GlobalCache).__droppoint_property_cache = propertyCache;
+  }, [propertyCache]);
+
   // Cache timeout in milliseconds (5 minutes)
   const CACHE_TIMEOUT = 5 * 60 * 1000;
 
@@ -155,6 +166,8 @@ export default function MapPage() {
         lastFetched: Date.now()
       }
     }));
+    
+    console.log('📁 [CACHE] Property data cached for:', address, `(${files.length} files, ${folders.length} folders)`);
   }, []);
 
   // Function to get cached property data
@@ -1166,7 +1179,7 @@ export default function MapPage() {
         setPendingUploads(prev => prev.map(p => 
           p.id === uploadId ? { ...p, status: 'uploading', progress: 0, error: undefined } : p
         ));
-        startSingleUpload(uploadId, file, uniqueName, propertyId, folderIdForUpload, abortController);
+        startSingleUpload(uploadId, file, uniqueName, propertyId, folderIdForUpload);
       };
 
       return {
@@ -1189,9 +1202,7 @@ export default function MapPage() {
 
     // Start uploads for each file
     newPendingUploads.forEach(pending => {
-      if (pending.abortController) {
-        startSingleUpload(pending.id, pending.file, pending.name, propertyId, folderIdForUpload, pending.abortController);
-      }
+      startSingleUpload(pending.id, pending.file, pending.name, propertyId, folderIdForUpload);
     });
 
     e.target.value = '';
@@ -1203,76 +1214,41 @@ export default function MapPage() {
     file: File, 
     uniqueName: string, 
     propertyId: string, 
-    folderIdForUpload: string | null,
-    abortController: AbortController
+    folderIdForUpload: string | null
   ) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.log('📁 [UPLOAD] User not found');
+      throw new Error('User not authenticated');
+    }
+
+    console.log('📁 [UPLOAD] Starting upload process for:', uniqueName);
+    
+    // Optimized upload with single progress update
+    const filePath = `${propertyId}/${uniqueName}`;
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-      console.log('📁 [UPLOAD] User authenticated:', user.id);
-
-      const filePath = `${propertyId}/${uniqueName}`;
-      
-      console.log('📁 [UPLOAD] Starting upload - File:', uniqueName, 'Path:', filePath, 'Folder ID:', folderIdForUpload);
-
-      // Use Supabase's upload method with proper progress tracking
-      console.log('📁 [UPLOAD] Uploading to Supabase storage...');
-      
-      // Create a promise that tracks progress
-      const uploadWithProgress = new Promise<{ path: string }>((resolve, reject) => {
-        // Set up abort signal
-        abortController.signal.addEventListener('abort', () => {
-          reject(new Error('Upload cancelled'));
+      // Upload to storage with progress tracking
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('property-files')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
         });
 
-        // Simulate progress for now - Supabase doesn't expose upload progress directly
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-          if (progress < 90) {
-            progress += Math.random() * 20;
-            if (progress > 90) progress = 90;
-            console.log('📁 [UPLOAD] Progress for', uniqueName, ':', Math.round(progress) + '%');
-            setPendingUploads(prev => prev.map(p => 
-              p.id === uploadId ? { ...p, progress: Math.round(progress) } : p
-            ));
-          }
-        }, 200);
+      if (uploadError) {
+        console.log('📁 [UPLOAD] Storage upload error:', uploadError);
+        throw uploadError;
+      }
 
-        // Perform the actual upload
-        supabase.storage
-          .from('property-files')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: true
-          })
-          .then(({ data, error }) => {
-            clearInterval(progressInterval);
-            
-            if (error) {
-              console.log('📁 [UPLOAD] Supabase upload error:', error);
-              reject(error);
-            } else {
-              console.log('📁 [UPLOAD] Supabase upload successful:', data);
-              // Set progress to 100%
-              setPendingUploads(prev => prev.map(p => 
-                p.id === uploadId ? { ...p, progress: 100 } : p
-              ));
-              resolve({ path: data.path });
-            }
-          })
-          .catch((err) => {
-            clearInterval(progressInterval);
-            reject(err);
-          });
-      });
+      console.log('📁 [UPLOAD] Storage upload successful:', uploadData.path);
 
-      const uploadResult = await uploadWithProgress;
-      
-      console.log('📁 [UPLOAD] Storage upload successful:', uploadResult);
+      // Update progress to 90% after storage upload
+      setPendingUploads(prev => prev.map(p => 
+        p.id === uploadId ? { ...p, progress: 90 } : p
+      ));
 
-      // Insert database record
+      // Insert database record with optimized payload
       const dbRecord = {
         property_id: propertyId,
         file_name: uniqueName,
@@ -1287,16 +1263,15 @@ export default function MapPage() {
 
       console.log('📁 [UPLOAD] Inserting DB record:', dbRecord);
 
-      // Retry database insert up to 3 times to handle RLS race conditions
+      // Single database insert with retry logic
       let dbError = null;
       let retryCount = 0;
-      const maxRetries = 3;
+      const maxRetries = 2; // Reduced from 3 for faster failure
       
       while (retryCount < maxRetries) {
         const { error } = await supabase.from('property_files').insert([dbRecord]);
         
         if (!error) {
-          // Success - break out of retry loop
           break;
         }
         
@@ -1306,8 +1281,7 @@ export default function MapPage() {
         console.log(`📁 [UPLOAD] Database insert attempt ${retryCount} failed:`, error);
         
         if (retryCount < maxRetries) {
-          // Wait longer between retries (exponential backoff)
-          const waitTime = 1000 * retryCount; // 1s, 2s, 3s
+          const waitTime = 500 * retryCount; // Faster retry: 500ms, 1s
           console.log(`📁 [UPLOAD] Retrying in ${waitTime}ms...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
         }
@@ -1325,7 +1299,7 @@ export default function MapPage() {
         p.id === uploadId ? { ...p, status: 'success', progress: 100 } : p
       ));
 
-      // Refresh file list
+      // Optimized file list refresh - only refresh files, not both files and folders
       const result = await supabase
         .from('property_files')
         .select('*')
@@ -1333,33 +1307,34 @@ export default function MapPage() {
         .order('uploaded_at', { ascending: false });
 
       if (result.data) {
-        console.log('📁 [UPLOAD] File list refreshed, found', result.data.length, 'files');
         setPropertyFiles(result.data);
-      }
-
-    } catch (err) {
-      if (abortController.signal.aborted) {
-        console.log('📁 [UPLOAD] Upload cancelled for:', uniqueName);
-        return; // Don't update state if cancelled
-      }
-
-      console.log('📁 [UPLOAD] Upload error for', uniqueName, ':', err);
-      
-      let errorMsg = 'Upload failed';
-      if (typeof err === 'string') {
-        errorMsg = err;
-      } else if (err && typeof err === 'object') {
-        if ('message' in err && typeof (err as { message: string }).message === 'string') {
-          errorMsg = (err as { message: string }).message;
-        } else if ('error' in err && typeof (err as { error: string }).error === 'string') {
-          errorMsg = (err as { error: string }).error;
+        
+        // Update cache immediately for instant access
+        const currentAddress = address || '';
+        if (currentAddress) {
+          const cacheKey = `${user.id}-${currentAddress}`;
+          setPropertyCache(prev => ({
+            ...prev,
+            [cacheKey]: {
+              files: result.data,
+              folders: prev[cacheKey]?.folders || [],
+              lastFetched: Date.now()
+            }
+          }));
         }
       }
 
-      console.log('📁 [UPLOAD] Processed error message:', errorMsg);
+      console.log('📁 [UPLOAD] Upload completed successfully for:', uniqueName);
+
+    } catch (error) {
+      console.log('📁 [UPLOAD] Upload failed for:', uniqueName, error);
+      
+      // Mark as failed
       setPendingUploads(prev => prev.map(p => 
-        p.id === uploadId ? { ...p, status: 'error', error: errorMsg, progress: 100 } : p
+        p.id === uploadId ? { ...p, status: 'error', progress: 0 } : p
       ));
+
+      throw error;
     }
   };
 
@@ -1877,23 +1852,14 @@ export default function MapPage() {
             setSavedProperty(property);
             setPropertyFiles(files);
             setFolders(folders);
-            setSelectedFolder('master'); // Reset to root folder
-            
-            // Update the property selection card address
-            setAddress(property.address);
-            
-            // Update satellite image coordinates to show the new property
-            setSnappedLatLng({ lat: property.lat, lng: property.lng });
-            
-            // Reset loading states since we have fresh data
+            setSelectedFolder('master');
             setFoldersLoading(false);
             setFilesLoading(false);
             
-            // Clear any pending uploads for the previous property
-            setPendingUploads([]);
+            // Update address to match the switched property
+            setAddress(property.address);
             
-            // Update the property cache with the new data
-            cachePropertyData(property.address, files, folders);
+            console.log('🔄 [SWITCH] Property switched to:', property.address, `(${files.length} files, ${folders.length} folders)`);
           }}
           onMapMove={(lat, lng) => {
             // Update map center when switching properties

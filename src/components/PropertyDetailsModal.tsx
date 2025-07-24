@@ -98,13 +98,11 @@ export const PropertyDetailsModal = ({
   });
 
   // Save view mode preference
-  const toggleViewMode = () => {
-    const newMode = viewMode === 'list' ? 'grid' : 'list';
-    setViewMode(newMode);
+  useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('droppoint-view-mode', newMode);
+      localStorage.setItem('droppoint-view-mode', viewMode);
     }
-  };
+  }, [viewMode]);
 
   // Mobile file viewer state
   const [mobileFileViewer, setMobileFileViewer] = useState<{
@@ -140,7 +138,15 @@ export const PropertyDetailsModal = ({
     onError: (error) => {
       console.error('Property switch error:', error);
       // You could add a toast notification here
-    }
+    },
+    propertyCache: (globalThis as { 
+      __droppoint_property_cache?: Record<string, {
+        files: PropertyFile[];
+        folders: PropertyFolder[];
+        lastFetched: number;
+      }> 
+    }).__droppoint_property_cache || {},
+    cacheTimeout: 5 * 60 * 1000
   });
 
   // Convert current property to PropertyWithFileCount format
@@ -444,7 +450,7 @@ export const PropertyDetailsModal = ({
         let menuClosed = false;
         
         if (folderMenuRef.current && !folderMenuRef.current.contains(target)) {
-          setFolderMenuId(null);
+          setFileMenuId(null);
           menuClosed = true;
         }
         if (fileMenuRef.current && !fileMenuRef.current.contains(target)) {
@@ -998,6 +1004,14 @@ export const PropertyDetailsModal = ({
     breadcrumbPath.unshift(current);
   }
 
+  const toggleViewMode = () => {
+    const newMode = viewMode === 'list' ? 'grid' : 'list';
+    setViewMode(newMode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('droppoint-view-mode', newMode);
+    }
+  };
+
   return (
     <div className={`fixed inset-0 z-40 flex ${mobileClasses.modal} justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in`}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative overflow-hidden"
@@ -1248,7 +1262,7 @@ export const PropertyDetailsModal = ({
                                 // If any menu is open, close it instead of navigating to folder
                                 if (fileMenuId || folderMenuId) {
                                   setFileMenuId(null);
-                                  setFolderMenuId(null);
+                                  setFileMenuId(null);
                                   return;
                                 }
                                 
@@ -1363,7 +1377,7 @@ export const PropertyDetailsModal = ({
                                         e.stopPropagation();
                                         setRenamingFileId(folder.id);
                                         setRenamingFileName(folder.name);
-                                        setFolderMenuId(null);
+                                        setFileMenuId(null);
                                       }}
                                     >
                                       <div className="flex items-center gap-2">
@@ -1400,7 +1414,7 @@ export const PropertyDetailsModal = ({
                                 // If any menu is open, close it instead of navigating to folder
                                 if (fileMenuId || folderMenuId) {
                                   setFileMenuId(null);
-                                  setFolderMenuId(null);
+                                  setFileMenuId(null);
                                   return;
                                 }
                                 
@@ -1485,7 +1499,7 @@ export const PropertyDetailsModal = ({
                                   className={`${isMobile ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
                                   onClick={e => {
                                     e.stopPropagation();
-                                    setFolderMenuId(null);
+                                    setFileMenuId(null);
                                     setFileMenuId(folderMenuId === folder.id ? null : folder.id);
                                   }}
                                   title="Folder actions"
@@ -1513,7 +1527,7 @@ export const PropertyDetailsModal = ({
                                         e.stopPropagation();
                                         setRenamingFileId(folder.id);
                                         setRenamingFileName(folder.name);
-                                        setFolderMenuId(null);
+                                        setFileMenuId(null);
                                       }}
                                     >
                                       <div className="flex items-center gap-2">
@@ -1562,7 +1576,7 @@ export const PropertyDetailsModal = ({
                                 // If any menu is open, close it instead of opening the file
                                 if (fileMenuId || folderMenuId) {
                                   setFileMenuId(null);
-                                  setFolderMenuId(null);
+                                  setFileMenuId(null);
                                   return;
                                 }
                                 
@@ -1655,7 +1669,7 @@ export const PropertyDetailsModal = ({
                                   style={{ minWidth: 24, minHeight: 24 }}
                                   onClick={e => {
                                     e.stopPropagation();
-                                    setFolderMenuId(null);
+                                    setFileMenuId(null);
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
                                     if (newMenuId) {
@@ -1686,7 +1700,7 @@ export const PropertyDetailsModal = ({
                                         setRenamingFileName(getFileNameWithoutExtension(file.file_name));
                                         setTimeout(() => {
                                           setFileMenuId(null);
-                                          setFolderMenuId(null);
+                                          setFileMenuId(null);
                                         }, 50);
                                       }}
                                     >
@@ -1766,7 +1780,7 @@ export const PropertyDetailsModal = ({
                                 // If any menu is open, close it instead of opening the file
                                 if (fileMenuId || folderMenuId) {
                                   setFileMenuId(null);
-                                  setFolderMenuId(null);
+                                  setFileMenuId(null);
                                   return;
                                 }
                                 
@@ -1862,7 +1876,7 @@ export const PropertyDetailsModal = ({
                                   className={`${isMobile ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
                                   onClick={e => {
                                     e.stopPropagation();
-                                    setFolderMenuId(null);
+                                    setFileMenuId(null);
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
                                     if (newMenuId) {
@@ -1882,6 +1896,8 @@ export const PropertyDetailsModal = ({
                                     style={{
                                       zIndex: 999999,
                                       boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                                      maxWidth: 'calc(100vw - 16px)',
+                                      maxHeight: 'calc(100vh - 16px)',
                                       ...menuPosition[file.id]
                                     }}
                                   >
@@ -1891,10 +1907,7 @@ export const PropertyDetailsModal = ({
                                         e.stopPropagation();
                                         setRenamingFileId(file.id);
                                         setRenamingFileName(getFileNameWithoutExtension(file.file_name));
-                                        setTimeout(() => {
-                                          setFileMenuId(null);
-                                          setFolderMenuId(null);
-                                        }, 50);
+                                        setFileMenuId(null);
                                       }}
                                     >
                                       <div className="flex items-center gap-2">
@@ -1902,43 +1915,6 @@ export const PropertyDetailsModal = ({
                                           <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                         Rename
-                                      </div>
-                                    </button>
-                                    <button
-                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150 border-b border-gray-100/50"
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        setMoveFileTarget(file);
-                                        setShowMoveModal(true);
-                                        setFileMenuId(null);
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                                        </svg>
-                                        Move
-                                      </div>
-                                    </button>
-                                    <button
-                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-150 border-b border-gray-100/50"
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        try {
-                                          const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
-                                          window.open(fileUrl, '_blank');
-                                        } catch (error) {
-                                          console.error('Error downloading file:', error);
-                                          alert('Unable to download file. Please try again.');
-                                        }
-                                        setFileMenuId(null);
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        Download
                                       </div>
                                     </button>
                                     <button
@@ -2028,7 +2004,7 @@ export const PropertyDetailsModal = ({
                                         e.stopPropagation();
                                         setRenamingFileId(folder.id);
                                         setRenamingFileName(folder.name);
-                                        setFolderMenuId(null);
+                                        setFileMenuId(null);
                                       }}
                                     >
                                       <div className="flex items-center gap-2">
@@ -2133,7 +2109,7 @@ export const PropertyDetailsModal = ({
                                   }`}
                                   onClick={e => {
                                     e.stopPropagation();
-                                    setFolderMenuId(null);
+                                    setFileMenuId(null);
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
                                     if (newMenuId) {

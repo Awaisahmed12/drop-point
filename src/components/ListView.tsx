@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useUserProperties, type PropertyWithFileCount } from '../hooks/useUserProperties';
 import { useMobileViewport } from '../hooks/useMobileViewport';
