@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { FileIcon } from './FileIcon';
 import { getFileSignedUrl } from '../utils/supabaseClient';
 
@@ -15,10 +16,10 @@ const imageCache = new Map<string, HTMLImageElement>();
 const failedImages = new Set<string>();
 
 // More reliable mobile detection - only disable on actual mobile devices
-const isMobile = typeof window !== 'undefined' && (
-  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-  window.innerWidth < 480
-);
+// const isMobile = typeof window !== 'undefined' && (
+//   /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+//   window.innerWidth < 480
+// );
 
 export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' }: FileThumbnailProps) => {
   const [showImage, setShowImage] = useState(false);
@@ -90,13 +91,13 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
                  // Use the original signed URL (Supabase doesn't support transformation params)
          const optimizedUrl = signedUrl;
 
-        // Preload with reasonable timeout
-        const img = new Image();
-        const timeoutId = setTimeout(() => {
-          failedImages.add(cacheKey);
-          img.onload = null;
-          img.onerror = null;
-        }, 5000); // 5 second max wait
+                 // Preload with reasonable timeout
+         const img = new window.Image();
+         const timeoutId = setTimeout(() => {
+           failedImages.add(cacheKey);
+           img.onload = null;
+           img.onerror = null;
+         }, 5000); // 5 second max wait
 
         img.onload = () => {
           clearTimeout(timeoutId);
@@ -112,7 +113,7 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
 
         img.src = optimizedUrl;
 
-      } catch (err) {
+      } catch {
         failedImages.add(cacheKey);
       }
     };
@@ -137,14 +138,15 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
       className={`relative overflow-hidden rounded-lg ${className}`}
       style={{ width: size, height: size }}
     >
-      {showImage && previewUrl ? (
-        <img
-          src={previewUrl}
-          alt={fileName}
-          className="w-full h-full object-cover"
-          style={{ imageRendering: 'auto' }}
-        />
-      ) : (
+             {showImage && previewUrl ? (
+         <Image
+           src={previewUrl}
+           alt={fileName}
+           fill
+           className="object-cover"
+           style={{ imageRendering: 'auto' }}
+         />
+       ) : (
         <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
           <FileIcon type={fileExtension} size={Math.floor(size * 0.7)} />
         </div>
