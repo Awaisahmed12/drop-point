@@ -5,7 +5,8 @@ DropPoint is a map-based document management platform for real estate profession
 ## 🚀 Current Features
 
 ### **Interactive Map System**
-- LandGlide-style crosshair cursor for precise property selection
+- **Google Maps-Style Pin Interaction**: Click/tap anywhere on map to drop new property pins
+- **Pin-Only Property Access**: Property details ONLY accessible by clicking pins (no crosshair system)
 - Three map views: Hybrid (default), Satellite, and Roadmap with seamless toggle
 - Smart address detection using reverse geocoding
 - User geolocation with fallback to US center
@@ -65,20 +66,20 @@ DropPoint is a map-based document management platform for real estate profession
   - **Build Optimization**: ✅ Production build successful with TypeScript strict mode compliance
   - **Context Menu Fixes**: Corrected file vs folder delete operations for proper functionality
 
-- **🚀 REVOLUTIONARY PIN SYSTEM**: Complete transformation from crosshair to Google Maps-style property pins
+- **🚀 GOOGLE MAPS-STYLE PIN SYSTEM**: Complete replacement of crosshair with intuitive pin interaction
   - **📍 Interactive Property Pins**: Beautiful blue house icons for all saved properties visible on map
-  - **🎯 Click-to-Drop**: Click anywhere on map to instantly drop new property pins  
-  - **🗺️ Free Map Scrolling**: No more center-locked crosshair - explore freely like Google Maps
-  - **📌 Smart Pin Management**: Intelligent property pin display and interaction
+  - **🎯 Click-to-Drop**: Click/tap anywhere on map to instantly drop new property pins  
+  - **🗺️ Free Map Exploration**: Explore map freely without any center-locked cursors or overlays
+  - **📌 Pin-Only Property Access**: Property details modal ONLY opens via pin clicks - no other triggers
   - **⚡ Instant Pin Loading**: Properties load as pins immediately when map loads
   - **🎨 Custom House Icons**: Professional blue house pins with hover and selection states
-  - **📍 Smart Pin Placement**: Prevents accidental drops near existing properties (100m threshold)
+  - **📍 Smart Pin Placement**: Prevents accidental drops near existing properties (50m threshold)
   - **🔄 Pin-to-Modal**: Click any property pin to instantly open property details with cached data
-  - **📱 Mobile-Optimized**: Touch-friendly pin interaction for mobile devices
+  - **📱 Mobile-Optimized**: Touch-friendly pin interaction optimized for mobile devices
   - **🎯 Visual Feedback**: Clear selected vs unselected pin states with custom icons
-  - **📋 Property Info Cards**: Show for newly dropped pins only, not existing properties
+  - **📋 Property Info Cards**: Show for newly dropped pins only, clean experience for existing properties
   - **⚡ Performance Optimized**: Efficient pin rendering with zero lag or loading delays
-  - **🎨 Professional Design**: Beautiful, intuitive pin-based property management system
+  - **🎨 Professional Design**: Intuitive pin-based property management following Google Maps conventions
 
 - Batch operations and smart file organization
 - In-app file viewer for mobile (no pop-up blockers)
@@ -302,7 +303,7 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 **Usage**: When you open a PropertyDetailsModal, you'll see the dropdown next to the property address. Click it to see all your saved properties with file counts, search through them, and switch to any property instantly.
 
 ### **Key Features Implemented**
-- **Interactive Map System**: LandGlide-style crosshair with dual view modes (Glider/Pin)
+- **Interactive Map System**: Google Maps-style pin interaction with click-to-drop functionality
 - **Property Management**: One-click saving with duplicate prevention
 - **File Management**: Drag-and-drop uploads with 30+ file format support
 - **Hierarchical Folders**: Nested folder structure with breadcrumb navigation
@@ -420,6 +421,33 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 - RLS policies need consistent view of related data (properties + property_files)
 
 **Impact**: Mobile users now experience reliable file uploads without mysterious permission errors, especially on slower networks.
+
+### **Pin-Only Property Access (Google Maps Style) ✅ COMPLETED**
+
+**Status**: Complete transformation from crosshair-based to pin-only property interaction
+
+**Problem**: Users found the crosshair-based property selection intrusive and confusing. The PropertyInfoCard would constantly appear and disappear during map exploration, interrupting the browsing experience when users weren't actually trying to select properties.
+
+**Solution**: 
+- **Pin-Only Modal Access**: Property details modal now ONLY opens when clicking/tapping property pins
+- **Google Maps-Style Interaction**: Click anywhere on map to drop new property pins, just like Google Maps
+- **Removed Center-Based Selection**: Eliminated the PropertyInfoCard that appeared during map interaction
+- **Clean Map Exploration**: Users can now freely explore the map without unwanted interruptions
+- **Smart Pin Dropping**: Improved pin dropping logic with 50m threshold to prevent accidental drops near existing properties
+
+**Technical Implementation**:
+- **Removed PropertyInfoCard triggers**: Eliminated center-based address fetching and property card display
+- **Enhanced pin dropping**: Improved `handleMapClick` with better error handling and user feedback
+- **Simplified interaction model**: Cleaned up unused state variables and interaction handlers
+- **Mobile-optimized**: Touch-friendly pin interaction that works reliably on mobile devices
+
+**User Experience**:
+- **Intuitive Interaction**: Familiar Google Maps-style behavior that users already understand
+- **No More Interruptions**: Browse the map freely without constant property card pop-ups
+- **Clear Intent**: Property selection only happens when users explicitly click pins
+- **Better Mobile UX**: Touch-optimized pin dropping and selection for mobile devices
+
+**Impact**: Map interaction is now intuitive and non-intrusive, following familiar Google Maps conventions while eliminating the annoying crosshair-based selection system.
 
 ### **Zoom-Based Property Selection ✅ COMPLETED**
 

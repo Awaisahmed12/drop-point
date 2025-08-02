@@ -80,10 +80,7 @@ export default function MapPage() {
   
   const [address, setAddress] = useState<string>('');
   const [addressLoading, setAddressLoading] = useState(false);
-  const [hasInteracted, setHasInteracted] = useState(false);
   const justSelectedRef = useRef(false);
-
-  const lastFetchedCenter = useRef<{ lat: number; lng: number } | null>(null);
 
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [savedProperty, setSavedProperty] = useState<Property | null>(null);
@@ -147,27 +144,7 @@ export default function MapPage() {
 
   // Cache functions moved to utils/propertyCache.ts
 
-  // Quick check if property exists
-  const checkPropertyExists = async (address: string): Promise<boolean> => {
-    const user = await supabase.auth.getUser();
-    if (!user.data.user) return false;
 
-    // First check cache
-    const cacheKey = `${user.data.user.id}-${address}`;
-    const cached = propertyCache[cacheKey];
-    if (cached && (Date.now() - cached.lastFetched) < CACHE_TIMEOUT) {
-      return true;
-    }
-
-    // If not in cache, do a lightweight query
-    const { count } = await supabase
-      .from('properties')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.data.user.id)
-      .eq('address', address);
-    
-    return count ? count > 0 : false;
-  };
 
   // Function to check if property data is cached and valid
   const isPropertyDataCached = useCallback(async (address: string): Promise<boolean> => {
@@ -332,8 +309,6 @@ export default function MapPage() {
           setFilesLoading(false);
           setAddress(propertyData.property.address);
           setSnappedLatLng({ lat: propertyData.property.lat, lng: propertyData.property.lng });
-          setHasInteracted(true);
-          lastFetchedCenter.current = { lat: propertyData.property.lat, lng: propertyData.property.lng };
           
           // Open the modal
           setShowDetailsModal(true);
@@ -423,11 +398,7 @@ export default function MapPage() {
     };
   }, [inputValue]);
 
-  // Helper to compare coordinates with a small threshold
-  function coordsChanged(a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null) {
-    if (!a || !b) return true;
-    return Math.abs(a.lat - b.lat) > 0.00001 || Math.abs(a.lng - b.lng) > 0.00001;
-  }
+
 
   // Handle zoom changes
   const handleZoomChange = useCallback(() => {
@@ -436,87 +407,35 @@ export default function MapPage() {
       if (currentZoom !== undefined) {
         setZoom(currentZoom);
         
-        // Clear address and interaction state if zoomed out below threshold
+        // Clear any selected new pin if zoomed out too far
         if (currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
-          setAddress('');
-          setHasInteracted(false);
-          setAddressLoading(false);
-          setSnappedLatLng(null);
-          lastFetchedCenter.current = null;
-        }
-      }
-    }
-  }, [map]);
-
-  // On dragend or zoom_changed, set hasInteracted and fetch address if center changed
-  const handleUserInteraction = useCallback(async () => {
-    if (map) {
-      const center = map.getCenter();
-      const currentZoom = map.getZoom();
-      
-      if (center && currentZoom !== undefined) {
-        const coords = { lat: center.lat(), lng: center.lng() };
-        
-        // Only fetch address if zoomed in enough
-        if (currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
-          return;
-        }
-        
-        if (coordsChanged(lastFetchedCenter.current, coords)) {
-          lastFetchedCenter.current = coords;
-          setHasInteracted(true);
-          setInputValue('');
-          
-          // Check address cache first
-          const cached = getAddressFromCache(coords.lat, coords.lng);
-          if (cached) {
-            setAddress(cached.address);
-            setSnappedLatLng(cached.snappedLatLng);
+          if (selectedProperty && !selectedProperty.id) {
+            setSelectedProperty(null);
+            setAddress('');
             setAddressLoading(false);
-
-            // Try to prefetch property data if this is a saved property
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              const { data: property } = await supabase
-                .from('properties')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('address', cached.address)
-                .maybeSingle();
-
-              if (property) {
-                // Check if we already have this property's data cached
-                const isCached = await isPropertyDataCached(cached.address);
-                if (!isCached) {
-                  // Start prefetching the property's files and folders
-                  const [folderResult, filesResult] = await Promise.all([
-                    supabase
-                      .from('property_folders')
-                      .select('*')
-                      .eq('property_id', property.id)
-                      .eq('user_id', user.id)
-                      .is('deleted_at', null)
-                      .order('created_at', { ascending: true }),
-                    supabase
-                      .from('property_files')
-                      .select('*')
-                      .eq('property_id', property.id)
-                      .order('uploaded_at', { ascending: false })
-                  ]);
-
-                  if (folderResult.data && filesResult.data) {
-                    await cachePropertyData(cached.address, filesResult.data, folderResult.data);
-                  }
-                }
-              }
-            }
-          } else {
-            fetchAddress(coords.lat, coords.lng);
+            setSnappedLatLng(null);
           }
         }
       }
     }
-  }, [map, isPropertyDataCached, cachePropertyData]);
+  }, [map, selectedProperty]);
+
+  // Simplified user interaction handler (mainly for cleanup on zoom changes)
+  const handleUserInteraction = useCallback(async () => {
+    if (map) {
+      const currentZoom = map.getZoom();
+      
+      // Clear any selected new pin if zoomed out too far
+      if (currentZoom !== undefined && currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
+        if (selectedProperty && !selectedProperty.id) {
+          setSelectedProperty(null);
+          setAddress('');
+          setAddressLoading(false);
+          setSnappedLatLng(null);
+        }
+      }
+    }
+  }, [map, selectedProperty]);
 
   // Only listen for dragend and zoom_changed for user interaction
   useEffect(() => {
@@ -663,8 +582,6 @@ export default function MapPage() {
             const coords = { lat: property.lat, lng: property.lng };
             setMapCenter(coords);
             setZoom(SEARCH_ZOOM);
-            setHasInteracted(true);
-            lastFetchedCenter.current = coords;
             
             // Set address directly from database
             setAddress(property.address);
@@ -713,8 +630,6 @@ export default function MapPage() {
     if (loc) {
       setMapCenter(loc);
       setZoom(SEARCH_ZOOM);
-      setHasInteracted(true);
-      lastFetchedCenter.current = loc;
       
       // First check if we have this address cached
       const cached = getAddressFromCache(loc.lat, loc.lng);
@@ -1459,82 +1374,13 @@ export default function MapPage() {
 
   // FileIcon component moved to src/components/FileIcon.tsx
 
-  // Add state for hover loading
-  // Address hover removed (was unused)
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Function to prefetch property data
-  const prefetchPropertyData = async (address: string) => {
-    // Quick check if property exists and isn't already cached
-    const exists = await checkPropertyExists(address);
-    const isCached = await isPropertyDataCached(address);
-    if (!exists || isCached) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
 
-    // Fetch the property first
-    const { data: property } = await supabase
-      .from('properties')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('address', address)
-      .maybeSingle();
 
-    if (!property) return;
 
-    // Then fetch folders and files
-    const [folderResult, filesResult] = await Promise.all([
-      supabase
-        .from('property_folders')
-        .select('*')
-        .eq('property_id', property.id)
-        .eq('user_id', user.id)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true }),
-      supabase
-        .from('property_files')
-        .select('*')
-        .eq('property_id', property.id)
-        .order('uploaded_at', { ascending: false })
-    ]);
 
-    if (folderResult.data && filesResult.data) {
-      await cachePropertyData(address, filesResult.data, folderResult.data);
-    }
-  };
 
-  // Add hover handlers to the Select button
-  const handlePropertyHover = (address: string) => {
-          // Address hover removed
-    
-    // Clear any existing timeout
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
-
-    // Set new timeout
-    hoverTimeoutRef.current = setTimeout(() => {
-      prefetchPropertyData(address);
-    }, 500); // Wait 500ms before starting prefetch
-  };
-
-  const handlePropertyHoverEnd = () => {
-    // Address hover removed
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-  };
-
-  // Clean up timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Add state for current location loading
   const [currentLocationLoading, setCurrentLocationLoading] = useState(false);
@@ -1590,10 +1436,8 @@ export default function MapPage() {
           console.log('🌍 [GEOLOCATION] Warning: Map not ready yet');
         }
 
-        // Update interaction state and fetch address
-        setHasInteracted(true);
+        // Clear search input
         setInputValue('');
-        lastFetchedCenter.current = newCenter;
         
         // Check cache first
         const cached = getAddressFromCache(latitude, longitude);
@@ -1703,12 +1547,17 @@ export default function MapPage() {
       const distance = Math.sqrt(
         Math.pow(property.lat - lat, 2) + Math.pow(property.lng - lng, 2)
       );
-      return distance < 0.001; // ~100m threshold
+      return distance < 0.0005; // ~50m threshold (tighter for better UX)
     });
     
     if (clickedNearExisting) {
       console.log('📍 [PINS] Click too close to existing property, ignoring');
       return;
+    }
+
+    // Clear any existing selected property that isn't saved
+    if (selectedProperty && !selectedProperty.id) {
+      setSelectedProperty(null);
     }
 
     setAddressLoading(true);
@@ -1736,32 +1585,49 @@ export default function MapPage() {
         };
         
         // Set as current property and show info card
-        setSavedProperty(newProperty);
+        setSelectedProperty(newProperty);
         setAddress(address);
         setSnappedLatLng(snappedLatLng);
-        setSelectedProperty(newProperty);
         
         // Cache the address
         saveAddressToCache(lat, lng, address, snappedLatLng);
-        
-        // Clear file/folder state for new property
-        setFolders([]);
-        setPropertyFiles([]);
-        setFoldersLoading(false);
-        setFilesLoading(false);
         
         console.log('📍 [PINS] New pin ready for property creation');
       } else {
         console.log('📍 [PINS] No address found for pin location');
         setAddress('Location not found');
+        
+        // Still create a property with coordinates but no address
+        const newProperty: Property = {
+          id: null,
+          address: 'Location not found',
+          lat,
+          lng,
+          label: null,
+          notes: null,
+        };
+        
+        setSelectedProperty(newProperty);
       }
     } catch (error) {
       console.error('📍 [PINS] Error creating pin:', error);
       setAddress('Error getting location');
+      
+      // Still create a property with coordinates but error address
+      const newProperty: Property = {
+        id: null,
+        address: 'Error getting location',
+        lat,
+        lng,
+        label: null,
+        notes: null,
+      };
+      
+      setSelectedProperty(newProperty);
     } finally {
       setAddressLoading(false);
     }
-  }, [userProperties]);
+  }, [userProperties, selectedProperty]);
 
   // Handle property pin click
   const handlePropertyPinClick = useCallback(async (property: Property) => {
@@ -1816,6 +1682,10 @@ export default function MapPage() {
               await cachePropertyData(property.address, filesResult.data, folderResult.data);
             }
           }
+        } else {
+          // New property - clear data
+          setFolders([]);
+          setPropertyFiles([]);
         }
       } catch (error) {
         console.error('📍 [PINS] Error loading property data:', error);
@@ -1824,6 +1694,9 @@ export default function MapPage() {
         setFilesLoading(false);
       }
     }
+    
+    // Open the property details modal
+    setShowDetailsModal(true);
   }, [getCachedPropertyData, cachePropertyData]);
 
   if (loading) {
@@ -1913,105 +1786,10 @@ export default function MapPage() {
           showDropdown={showDropdown}
           onCurrentLocationClick={handleCurrentLocationClick}
           currentLocationLoading={currentLocationLoading}
-          showPropertyInfoCard={hasInteracted && !!address && zoom >= PROPERTY_SELECTION_MIN_ZOOM}
+          showPropertyInfoCard={false}
           onListViewClick={handleListViewClick}
         />
-        {hasInteracted && address && zoom >= PROPERTY_SELECTION_MIN_ZOOM && (
-          <PropertyInfoCard
-            address={address}
-            addressLoading={addressLoading}
-            onMouseEnter={() => handlePropertyHover(address)}
-            onMouseLeave={handlePropertyHoverEnd}
-            onSelect={async () => {
-              if (map) {
-                const center = map.getCenter();
-                // Try to fetch property from Supabase by address and user
-                const { data: { user } } = await supabase.auth.getUser();
-                let dbProperty = null;
-                if (user) {
-                  const { data: existing } = await supabase
-                    .from('properties')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('address', address)
-                    .maybeSingle();
-                  dbProperty = existing;
-                }
 
-                if (dbProperty) {
-                  setSavedProperty(dbProperty);
-                  
-                  // Check if we have cached data
-                  const cached = await getCachedPropertyData(address);
-                  if (cached) {
-                    // Use cached data immediately
-                    setFolders(cached.folders);
-                    setPropertyFiles(cached.files);
-                    setFoldersLoading(false);
-                    setFilesLoading(false);
-                  } else {
-                    // No cached data - set loading states and fetch
-                    setFoldersLoading(true);
-                    setFilesLoading(true);
-                    
-                    // Fetch data immediately
-                    try {
-                      const [folderResult, filesResult] = await Promise.all([
-                        supabase
-                          .from('property_folders')
-                          .select('*')
-                          .eq('property_id', dbProperty.id)
-                          .eq('user_id', user!.id)
-                          .is('deleted_at', null)
-                          .order('created_at', { ascending: true }),
-                        supabase
-                          .from('property_files')
-                          .select('*')
-                          .eq('property_id', dbProperty.id)
-                          .order('uploaded_at', { ascending: false })
-                      ]);
-
-                      if (folderResult.data) {
-                        setFolders(folderResult.data);
-                      }
-
-                      if (filesResult.data) {
-                        setPropertyFiles(filesResult.data);
-                      }
-
-                      // Cache the fetched data
-                      if (folderResult.data && filesResult.data) {
-                        await cachePropertyData(address, filesResult.data, folderResult.data);
-                      }
-                    } catch (error) {
-                      console.error('Error fetching property data:', error);
-                    } finally {
-                      setFoldersLoading(false);
-                      setFilesLoading(false);
-                    }
-                  }
-                } else {
-                  setSavedProperty({
-                    address,
-                    lat: center?.lat() ?? 0,
-                    lng: center?.lng() ?? 0,
-                    label: null,
-                    notes: null,
-                    id: null, // Not saved yet
-                  });
-                  // New property - clear data and set not loading
-                  setFolders([]);
-                  setPropertyFiles([]);
-                  setFoldersLoading(false);
-                  setFilesLoading(false);
-                }
-                
-                // Open modal after all data is ready
-                setShowDetailsModal(true);
-              }
-            }}
-          />
-        )}
         {/* Show PropertyInfoCard only for newly dropped pins */}
         {selectedProperty && !selectedProperty.id && address && (
           <PropertyInfoCard
@@ -2019,7 +1797,23 @@ export default function MapPage() {
             addressLoading={addressLoading}
             onMouseEnter={() => {}}
             onMouseLeave={() => {}}
-            onSelect={() => {
+            onSelect={async () => {
+              // Create property object for new pin
+              setSavedProperty({
+                address,
+                lat: selectedProperty.lat,
+                lng: selectedProperty.lng,
+                label: null,
+                notes: null,
+                id: null, // Not saved yet
+              });
+              
+              // Clear file/folder state for new property
+              setFolders([]);
+              setPropertyFiles([]);
+              setFoldersLoading(false);
+              setFilesLoading(false);
+              
               // Open modal for new property
               setShowDetailsModal(true);
             }}
@@ -2070,8 +1864,6 @@ export default function MapPage() {
             if (map) {
               map.panTo({ lat, lng });
             }
-            // Update the last fetched center to prevent unnecessary address fetching
-            lastFetchedCenter.current = { lat, lng };
           }}
         />
 
@@ -2139,8 +1931,6 @@ export default function MapPage() {
           setSavedProperty(property);
           setAddress(property.address);
           setSnappedLatLng({ lat: property.lat, lng: property.lng });
-          setHasInteracted(true);
-          lastFetchedCenter.current = { lat: property.lat, lng: property.lng };
           
           // Background map updates (silent, no UI disruption)
           setMapCenter({ lat: property.lat, lng: property.lng });
