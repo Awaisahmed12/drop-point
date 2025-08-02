@@ -1079,6 +1079,9 @@ export default function MapPage() {
         setSavedProperty(newProperty);
         console.log('📁 [UPLOAD] Property auto-saved with ID:', propertyId);
         
+        // Refresh user properties to show the new property as a permanent pin
+        await loadUserProperties();
+        
         // Add small delay to ensure property is fully propagated in Supabase
         // This is especially important on mobile networks with higher latency
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -1542,19 +1545,6 @@ export default function MapPage() {
     
     console.log('📍 [PINS] Map clicked at:', { lat, lng });
     
-    // Check if clicked on existing property (prevent accidental drops)
-    const clickedNearExisting = userProperties.some(property => {
-      const distance = Math.sqrt(
-        Math.pow(property.lat - lat, 2) + Math.pow(property.lng - lng, 2)
-      );
-      return distance < 0.0005; // ~50m threshold (tighter for better UX)
-    });
-    
-    if (clickedNearExisting) {
-      console.log('📍 [PINS] Click too close to existing property, ignoring');
-      return;
-    }
-
     // Clear any existing selected property that isn't saved
     if (selectedProperty && !selectedProperty.id) {
       setSelectedProperty(null);
@@ -1627,7 +1617,7 @@ export default function MapPage() {
     } finally {
       setAddressLoading(false);
     }
-  }, [userProperties, selectedProperty]);
+  }, [selectedProperty]);
 
   // Handle property pin click
   const handlePropertyPinClick = useCallback(async (property: Property) => {
@@ -1771,6 +1761,17 @@ export default function MapPage() {
               title={property.address}
             />
           ))}
+          
+          {/* Temporary pin for newly dropped property */}
+          {selectedProperty && !selectedProperty.id && (
+            <Marker
+              key={`new-pin-${selectedProperty.lat}-${selectedProperty.lng}`}
+              position={{ lat: selectedProperty.lat, lng: selectedProperty.lng }}
+              icon={createPropertyPinIcon(true)} // Always selected since it's the active new pin
+              onClick={() => handlePropertyPinClick(selectedProperty)}
+              title={selectedProperty.address || 'New Property'}
+            />
+          )}
         </GoogleMap>
         <MapSearch
           onPlaceSelect={selectPredictionByPrediction}
