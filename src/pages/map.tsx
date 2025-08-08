@@ -81,6 +81,7 @@ export default function MapPage() {
   const [address, setAddress] = useState<string>('');
   const [addressLoading, setAddressLoading] = useState(false);
   const justSelectedRef = useRef(false);
+  const lastClickTimeRef = useRef(0);
 
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [savedProperty, setSavedProperty] = useState<Property | null>(null);
@@ -408,14 +409,14 @@ export default function MapPage() {
         setZoom(currentZoom);
         
         // Clear any selected new pin if zoomed out too far
-        if (currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
-          if (selectedProperty && !selectedProperty.id) {
-            setSelectedProperty(null);
-            setAddress('');
-            setAddressLoading(false);
-            setSnappedLatLng(null);
-          }
-        }
+        // if (currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
+        //   if (selectedProperty && !selectedProperty.id) {
+        //     setSelectedProperty(null);
+        //     setAddress('');
+        //     setAddressLoading(false);
+        //     setSnappedLatLng(null);
+        //   }
+        // }
       }
     }
   }, [map, selectedProperty]);
@@ -426,28 +427,28 @@ export default function MapPage() {
       const currentZoom = map.getZoom();
       
       // Clear any selected new pin if zoomed out too far
-      if (currentZoom !== undefined && currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
-        if (selectedProperty && !selectedProperty.id) {
-          setSelectedProperty(null);
-          setAddress('');
-          setAddressLoading(false);
-          setSnappedLatLng(null);
-        }
-      }
+      // if (currentZoom !== undefined && currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
+      //   if (selectedProperty && !selectedProperty.id) {
+      //     setSelectedProperty(null);
+      //     setAddress('');
+      //     setAddressLoading(false);
+      //     setSnappedLatLng(null);
+      //   }
+      // }
     }
   }, [map, selectedProperty]);
 
   // Only listen for dragend and zoom_changed for user interaction
-  useEffect(() => {
-    if (map) {
-      const dragendListener = map.addListener('dragend', handleUserInteraction);
-      const zoomListener = map.addListener('zoom_changed', handleUserInteraction);
-      return () => {
-        if (dragendListener) dragendListener.remove();
-        if (zoomListener) zoomListener.remove();
-      };
-    }
-  }, [map, handleUserInteraction]);
+  // useEffect(() => {
+  //   if (map) {
+  //     const dragendListener = map.addListener('dragend', handleUserInteraction);
+  //     const zoomListener = map.addListener('zoom_changed', handleUserInteraction);
+  //     return () => {
+  //       if (dragendListener) dragendListener.remove();
+  //       if (zoomListener) zoomListener.remove();
+  //     };
+  //   }
+  // }, [map, handleUserInteraction]);
 
   // Click outside handler removed - dropdown handled by MapSearch component
 
@@ -486,6 +487,11 @@ export default function MapPage() {
     setAddress('');
     try {
       const res = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
       const data = await res.json();
       if (data.results && data.results[0]) {
         const address = data.results[0].formatted_address;
@@ -502,10 +508,20 @@ export default function MapPage() {
         setSnappedLatLng(null);
         saveAddressToCache(lat, lng, 'No address found', null);
       }
-    } catch {
-      setAddress('Error fetching address');
+    } catch (error) {
+      console.error('📍 [GEOCODE] Error fetching address:', error);
+      
+      let errorAddress = 'Error fetching address';
+      
+      // Check if it's a JSON parsing error
+      if (error instanceof SyntaxError && error.message.includes('JSON')) {
+        console.error('📍 [GEOCODE] JSON parsing error - likely API key issue');
+        errorAddress = 'Address lookup failed - check API key';
+      }
+      
+      setAddress(errorAddress);
       setSnappedLatLng(null);
-      saveAddressToCache(lat, lng, 'Error fetching address', null);
+      saveAddressToCache(lat, lng, errorAddress, null);
     }
     setAddressLoading(false);
   };
@@ -1545,52 +1561,102 @@ export default function MapPage() {
     
     console.log('📍 [PINS] Map clicked at:', { lat, lng });
     
-    // Clear any existing selected property that isn't saved
-    if (selectedProperty && !selectedProperty.id) {
-      setSelectedProperty(null);
-    }
-
-    setAddressLoading(true);
+    // Check if this might be a double-click by tracking recent clicks
+    const currentTime = Date.now();
+    const timeSinceLastClick = currentTime - lastClickTimeRef.current;
+    lastClickTimeRef.current = currentTime;
     
-    try {
-      // Get address for the new pin location
-      const res = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
-      const data = await res.json();
+    // If clicks are happening rapidly (within 300ms), it's likely a double-click for zoom
+    if (timeSinceLastClick < 300) {
+      console.log('📍 [PINS] Double-click detected - allowing zoom behavior only');
+      return; // Don't drop pins during double-clicking
+    }
+    
+    // Add a small delay to detect if this is part of a double-click sequence
+    setTimeout(async () => {
+      // Check if another click happened shortly after (indicating double-click)
+      if (Date.now() - lastClickTimeRef.current < 250) {
+        console.log('📍 [PINS] Part of double-click sequence - skipping pin drop');
+        return;
+      }
       
-      if (data.results && data.results[0]) {
-        const address = data.results[0].formatted_address;
-        const snapped = data.results[0].geometry.location;
-        const snappedLatLng = { lat: snapped.lat, lng: snapped.lng };
+      // Single click confirmed - proceed with pin drop
+      // Clear any existing selected property that isn't saved
+      if (selectedProperty && !selectedProperty.id) {
+        setSelectedProperty(null);
+      }
+
+      setAddressLoading(true);
+      
+      try {
+        // Get address for the new pin location
+        const res = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
         
-        console.log('📍 [PINS] New pin address:', address);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
         
-        // Create new property for pin
-        const newProperty: Property = {
-          id: null, // Will be assigned when saved
-          address,
-          lat: snappedLatLng.lat,
-          lng: snappedLatLng.lng,
-          label: null,
-          notes: null,
-        };
+        const data = await res.json();
         
-        // Set as current property and show info card
-        setSelectedProperty(newProperty);
-        setAddress(address);
-        setSnappedLatLng(snappedLatLng);
+        if (data.results && data.results[0]) {
+          const address = data.results[0].formatted_address;
+          const snapped = data.results[0].geometry.location;
+          const snappedLatLng = { lat: snapped.lat, lng: snapped.lng };
+          
+          console.log('📍 [PINS] New pin address:', address);
+          
+          // Create new property for pin
+          const newProperty: Property = {
+            id: null, // Will be assigned when saved
+            address,
+            lat: snappedLatLng.lat,
+            lng: snappedLatLng.lng,
+            label: null,
+            notes: null,
+          };
+          
+          // Set as current property and show info card
+          setSelectedProperty(newProperty);
+          setAddress(address);
+          setSnappedLatLng(snappedLatLng);
+          
+          // Cache the address
+          saveAddressToCache(lat, lng, address, snappedLatLng);
+          
+          console.log('📍 [PINS] New pin ready for property creation');
+        } else {
+          console.log('📍 [PINS] No address found for pin location');
+          setAddress('Location not found');
+          
+          // Still create a property with coordinates but no address
+          const newProperty: Property = {
+            id: null,
+            address: 'Location not found',
+            lat,
+            lng,
+            label: null,
+            notes: null,
+          };
+          
+          setSelectedProperty(newProperty);
+        }
+      } catch (error) {
+        console.error('📍 [PINS] Error creating pin:', error);
         
-        // Cache the address
-        saveAddressToCache(lat, lng, address, snappedLatLng);
+        let errorAddress = 'Error getting location';
         
-        console.log('📍 [PINS] New pin ready for property creation');
-      } else {
-        console.log('📍 [PINS] No address found for pin location');
-        setAddress('Location not found');
+        // Check if it's a JSON parsing error
+        if (error instanceof SyntaxError && error.message.includes('JSON')) {
+          console.error('📍 [PINS] JSON parsing error - likely API key issue');
+          errorAddress = 'Address lookup failed - check API key';
+        }
         
-        // Still create a property with coordinates but no address
+        setAddress(errorAddress);
+        
+        // Still create a property with coordinates but error address
         const newProperty: Property = {
           id: null,
-          address: 'Location not found',
+          address: errorAddress,
           lat,
           lng,
           label: null,
@@ -1598,25 +1664,10 @@ export default function MapPage() {
         };
         
         setSelectedProperty(newProperty);
+      } finally {
+        setAddressLoading(false);
       }
-    } catch (error) {
-      console.error('📍 [PINS] Error creating pin:', error);
-      setAddress('Error getting location');
-      
-      // Still create a property with coordinates but error address
-      const newProperty: Property = {
-        id: null,
-        address: 'Error getting location',
-        lat,
-        lng,
-        label: null,
-        notes: null,
-      };
-      
-      setSelectedProperty(newProperty);
-    } finally {
-      setAddressLoading(false);
-    }
+    }, 250); // Wait 250ms to detect double-click
   }, [selectedProperty]);
 
   // Handle property pin click
@@ -1724,6 +1775,12 @@ export default function MapPage() {
             setMap(mapInstance);
           }}
           onClick={handleMapClick}
+          onDblClick={(event) => {
+            console.log('📍 [PINS] Double-click detected - allowing Google Maps zoom');
+            // Google Maps will handle the zoom automatically
+            // Just update our click tracking to prevent pin drops
+            lastClickTimeRef.current = Date.now();
+          }}
           onZoomChanged={handleZoomChange}
           mapTypeId={mapType as google.maps.MapTypeId}
           options={{
