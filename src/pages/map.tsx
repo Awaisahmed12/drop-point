@@ -21,7 +21,6 @@ import {
   GOOGLE_MAP_LIBRARIES, 
   DEFAULT_ZOOM, 
   SEARCH_ZOOM, 
-  PROPERTY_SELECTION_MIN_ZOOM,
   MAP_TYPE_KEY, 
   DEFAULT_MAP_TYPE 
 } from '../../constants';
@@ -419,24 +418,24 @@ export default function MapPage() {
         // }
       }
     }
-  }, [map, selectedProperty]);
+  }, [map]);
 
   // Simplified user interaction handler (mainly for cleanup on zoom changes)
-  const handleUserInteraction = useCallback(async () => {
-    if (map) {
-      const currentZoom = map.getZoom();
-      
-      // Clear any selected new pin if zoomed out too far
-      // if (currentZoom !== undefined && currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
-      //   if (selectedProperty && !selectedProperty.id) {
-      //     setSelectedProperty(null);
-      //     setAddress('');
-      //     setAddressLoading(false);
-      //     setSnappedLatLng(null);
-      //   }
-      // }
-    }
-  }, [map, selectedProperty]);
+  // const handleUserInteraction = useCallback(async () => {
+  //   if (map) {
+  //     const currentZoom = map.getZoom();
+  //     
+  //     // Clear any selected new pin if zoomed out too far
+  //     // if (currentZoom !== undefined && currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
+  //     //   if (selectedProperty && !selectedProperty.id) {
+  //     //     setSelectedProperty(null);
+  //     //     setAddress('');
+  //     //     setAddressLoading(false);
+  //     //     setSnappedLatLng(null);
+  //     //   }
+  //     // }
+  //   }
+  // }, [map, selectedProperty]);
 
   // Only listen for dragend and zoom_changed for user interaction
   // useEffect(() => {
@@ -449,8 +448,6 @@ export default function MapPage() {
   //     };
   //   }
   // }, [map, handleUserInteraction]);
-
-  // Click outside handler removed - dropdown handled by MapSearch component
 
   // On mount, read map type from localStorage
   useEffect(() => {
@@ -1775,7 +1772,7 @@ export default function MapPage() {
             setMap(mapInstance);
           }}
           onClick={handleMapClick}
-          onDblClick={(event) => {
+          onDblClick={() => {
             console.log('📍 [PINS] Double-click detected - allowing Google Maps zoom');
             // Google Maps will handle the zoom automatically
             // Just update our click tracking to prevent pin drops
