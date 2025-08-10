@@ -715,12 +715,58 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 
 ## 🚧 Next Steps
 
-- [ ] Sharing system (public links, email-based sharing)
-- [ ] Property tagging and multiple map views
-- [ ] Export/download functionality
-- [ ] "My Properties" dashboard
-- [ ] Advanced search and filtering
-- [ ] Collaboration features
+This roadmap consolidates the remaining high‑leverage work to take the app from polished MVP to a scalable, fundable product.
+
+### Product & UX
+- Onboarding and empty states (first‑run tour, sample property, CSV import)
+- Sharing & collaboration (property‑level invites/roles, activity feed)
+- Offline‑first PWA (installable, background sync, local cache)
+- Global search (address, file names, OCR content, filters)
+- AI assist (OCR → auto‑tags → semantic search → suggested folders)
+- Mobile polish (haptics, bottom sheets, gestures, keyboard avoidance)
+- Accessibility & i18n (WCAG AA, RTL, language packs)
+
+### Compliance & Legal (MVP-ready)
+- Cookie consent banner (essential vs analytics) with Accept/Decline and links to legal pages
+- Privacy Policy and Terms (draft placeholders; replace with counsel‑reviewed versions)
+- User profile name (stored in Supabase user metadata)
+
+### Data, Security & Scale
+- Security hardening (RLS review, ownership invariants, signed URL rotation)
+- Backups & disaster recovery (daily backups, PITR, runbook)
+- Audit trails (per‑file/property events, export)
+- Big‑file pipeline (chunked/resumable uploads, AV scan, dedupe)
+- Performance (index tuning, CDN headers, image proxy, marker virtualization)
+
+### Monetization & Growth
+- Billing (Free/Pro/Team), metering (storage, collaborators), Stripe portal
+- Usage insights (dashboards, weekly digests)
+- Referral & trials (invite links, extended trial on invites)
+
+### Ops & Quality
+- Observability (Sentry, logs, uptime checks, Slack alerts)
+- E2E tests for critical flows (auth, upload, share, search, map select)
+- Release pipeline (preview envs, feature flags, staged rollouts)
+
+### Execution plan (next 2 sprints)
+- Sprint 1 (Foundations)
+  - Property‑level sharing with invite links and roles (viewer/editor)
+  - Stripe test‑mode billing (Free 5GB, Pro 200GB)
+  - Sentry + uptime checks wired
+  - DoD: share link opens read‑only; upgrade changes quota; errors visible in Sentry
+- Sprint 2 (Value drivers)
+  - OCR for PDFs/images (queued) → searchable text, basic auto‑tags
+  - Global search with filters (address, file name, OCR text)
+  - Offline cache for last 10 properties and recent files
+  - DoD: search finds OCR text; offline works after first open; fast results
+
+### KPIs
+- Time‑to‑first upload
+- Properties created/user
+- Search success rate
+- Upload success rate
+- Retention (D7/D30)
+- Conversion to Pro
 
 ---
 
