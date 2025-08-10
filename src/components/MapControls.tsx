@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 interface MapControlsProps {
   mapType: string;
   onMapTypeChange: (type: 'roadmap' | 'satellite' | 'hybrid') => void;
@@ -59,6 +61,17 @@ export const MapControls = ({
   // Desktop current location button (positioned after search bar)
   const desktopCurrentLocationButton = onCurrentLocationClick && (
     <div className="hidden sm:flex absolute top-6 right-6 z-30 gap-2">
+      <Link
+        className="px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm"
+        href="/account"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M4 21v-2a4 4 0 0 1 3-3.87"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        Account
+      </Link>
       {/* List View Button */}
       {onListViewClick && (
         <button
@@ -142,6 +155,19 @@ export const MapControls = ({
   
   const mobileControls = shouldShowMobileControls && (
     <div className="absolute right-4 top-20 z-30 sm:hidden flex flex-col gap-2">
+      {/* Mobile account button */}
+      <Link
+        className="w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl cursor-pointer"
+        href="/account"
+        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+        aria-label="Account"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M4 21v-2a4 4 0 0 1 3-3.87"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </Link>
       {/* Map Type Toggle - cycles through all 3 types */}
       <button
         className="w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl cursor-pointer"

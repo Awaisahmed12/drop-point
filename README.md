@@ -209,7 +209,22 @@ CREATE TABLE property_folders (
 
 ## 🚀 Getting Started
 
-1. **Install Dependencies**
+### Prerequisites
+- Node.js 18.18+ (LTS recommended) and npm 9+
+- Supabase project and Google Maps API key
+
+### Windows PowerShell setup (first-time only)
+If you see a script signing error when running npm commands in PowerShell, allow locally created scripts for your user:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+```
+
+1. **Install Dependencies (reproducible)**
+   ```bash
+   npm ci
+   ```
+   If you are actively changing dependencies, you can use:
    ```bash
    npm install
    ```
@@ -232,6 +247,19 @@ CREATE TABLE property_folders (
    ```bash
    npm run dev
    ```
+
+### Build & Run (Production)
+```bash
+npm run build
+npm start
+```
+
+## 🧾 Accounts & Usage (MVP)
+
+- Free plan limit is configurable via `NEXT_PUBLIC_FREE_TIER_GB` (default 5 GB total).
+- Uploads are blocked when the projected total exceeds the free limit.
+- Account page (`/account`) shows a usage meter and plan info; billing upgrade CTA is stubbed for now.
+
 
 ## 📁 File Structure
 
@@ -274,6 +302,23 @@ src/
 - **Progressive Enhancement**: Works across all device sizes
 
 ## 🎯 Recent Updates & Features
+
+### **Selection Card for Existing Pins + Background Prefetch ✅ COMPLETED**
+
+### **Current Location Zoom Tuning ✅ COMPLETED**
+
+### **Mobile Blue Dot (Live Location) ✅ COMPLETED**
+
+- When location permission is granted, a live blue dot appears at the user's current location.
+- Includes a subtle accuracy ring that updates in real-time.
+- Efficient geolocation watch starts only after permission and is cleaned up automatically.
+
+- Adjusted current location zoom to a friendlier neighborhood level on both web and mobile.
+- Uses a dedicated `CURRENT_LOCATION_ZOOM` constant for consistent behavior.
+
+- When clicking any existing property pin, the blue selection card now appears (same as for newly dropped pins) instead of immediately opening the details modal.
+- While the card is visible, the app preloads that property's folders and files in the background. When you tap Select, the modal opens with data ready or near-ready for a snappy experience.
+- Current location and map controls auto-adjust to avoid overlapping the card.
 
 ### **PropertySwitcher Feature ✅ **COMPLETED & INTEGRATED**
 

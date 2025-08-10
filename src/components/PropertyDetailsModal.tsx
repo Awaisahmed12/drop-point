@@ -12,7 +12,7 @@ import type { PropertyWithFileCount } from '../hooks/useUserProperties';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
 import { getFileSignedUrl } from '../utils/supabaseClient';
-import { HomeIcon, FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
+import { FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 
 interface PropertyDetailsModalProps {
   isOpen: boolean;
@@ -1013,7 +1013,15 @@ export const PropertyDetailsModal = ({
   };
 
   return (
-    <div className={`fixed inset-0 z-40 flex ${mobileClasses.modal} justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in`}>
+    <div
+      className={`fixed inset-0 z-40 flex ${mobileClasses.modal} justify-center bg-black/50 backdrop-blur-md transition-all animate-fade-in`}
+      onClick={(e) => {
+        // Close when clicking the backdrop
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative overflow-hidden"
            style={{ 
              borderRadius: '1.5rem', 
@@ -1106,35 +1114,62 @@ export const PropertyDetailsModal = ({
             minHeight: '200px', // Minimum height for content
             // Let content naturally size on mobile instead of fixed height restrictions
           }}>
-            {/* Satellite Image - First in scrollable area, will scroll away */}
+            {/* Property preview: switch to satellite map on very skinny layouts, otherwise Street View */}
             <div className={`relative w-full ${isMobile ? 'h-28' : 'h-32'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
               <Image
-                src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
-                alt="Property satellite view"
+                src={
+                  // Use Street View on mobile where aspect fits; use satellite map on desktop to avoid skinny distortion
+                  isMobile
+                    ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`
+                    : `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`
+                }
+                alt="Property preview"
                 layout="fill"
                 objectFit="cover"
                 priority
                 unoptimized
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  if (target && target.src.indexOf('streetview') !== -1) {
+                    target.src = `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`;
+                  }
+                }}
               />
             </div>
 
             {/* All other content comes after satellite image */}
             <div className="bg-white sticky top-0 z-50 border-b border-gray-100">
-              {/* Breadcrumbs - show if not at root level OR if we have a current folder */}
+              {/* Breadcrumbs - compact unified bar */}
               {(breadcrumbPath.length > 0 || selectedFolder !== 'master') && (
-                <div className="px-4 py-1 bg-white border-b border-gray-100">
-                  {/* Breadcrumb Path */}
-                  <div className="flex items-center gap-2 text-xs text-gray-600 overflow-x-auto">
-                    <HomeIcon 
-                      className="w-3 h-3 text-gray-400 cursor-pointer hover:text-blue-600 transition-colors flex-shrink-0" 
+                <div className="px-4 py-2 bg-white border-b border-gray-100">
+                  <div className="flex items-center gap-2 text-xs text-gray-700 overflow-x-auto">
+                    {selectedFolder !== 'master' && (
+                      <button
+                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
+                        onClick={() => {
+                          const currentFolder = folders.find(f => f.id === selectedFolder);
+                          const parentId = currentFolder?.parent_id || 'master';
+                          setSearchQuery('');
+                          onFolderChange(parentId);
+                        }}
+                        aria-label="Back"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                      </button>
+                    )}
+                    <button
+                      className="text-gray-500 hover:text-blue-600 flex items-center gap-1 flex-shrink-0"
                       onClick={() => {
                         setSearchQuery('');
                         onFolderChange('master');
                       }}
-                    />
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M10.707 1.293a1 1 0 00-1.414 0l-8 8a1 1 0 001.414 1.414L4 9.414V20a2 2 0 002 2h3a1 1 0 001-1v-5a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 001 1h3a2 2 0 002-2V9.414l1.293 1.293a1 1 0 001.414-1.414l-8-8z"/></svg>
+                      <span className="whitespace-nowrap">Home</span>
+                    </button>
                     {breadcrumbPath.map((folder) => (
                       <div key={folder.id} className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-gray-400">/</span>
+                        <span className="text-gray-400">›</span>
                         <button
                           className="text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
                           onClick={() => {
@@ -1147,28 +1182,6 @@ export const PropertyDetailsModal = ({
                       </div>
                     ))}
                   </div>
-                  
-                  {/* Back Button - Show directly under breadcrumbs when not at root */}
-                  {selectedFolder !== 'master' && (
-                    <div className="mt-0.5">
-                      <button
-                        className="flex items-center gap-1 px-1 py-0.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                        onClick={() => {
-                          // Go back to parent folder
-                          const currentFolder = folders.find(f => f.id === selectedFolder);
-                          const parentId = currentFolder?.parent_id || 'master';
-                          // Clear search when navigating back
-                          setSearchQuery('');
-                          onFolderChange(parentId);
-                        }}
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                        </svg>
-                        Back
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
               

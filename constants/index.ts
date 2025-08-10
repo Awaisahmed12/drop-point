@@ -16,6 +16,10 @@ export const GOOGLE_MAP_LIBRARIES = ["places"] as Libraries;
 
 export const DEFAULT_ZOOM = 12;
 export const SEARCH_ZOOM = 19;
+// Friendlier zoom level when jumping to current location (neighborhood view)
+export const CURRENT_LOCATION_ZOOM = 15;
+// Closer follow-up zoom for current location (street-level but not max)
+export const CURRENT_LOCATION_ZOOM_DEEP = 17;
 export const PROPERTY_SELECTION_MIN_ZOOM = 18; // Minimum zoom to show property selection card
 // Map configuration
 export const MAP_TYPE_KEY = 'droppoint-map-type';
@@ -47,6 +51,10 @@ export const SUPPORTED_FILE_TYPES = [
   'video/*',
   'audio/*',
 ];
+
+// Monetization: Free tier quota (bytes)
+export const FREE_TIER_GB = Number(process.env.NEXT_PUBLIC_FREE_TIER_GB ?? '5');
+export const FREE_TIER_MAX_BYTES = FREE_TIER_GB * 1024 * 1024 * 1024; // default 5 GB, configurable via env
 
 // Google Drive-inspired color map for file types
 export const fileTypeColorMap: Record<string, string> = {

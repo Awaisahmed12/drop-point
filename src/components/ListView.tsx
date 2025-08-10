@@ -67,7 +67,16 @@ export const ListView = ({
   if (!isOpen) return null;
 
   return (
-    <div className={`fixed inset-0 z-40 flex ${mobileClasses.modal} justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in`}>
+    <div
+      className={`fixed inset-0 z-40 flex ${mobileClasses.modal} justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      aria-modal="true"
+      role="dialog"
+    >
       <div 
         className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl flex flex-col border border-blue-100 relative overflow-hidden"
         style={{ 
@@ -75,6 +84,8 @@ export const ListView = ({
           ...getModalDimensions(),
           maxWidth: isMobile ? 'calc(100vw - 24px)' : undefined,
           margin: isMobile ? '12px' : undefined,
+          // Shorten height to clear bottom nav
+          maxHeight: isMobile ? 'calc(100dvh - 96px)' : undefined,
         }}
       >
         {/* Header - matches PropertyDetailsModal style */}

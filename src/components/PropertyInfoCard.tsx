@@ -14,7 +14,8 @@ export const PropertyInfoCard = ({
   onMouseLeave 
 }: PropertyInfoCardProps) => {
   return (
-    <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 w-full max-w-md px-4">
+    <div className="absolute left-1/2 transform -translate-x-1/2 z-30 w-full max-w-md px-4"
+         style={{ bottom: '88px' }}>
       <div 
         className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-4 border border-blue-100 animate-fade-in relative"
         onMouseEnter={onMouseEnter}

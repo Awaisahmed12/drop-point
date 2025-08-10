@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
@@ -10,9 +10,12 @@ import { ListView } from '../components/ListView';
 import { MoveModal } from '../components/MoveModal';
 import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
 import { getAddressFromCache, saveAddressToCache } from '../../utils/propertyCache';
+import { getUserUsageBytes } from '../utils/usage';
+import { FREE_TIER_MAX_BYTES } from '../../constants';
 import { MapSearch } from '../components/MapSearch';
 import { MapControls } from '../components/MapControls';
 import { PropertyInfoCard } from '../components/PropertyInfoCard';
+import { MobileBottomNav } from '../components/MobileBottomNav';
 
 import { 
   containerStyle, 
@@ -21,6 +24,8 @@ import {
   GOOGLE_MAP_LIBRARIES, 
   DEFAULT_ZOOM, 
   SEARCH_ZOOM, 
+  CURRENT_LOCATION_ZOOM,
+  CURRENT_LOCATION_ZOOM_DEEP,
   MAP_TYPE_KEY, 
   DEFAULT_MAP_TYPE 
 } from '../../constants';
@@ -65,6 +70,11 @@ const createPropertyPinIcon = (selected: boolean = false) => ({
 });
 
 export default function MapPage() {
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'droppoint-google-maps',
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAP_LIBRARIES,
+  });
   const router = useRouter();
   const { getMobileStyles, mobileClasses } = useMobileViewport();
   const [loading, setLoading] = useState(true);
@@ -110,6 +120,11 @@ export default function MapPage() {
   // Add ref for menu click outside
   const folderMenuRef = useRef<HTMLDivElement | null>(null);
   const fileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Track staged zoom behavior for current location (first -> deep)
+  const currentLocationZoomStageRef = useRef<'none' | 'first' | 'deep'>('none');
+
+  // (Removed) Live user location dot tracking
 
   // Add state for renaming files
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
@@ -187,16 +202,14 @@ export default function MapPage() {
     return null;
   }, [propertyCache, CACHE_TIMEOUT]);
 
-  // Auth guard
+  // Optimistic auth guard: render immediately; redirect only if unauthenticated when check resolves
   useEffect(() => {
-    const getUser = async () => {
-      const result = await supabase.auth.getUser();
+    setLoading(false);
+    supabase.auth.getUser().then((result) => {
       if (!result.data.user) {
         router.replace('/');
       }
-      setLoading(false);
-    };
-    getUser();
+    });
   }, [router]);
 
   // Load user properties as pins
@@ -322,7 +335,7 @@ export default function MapPage() {
     }
   }, []);
 
-  // Try to get user's geolocation on mount
+  // Try to get user's geolocation on mount (skip if returning from bottom nav quick switch)
   useEffect(() => {
     console.log('🌍 [GEOLOCATION] Checking geolocation support...');
     console.log('🌍 [GEOLOCATION] Navigator available:', typeof navigator !== 'undefined');
@@ -331,7 +344,12 @@ export default function MapPage() {
     console.log('🌍 [GEOLOCATION] Current protocol:', window.location.protocol);
     console.log('🌍 [GEOLOCATION] Current hostname:', window.location.hostname);
     
-    if (typeof window !== 'undefined' && navigator.geolocation) {
+    const shouldSkipGeo = typeof window !== 'undefined' && sessionStorage.getItem('droppoint-skip-geo') === '1';
+    if (shouldSkipGeo) {
+      try { sessionStorage.removeItem('droppoint-skip-geo'); } catch {}
+    }
+
+    if (!shouldSkipGeo && typeof window !== 'undefined' && navigator.geolocation) {
       console.log('🌍 [GEOLOCATION] Attempting to get current position on mount...');
       
       // First, check permissions if available
@@ -1010,6 +1028,45 @@ export default function MapPage() {
     }
   }
 
+  // Handler for creating a new folder under the current selectedFolder
+  async function handleCreateFolderByName(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      if (!savedProperty || !savedProperty.id) {
+        alert('Please save the property before creating folders.');
+        return;
+      }
+      const parentId = selectedFolder === 'master' ? null : selectedFolder;
+
+      const { data, error } = await supabase
+        .from('property_folders')
+        .insert({
+          property_id: savedProperty.id,
+          user_id: user.id,
+          parent_id: parentId,
+          name: trimmed,
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('📁 [FOLDERS] Error creating folder:', error);
+        alert('Could not create folder. Please try again.');
+        return;
+      }
+
+      if (data) {
+        setFolders(prev => [...prev, data]);
+      }
+    } catch (err) {
+      console.error('📁 [FOLDERS] Unexpected error creating folder:', err);
+      alert('Could not create folder.');
+    }
+  }
+
   // Add beforeunload warning if uploads are pending
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -1213,6 +1270,24 @@ export default function MapPage() {
     }
 
     console.log('📁 [UPLOAD] Starting upload process for:', uniqueName);
+    
+    // Enforce free-tier quota before uploading
+    try {
+      const usedBytes = await getUserUsageBytes(user.id);
+      const projected = usedBytes + file.size;
+      if (projected > FREE_TIER_MAX_BYTES) {
+        console.warn('⛔ [UPLOAD] Quota exceeded. Used:', usedBytes, 'Attempting:', file.size);
+        alert('Storage limit reached for the free plan (5 GB). Please delete files or upgrade to continue uploading.');
+        // Remove pending upload entry if present
+        setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
+        return;
+      }
+    } catch (err) {
+      console.error('⚠️ [USAGE] Failed to check usage. Blocking upload for safety.', err);
+      alert('Unable to verify your storage usage right now. Please try again shortly.');
+      setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
+      return;
+    }
     
     // Optimized upload with single progress update
     const filePath = `${propertyId}/${uniqueName}`;
@@ -1440,14 +1515,36 @@ export default function MapPage() {
         
         console.log('🌍 [GEOLOCATION] New center:', newCenter);
         
+        // Determine desired zoom based on current state and stage
+        const currentZoom = map?.getZoom?.() ?? zoom;
+        const initialZoom = CURRENT_LOCATION_ZOOM;
+        const deepZoom = CURRENT_LOCATION_ZOOM_DEEP;
+
+        let targetZoom = initialZoom;
+        const stage = currentLocationZoomStageRef.current;
+
+        if (stage === 'none') {
+          // First click: if already zoomed deeper than initial, go straight to deep
+          targetZoom = currentZoom > initialZoom ? deepZoom : initialZoom;
+          currentLocationZoomStageRef.current = 'first';
+        } else if (stage === 'first') {
+          // Second click: go deeper regardless (unless already deeper)
+          targetZoom = Math.max(currentZoom, deepZoom);
+          currentLocationZoomStageRef.current = 'deep';
+        } else {
+          // Subsequent clicks: toggle between initial and deep based on current depth
+          targetZoom = currentZoom > initialZoom ? initialZoom : deepZoom;
+          currentLocationZoomStageRef.current = currentZoom > initialZoom ? 'first' : 'deep';
+        }
+
         // Update map center and zoom
         setMapCenter(newCenter);
-        setZoom(SEARCH_ZOOM);
+        setZoom(targetZoom);
         
         if (map) {
           console.log('🌍 [GEOLOCATION] Updating map position...');
           map.panTo(newCenter);
-          map.setZoom(SEARCH_ZOOM);
+          map.setZoom(targetZoom);
         } else {
           console.log('🌍 [GEOLOCATION] Warning: Map not ready yet');
         }
@@ -1517,6 +1614,9 @@ export default function MapPage() {
           TIMEOUT: error.TIMEOUT
         });
         
+        // Reset zoom stage on error to allow fresh attempt
+        currentLocationZoomStageRef.current = 'none';
+
         let errorMessage = 'Unable to retrieve your location.';
         let debugInfo = '';
         
@@ -1547,7 +1647,7 @@ export default function MapPage() {
         maximumAge: 60000 // Cache location for 1 minute
       }
     );
-  }, [map, isPropertyDataCached, cachePropertyData]);
+  }, [map, isPropertyDataCached, cachePropertyData, zoom]);
 
   // Handle map click to drop new pin
   const handleMapClick = useCallback(async (event: google.maps.MapMouseEvent) => {
@@ -1667,10 +1767,11 @@ export default function MapPage() {
     }, 250); // Wait 250ms to detect double-click
   }, [selectedProperty]);
 
-  // Handle property pin click
+  // Handle property pin click - show selection card and prefetch in background
   const handlePropertyPinClick = useCallback(async (property: Property) => {
     console.log('📍 [PINS] Property pin clicked:', property.address);
     
+    setSelectedFolder('master'); // reset folder to root when opening a property
     setSelectedProperty(property);
     setSavedProperty(property);
     setAddress(property.address);
@@ -1733,8 +1834,7 @@ export default function MapPage() {
       }
     }
     
-    // Open the property details modal
-    setShowDetailsModal(true);
+    // Do not open modal immediately; wait for user to confirm via selection card
   }, [getCachedPropertyData, cachePropertyData]);
 
   if (loading) {
@@ -1757,10 +1857,12 @@ export default function MapPage() {
         <meta property="twitter:title" content="Map View - DropPoint Real Estate Document Management" />
         <meta property="twitter:description" content="Interactive map interface for managing real estate properties and documents. Select properties, upload files, and organize your real estate portfolio with our map-based system." />
       </Head>
-      <LoadScript
-        googleMapsApiKey={GOOGLE_MAPS_API_KEY}
-        libraries={GOOGLE_MAP_LIBRARIES}
-      >
+      {/* Google Maps loader */}
+      {!isLoaded ? (
+        <div className="absolute inset-0 flex items-center justify-center text-gray-600">Loading map…</div>
+      ) : loadError ? (
+        <div className="absolute inset-0 flex items-center justify-center text-red-600">Failed to load map.</div>
+      ) : (
         <GoogleMap
           mapContainerStyle={containerStyle}
           center={mapCenter}
@@ -1826,7 +1928,10 @@ export default function MapPage() {
               title={selectedProperty.address || 'New Property'}
             />
           )}
+
+          {/* Mobile live location indicator removed */}
         </GoogleMap>
+      )}
         <MapSearch
           onPlaceSelect={selectPredictionByPrediction}
           inputValue={inputValue}
@@ -1841,36 +1946,61 @@ export default function MapPage() {
           showDropdown={showDropdown}
           onCurrentLocationClick={handleCurrentLocationClick}
           currentLocationLoading={currentLocationLoading}
-          showPropertyInfoCard={false}
+          showPropertyInfoCard={Boolean(selectedProperty && address)}
           onListViewClick={handleListViewClick}
         />
 
-        {/* Show PropertyInfoCard only for newly dropped pins */}
-        {selectedProperty && !selectedProperty.id && address && (
+        {/* Mobile bottom nav */}
+        <MobileBottomNav
+          onList={() => router.push('/list')}
+          onLocate={handleCurrentLocationClick}
+          onMap={() => {
+            // Cycle map type: roadmap -> hybrid -> satellite -> roadmap
+            if (mapType === 'roadmap') setMapType('hybrid');
+            else if (mapType === 'hybrid') setMapType('satellite');
+            else setMapType('roadmap');
+          }}
+          locateLabel={currentLocationLoading ? 'Locating' : (zoom > CURRENT_LOCATION_ZOOM ? 'Wider' : 'Current')}
+        />
+
+        {/* Show PropertyInfoCard for both newly dropped and existing pins */}
+        {selectedProperty && address && (
           <PropertyInfoCard
             address={address}
             addressLoading={addressLoading}
             onMouseEnter={() => {}}
             onMouseLeave={() => {}}
             onSelect={async () => {
-              // Create property object for new pin
-              setSavedProperty({
-                address,
-                lat: selectedProperty.lat,
-                lng: selectedProperty.lng,
-                label: null,
-                notes: null,
-                id: null, // Not saved yet
-              });
-              
-              // Clear file/folder state for new property
-              setFolders([]);
-              setPropertyFiles([]);
-              setFoldersLoading(false);
-              setFilesLoading(false);
-              
-              // Open modal for new property
-              setShowDetailsModal(true);
+              if (!selectedProperty.id) {
+                // New, unsaved property: initialize and open modal
+                setSavedProperty({
+                  address,
+                  lat: selectedProperty.lat,
+                  lng: selectedProperty.lng,
+                  label: null,
+                  notes: null,
+                  id: null,
+                });
+                setFolders([]);
+                setPropertyFiles([]);
+                setFoldersLoading(false);
+                setFilesLoading(false);
+                setShowDetailsModal(true);
+              } else {
+                // Existing property: ensure data is ready (cache or background-fetched), then open modal
+                const cached = await getCachedPropertyData(selectedProperty.address);
+                if (cached) {
+                  setFolders(cached.folders);
+                  setPropertyFiles(cached.files);
+                  setFoldersLoading(false);
+                  setFilesLoading(false);
+                }
+                setSavedProperty(selectedProperty);
+                setShowDetailsModal(true);
+              }
+              // Hide the selection card once modal is opened
+              setSelectedProperty(null);
+              setAddress('');
             }}
           />
         )}
@@ -1890,10 +2020,7 @@ export default function MapPage() {
           }}
           onFileDelete={handleDeleteFile}
           onFileRename={handleRename}
-          onFolderCreate={async (name: string) => {
-            // Folder creation now handled entirely by PropertyDetailsModal
-            console.log('Folder creation request for:', name);
-          }}
+          onFolderCreate={handleCreateFolderByName}
           onFolderDelete={handleDeleteFolder}
           pendingUploads={pendingUploads}
           getCachedPropertyData={getCachedPropertyData}
@@ -1922,7 +2049,7 @@ export default function MapPage() {
           }}
         />
 
-      </LoadScript>
+      
       {/* MoveModal for files */}
       {showMoveModal && moveFileTarget && (
         <MoveModal

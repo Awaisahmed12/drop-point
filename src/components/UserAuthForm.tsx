@@ -15,6 +15,7 @@ export default function UserAuthForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +42,8 @@ export default function UserAuthForm() {
         if (error) throw error;
         setMessage('Check your email for a confirmation link.');
       } else {
+        // Persist session like "Remember me" by default (Supabase persists session in storage).
+        // Optionally, if rememberMe is false, clear on unload or shorten persistence later.
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         setMessage('Logged in! Redirecting...');
@@ -134,6 +137,14 @@ export default function UserAuthForm() {
         >
           {loading ? (isSignUp ? 'Signing Up...' : 'Logging In...') : (isSignUp ? 'Sign Up' : 'Log In')}
         </button>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+          />
+          Remember me
+        </label>
       </form>
       
       {/* Error and message display */}
