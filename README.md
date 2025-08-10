@@ -362,7 +362,7 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 - **Seamless integration**: Works with existing address detection and property prefetching
 - **Permission handling**: Clear error messages for location access issues
 - **Precise positioning**: Button calculates exact clearance (220px) above property info card to prevent overlap
-- **Responsive design**: Separate positioning for mobile (bottom-right) and desktop (left sidebar) layouts
+- **Responsive design**: Desktop button near search; on mobile it's a floating button above the bottom nav (not inside the nav)
 
 ### **Google Maps-Style Map Controls**
 - **Three-way toggle**: Circular button cycles through Hybrid (default) → Satellite → Roadmap
@@ -700,7 +700,9 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 **Impact**: Context menus now provide a flawless, professional experience with intelligent positioning and intuitive click behavior - no more cut-off menus or accidental clicks!
 
 ### **Mobile Map Improvements**
-- Clean satellite/map toggle (hidden during search)
+- Clean satellite/map toggle as a floating side button (hidden during search)
+- Current location is a floating button; removed from bottom nav for clearer IA
+- Bottom nav reduced to Map, List, Account (no current location)
 - POI-free experience (no distracting business markers)
 - Enhanced mobile viewport handling
 - Improved touch targets and interactions

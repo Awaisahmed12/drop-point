@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import Head from 'next/head';
+import Link from 'next/link';
 import { supabase } from '../utils/supabaseClient';
 import { getUserUsageBytes, formatBytes } from '../utils/usage';
 import { FREE_TIER_MAX_BYTES, FREE_TIER_GB } from '../../constants';
@@ -46,12 +47,7 @@ export default function AccountPage() {
                   <div className="text-lg font-semibold text-gray-900">{email}</div>
                 </div>
                 <div className="hidden sm:block">
-                  <button
-                    onClick={() => { window.location.href = '/map'; }}
-                    className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold"
-                  >
-                    Back to app
-                  </button>
+                  <Link href="/map" className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold">Back to app</Link>
                 </div>
               </div>
             </div>
@@ -79,7 +75,7 @@ export default function AccountPage() {
         )}
       </div>
       {/* Mobile bottom nav fixed */}
-      <MobileBottomNav locateLabel="Current" />
+      <MobileBottomNav />
     </div>
   );
 }

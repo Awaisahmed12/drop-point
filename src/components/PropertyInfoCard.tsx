@@ -4,6 +4,7 @@ interface PropertyInfoCardProps {
   onSelect: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  onClose?: () => void;
 }
 
 export const PropertyInfoCard = ({ 
@@ -11,16 +12,29 @@ export const PropertyInfoCard = ({
   addressLoading, 
   onSelect, 
   onMouseEnter, 
-  onMouseLeave 
+  onMouseLeave,
+  onClose
 }: PropertyInfoCardProps) => {
   return (
-    <div className="absolute left-1/2 transform -translate-x-1/2 z-30 w-full max-w-md px-4"
+    <div className="absolute left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md px-4"
          style={{ bottom: '88px' }}>
       <div 
-        className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-4 border border-blue-100 animate-fade-in relative"
+        className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 pt-5 flex flex-col items-center gap-4 border border-blue-100 animate-fade-in relative"
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
+        {onClose && (
+          <button
+            aria-label="Close"
+            className="absolute -top-1 right-1 p-1.5 cursor-pointer flex-shrink-0 hover:opacity-80 active:opacity-60"
+            onClick={onClose}
+            title="Close"
+          >
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
         <div className="text-gray-900 text-lg font-semibold text-center">
           {addressLoading ? (
             <div className="flex items-center gap-2">

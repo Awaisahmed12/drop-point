@@ -26,8 +26,9 @@ import {
   SEARCH_ZOOM, 
   CURRENT_LOCATION_ZOOM,
   CURRENT_LOCATION_ZOOM_DEEP,
-  MAP_TYPE_KEY, 
-  DEFAULT_MAP_TYPE 
+    MAP_TYPE_KEY, 
+    DEFAULT_MAP_TYPE,
+    COORDINATE_THRESHOLD 
 } from '../../constants';
 
 // Constants moved to constants/index.ts
@@ -82,6 +83,12 @@ export default function MapPage() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [mapType, setMapType] = useState<string>(DEFAULT_MAP_TYPE);
+  // Smooth initial render flags
+  const [propertiesLoaded, setPropertiesLoaded] = useState(false);
+  // kept for readability in flow but not used directly anymore
+  // const [initialLocateDone, setInitialLocateDone] = useState(false);
+  const [mapFirstIdle, setMapFirstIdle] = useState(false);
+  const [initialCenterResolved, setInitialCenterResolved] = useState(false);
   
   // Pin system state
   const [userProperties, setUserProperties] = useState<Property[]>([]);
@@ -123,6 +130,10 @@ export default function MapPage() {
 
   // Track staged zoom behavior for current location (first -> deep)
   const currentLocationZoomStageRef = useRef<'none' | 'first' | 'deep'>('none');
+  // Count of pending programmatic zoom changes to ignore in onZoomChanged
+  const programmaticZoomChangesRef = useRef(0);
+  // Track stage internally only for logic decisions; store in ref to avoid unused state
+  const currentLocationStageRef = useRef<'none' | 'first' | 'deep'>('none');
 
   // (Removed) Live user location dot tracking
 
@@ -236,6 +247,8 @@ export default function MapPage() {
       }
     } catch (error) {
       console.error('📍 [PINS] Error loading user properties:', error);
+    } finally {
+      setPropertiesLoaded(true);
     }
   }, []);
 
@@ -335,93 +348,75 @@ export default function MapPage() {
     }
   }, []);
 
-  // Try to get user's geolocation on mount (optionally focus current location based on nav intent)
+  // NOTE: in-app focus current location listener is attached after handler declaration (below)
+
+  // Resolve initial center BEFORE the map displays to avoid flashes from US center -> current location
   useEffect(() => {
-    console.log('🌍 [GEOLOCATION] Checking geolocation support...');
-    console.log('🌍 [GEOLOCATION] Navigator available:', typeof navigator !== 'undefined');
-    console.log('🌍 [GEOLOCATION] Geolocation available:', typeof navigator !== 'undefined' && 'geolocation' in navigator);
-    console.log('🌍 [GEOLOCATION] Secure context (HTTPS):', window.isSecureContext);
-    console.log('🌍 [GEOLOCATION] Current protocol:', window.location.protocol);
-    console.log('🌍 [GEOLOCATION] Current hostname:', window.location.hostname);
-    
+    let resolved = false;
+    const resolveFallback = async () => {
+      if (resolved) return;
+      resolved = true;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: properties } = await supabase
+            .from('properties')
+            .select('lat,lng')
+            .eq('user_id', user.id)
+            .order('updated_at', { ascending: false })
+            .limit(1);
+          if (properties && properties.length > 0) {
+            setMapCenter({ lat: properties[0].lat, lng: properties[0].lng });
+            setZoom(10);
+            setInitialCenterResolved(true);
+            return;
+          }
+        }
+      } catch {}
+      setMapCenter(US_CENTER);
+      setZoom(5);
+      setInitialCenterResolved(true);
+    };
+
     const focusCurrent = typeof window !== 'undefined' && sessionStorage.getItem('droppoint-focus-current') === '1';
     if (focusCurrent) {
       try { sessionStorage.removeItem('droppoint-focus-current'); } catch {}
+      // Pre-arm: next tap will deep-zoom if we are already at initial zoom.
+      currentLocationZoomStageRef.current = 'first';
+      currentLocationStageRef.current = 'first';
     }
 
-    if ((focusCurrent || zoom === DEFAULT_ZOOM) && typeof window !== 'undefined' && navigator.geolocation) {
-      console.log('🌍 [GEOLOCATION] Attempting to get current position on mount...');
-      
-      // First, check permissions if available
-      if ('permissions' in navigator) {
-        navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-          console.log('🌍 [GEOLOCATION] Permission status:', result.state);
-          console.log('🌍 [GEOLOCATION] Permission details:', result);
-        }).catch((err) => {
-          console.log('🌍 [GEOLOCATION] Could not check permissions:', err);
-        });
+    if (!initialCenterResolved && (focusCurrent || zoom === DEFAULT_ZOOM)) {
+      if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+        const fallbackTimer = window.setTimeout(resolveFallback, 1200);
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            if (resolved) return;
+            resolved = true;
+            window.clearTimeout(fallbackTimer);
+            setMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
+            setZoom(CURRENT_LOCATION_ZOOM);
+            // We are at primary at current location; pre-arm deep (next tap goes deep)
+            currentLocationZoomStageRef.current = 'first';
+            currentLocationStageRef.current = 'first';
+            setInitialCenterResolved(true);
+          },
+          () => {
+            window.clearTimeout(fallbackTimer);
+            resolveFallback();
+          },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+        );
+        return () => {
+          window.clearTimeout(fallbackTimer);
+        };
+      } else {
+        resolveFallback();
       }
-      
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log('🌍 [GEOLOCATION] Success on mount:', position.coords);
-          console.log('🌍 [GEOLOCATION] Accuracy:', position.coords.accuracy);
-          console.log('🌍 [GEOLOCATION] Timestamp:', new Date(position.timestamp));
-          setMapCenter({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-          console.log('🌍 [GEOLOCATION] Map center updated to:', {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.log('🌍 [GEOLOCATION] Error on mount:', error.code, error.message);
-          console.log('🌍 [GEOLOCATION] Error constants:', {
-            PERMISSION_DENIED: GeolocationPositionError.PERMISSION_DENIED,
-            POSITION_UNAVAILABLE: GeolocationPositionError.POSITION_UNAVAILABLE,
-            TIMEOUT: GeolocationPositionError.TIMEOUT
-          });
-          // If denied or unavailable, do nothing (fallback to US_CENTER)
-        },
-        {
-          enableHighAccuracy: false, // Use false for faster initial load
-          timeout: 8000,
-          maximumAge: 300000 // 5 minutes cache for initial load
-        }
-      );
-    } else {
-      console.log('🌍 [GEOLOCATION] Navigator.geolocation not available');
-      console.log('🌍 [GEOLOCATION] Window available:', typeof window !== 'undefined');
-      console.log('🌍 [GEOLOCATION] Navigator available:', typeof navigator !== 'undefined');
+    } else if (!initialCenterResolved) {
+      setInitialCenterResolved(true);
     }
-
-    // Fallback if no geolocation: center on a known user property or US center
-    if (typeof window !== 'undefined' && (!navigator.geolocation || !focusCurrent)) {
-      setTimeout(async () => {
-        if (!mapCenter || (mapCenter.lat === US_CENTER.lat && mapCenter.lng === US_CENTER.lng)) {
-          try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              const { data: properties } = await supabase
-                .from('properties')
-                .select('lat,lng')
-                .eq('user_id', user.id)
-                .limit(1);
-              if (properties && properties.length > 0) {
-                setMapCenter({ lat: properties[0].lat, lng: properties[0].lng });
-                setZoom(10);
-              } else {
-                setMapCenter(US_CENTER);
-                setZoom(5);
-              }
-            }
-          } catch {}
-        }
-      }, 0);
-    }
-  }, [zoom, mapCenter]);
+  }, [zoom, initialCenterResolved]);
 
   // Fetch predictions as user types
   useEffect(() => {
@@ -1540,35 +1535,50 @@ export default function MapPage() {
         
         console.log('🌍 [GEOLOCATION] New center:', newCenter);
         
-        // Determine desired zoom based on current state and stage
-        const currentZoom = map?.getZoom?.() ?? zoom;
+        // Keep it simple: always perform a visible action.
         const initialZoom = CURRENT_LOCATION_ZOOM;
         const deepZoom = CURRENT_LOCATION_ZOOM_DEEP;
+        const currentZoom = map?.getZoom?.() ?? zoom;
+        const centerNowA = map?.getCenter?.();
+        const isCloseToLocation = centerNowA
+          ? (Math.abs(centerNowA.lat() - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(centerNowA.lng() - newCenter.lng) < COORDINATE_THRESHOLD)
+          : (Math.abs(mapCenter.lat - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(mapCenter.lng - newCenter.lng) < COORDINATE_THRESHOLD);
+        const isAtInitialZoom = Math.abs((currentZoom || 0) - initialZoom) < 0.25;
 
         let targetZoom = initialZoom;
-        const stage = currentLocationZoomStageRef.current;
-
-        if (stage === 'none') {
-          // First click: if already zoomed deeper than initial, go straight to deep
-          targetZoom = currentZoom > initialZoom ? deepZoom : initialZoom;
+        if (!isCloseToLocation) {
+          // If we've moved away, first click always snaps back to current location at initial zoom
+          targetZoom = initialZoom;
           currentLocationZoomStageRef.current = 'first';
-        } else if (stage === 'first') {
-          // Second click: go deeper regardless (unless already deeper)
-          targetZoom = Math.max(currentZoom, deepZoom);
+          currentLocationStageRef.current = 'first';
+        } else if (isAtInitialZoom) {
+          // Already at current location and initial zoom → deep zoom
+          targetZoom = deepZoom;
           currentLocationZoomStageRef.current = 'deep';
+          currentLocationStageRef.current = 'deep';
         } else {
-          // Subsequent clicks: toggle between initial and deep based on current depth
-          targetZoom = currentZoom > initialZoom ? initialZoom : deepZoom;
-          currentLocationZoomStageRef.current = currentZoom > initialZoom ? 'first' : 'deep';
+          // At current location but deeper than initial → go back to initial
+          targetZoom = initialZoom;
+          currentLocationZoomStageRef.current = 'first';
+          currentLocationStageRef.current = 'first';
         }
 
-        // Update map center and zoom
+        // Update map center and zoom programmatically (avoid resetting stage)
+        // Mark one programmatic zoom so onZoomChanged doesn't reset stage
+        programmaticZoomChangesRef.current += 1;
+        // If user is already very close to the target center, avoid an extra panTo
+        const centerNowB = map?.getCenter?.();
+        const isClose = centerNowB
+          ? (Math.abs(centerNowB.lat() - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(centerNowB.lng() - newCenter.lng) < COORDINATE_THRESHOLD)
+          : false;
+        const forcePan = true;
         setMapCenter(newCenter);
         setZoom(targetZoom);
-        
         if (map) {
           console.log('🌍 [GEOLOCATION] Updating map position...');
-          map.panTo(newCenter);
+          if (!isClose || forcePan) map.panTo(newCenter);
+          // Track programmatic zoom change
+          programmaticZoomChangesRef.current += 1;
           map.setZoom(targetZoom);
         } else {
           console.log('🌍 [GEOLOCATION] Warning: Map not ready yet');
@@ -1641,6 +1651,7 @@ export default function MapPage() {
         
         // Reset zoom stage on error to allow fresh attempt
         currentLocationZoomStageRef.current = 'none';
+        currentLocationStageRef.current = 'none';
 
         let errorMessage = 'Unable to retrieve your location.';
         let debugInfo = '';
@@ -1672,7 +1683,16 @@ export default function MapPage() {
         maximumAge: 60000 // Cache location for 1 minute
       }
     );
-  }, [map, isPropertyDataCached, cachePropertyData, zoom]);
+  }, [map, isPropertyDataCached, cachePropertyData, zoom, mapCenter.lat, mapCenter.lng]);
+
+  // Support in-app focus current location requests (from bottom nav Map when already on map)
+  useEffect(() => {
+    const handler = () => {
+      handleCurrentLocationClick();
+    };
+    window.addEventListener('droppoint-focus-current-request', handler);
+    return () => window.removeEventListener('droppoint-focus-current-request', handler);
+  }, [handleCurrentLocationClick]);
 
   // Handle map click to drop new pin
   const handleMapClick = useCallback(async (event: google.maps.MapMouseEvent) => {
@@ -1883,7 +1903,7 @@ export default function MapPage() {
         <meta property="twitter:description" content="Interactive map interface for managing real estate properties and documents. Select properties, upload files, and organize your real estate portfolio with our map-based system." />
       </Head>
       {/* Google Maps loader */}
-      {!isLoaded ? (
+      {!isLoaded || !initialCenterResolved ? (
         <div className="absolute inset-0 flex items-center justify-center text-gray-600">Loading map…</div>
       ) : loadError ? (
         <div className="absolute inset-0 flex items-center justify-center text-red-600">Failed to load map.</div>
@@ -1897,6 +1917,10 @@ export default function MapPage() {
             console.log('🗺️ [MAP] Initial center:', mapCenter);
             console.log('🗺️ [MAP] Initial zoom:', zoom);
             setMap(mapInstance);
+            // Mark first idle when map stabilizes
+            mapInstance.addListener('idle', () => {
+              setMapFirstIdle(true);
+            });
           }}
           onClick={handleMapClick}
           onDblClick={() => {
@@ -1904,8 +1928,28 @@ export default function MapPage() {
             // Google Maps will handle the zoom automatically
             // Just update our click tracking to prevent pin drops
             lastClickTimeRef.current = Date.now();
+            currentLocationZoomStageRef.current = 'none';
+            currentLocationStageRef.current = 'none';
           }}
-          onZoomChanged={handleZoomChange}
+          onZoomChanged={() => {
+            handleZoomChange();
+            // Ignore zoom changes until we've resolved initial center
+            if (!initialCenterResolved) return;
+            if (programmaticZoomChangesRef.current > 0) {
+              programmaticZoomChangesRef.current -= 1;
+              return;
+            }
+            currentLocationZoomStageRef.current = 'none';
+            currentLocationStageRef.current = 'none';
+          }}
+          onDragStart={() => {
+            currentLocationZoomStageRef.current = 'none';
+            currentLocationStageRef.current = 'none';
+          }}
+          onDragEnd={() => {
+            currentLocationZoomStageRef.current = 'none';
+            currentLocationStageRef.current = 'none';
+          }}
           mapTypeId={mapType as google.maps.MapTypeId}
           options={{
             tilt: 0,
@@ -1932,8 +1976,8 @@ export default function MapPage() {
             ]
           }}
         >
-          {/* Property pins */}
-          {userProperties.map((property) => (
+          {/* Property pins - render only after propertiesLoaded to reduce re-renders */}
+          {propertiesLoaded && userProperties.map((property) => (
             <Marker
               key={property.id || `temp-${property.lat}-${property.lng}`}
               position={{ lat: property.lat, lng: property.lng }}
@@ -1957,35 +2001,32 @@ export default function MapPage() {
           {/* Mobile live location indicator removed */}
         </GoogleMap>
       )}
-        <MapSearch
+        {/* Defer overlays until map is first idle to avoid layout flashes */}
+        {(mapFirstIdle || !isLoaded) && (
+          <MapSearch
           onPlaceSelect={selectPredictionByPrediction}
           inputValue={inputValue}
           onInputChange={setInputValue}
           predictions={predictions}
           onPredictionsChange={setPredictions}
           onShowDropdownChange={setShowDropdown}
-        />
-        <MapControls 
-          mapType={mapType}
-          onMapTypeChange={setMapType}
-          showDropdown={showDropdown}
-          onCurrentLocationClick={handleCurrentLocationClick}
-          currentLocationLoading={currentLocationLoading}
-          showPropertyInfoCard={Boolean(selectedProperty && address)}
-          onListViewClick={handleListViewClick}
-        />
+          />
+        )}
+        {(mapFirstIdle || !isLoaded) && (
+          <MapControls 
+            mapType={mapType}
+            onMapTypeChange={setMapType}
+            showDropdown={showDropdown}
+            onCurrentLocationClick={handleCurrentLocationClick}
+            currentLocationLoading={currentLocationLoading}
+            showPropertyInfoCard={Boolean(selectedProperty && address)}
+            onListViewClick={handleListViewClick}
+          />
+        )}
 
         {/* Mobile bottom nav */}
         <MobileBottomNav
           onList={() => router.push('/list')}
-          onLocate={handleCurrentLocationClick}
-          onMap={() => {
-            // Cycle map type: roadmap -> hybrid -> satellite -> roadmap
-            if (mapType === 'roadmap') setMapType('hybrid');
-            else if (mapType === 'hybrid') setMapType('satellite');
-            else setMapType('roadmap');
-          }}
-          locateLabel={currentLocationLoading ? 'Locating' : (zoom > CURRENT_LOCATION_ZOOM ? 'Wider' : 'Current')}
         />
 
         {/* Show PropertyInfoCard for both newly dropped and existing pins */}
@@ -1995,6 +2036,10 @@ export default function MapPage() {
             addressLoading={addressLoading}
             onMouseEnter={() => {}}
             onMouseLeave={() => {}}
+            onClose={() => {
+              setSelectedProperty(null);
+              setAddress('');
+            }}
             onSelect={async () => {
               if (!selectedProperty.id) {
                 // New, unsaved property: initialize and open modal
