@@ -335,7 +335,7 @@ export default function MapPage() {
     }
   }, []);
 
-  // Try to get user's geolocation on mount (skip if returning from bottom nav quick switch)
+  // Try to get user's geolocation on mount (optionally focus current location based on nav intent)
   useEffect(() => {
     console.log('🌍 [GEOLOCATION] Checking geolocation support...');
     console.log('🌍 [GEOLOCATION] Navigator available:', typeof navigator !== 'undefined');
@@ -344,12 +344,12 @@ export default function MapPage() {
     console.log('🌍 [GEOLOCATION] Current protocol:', window.location.protocol);
     console.log('🌍 [GEOLOCATION] Current hostname:', window.location.hostname);
     
-    const shouldSkipGeo = typeof window !== 'undefined' && sessionStorage.getItem('droppoint-skip-geo') === '1';
-    if (shouldSkipGeo) {
-      try { sessionStorage.removeItem('droppoint-skip-geo'); } catch {}
+    const focusCurrent = typeof window !== 'undefined' && sessionStorage.getItem('droppoint-focus-current') === '1';
+    if (focusCurrent) {
+      try { sessionStorage.removeItem('droppoint-focus-current'); } catch {}
     }
 
-    if (!shouldSkipGeo && typeof window !== 'undefined' && navigator.geolocation) {
+    if ((focusCurrent || zoom === DEFAULT_ZOOM) && typeof window !== 'undefined' && navigator.geolocation) {
       console.log('🌍 [GEOLOCATION] Attempting to get current position on mount...');
       
       // First, check permissions if available
@@ -396,7 +396,32 @@ export default function MapPage() {
       console.log('🌍 [GEOLOCATION] Window available:', typeof window !== 'undefined');
       console.log('🌍 [GEOLOCATION] Navigator available:', typeof navigator !== 'undefined');
     }
-  }, []);
+
+    // Fallback if no geolocation: center on a known user property or US center
+    if (typeof window !== 'undefined' && (!navigator.geolocation || !focusCurrent)) {
+      setTimeout(async () => {
+        if (!mapCenter || (mapCenter.lat === US_CENTER.lat && mapCenter.lng === US_CENTER.lng)) {
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              const { data: properties } = await supabase
+                .from('properties')
+                .select('lat,lng')
+                .eq('user_id', user.id)
+                .limit(1);
+              if (properties && properties.length > 0) {
+                setMapCenter({ lat: properties[0].lat, lng: properties[0].lng });
+                setZoom(10);
+              } else {
+                setMapCenter(US_CENTER);
+                setZoom(5);
+              }
+            }
+          } catch {}
+        }
+      }, 0);
+    }
+  }, [zoom, mapCenter]);
 
   // Fetch predictions as user types
   useEffect(() => {

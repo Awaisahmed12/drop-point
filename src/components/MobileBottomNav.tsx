@@ -39,7 +39,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList, onLoca
           className="py-3 flex flex-col items-center justify-center text-gray-700 hover:bg-gray-50"
           onClick={() => {
             if (onMap) { onMap(); return; }
-            try { sessionStorage.setItem('droppoint-skip-geo', '1'); } catch {}
+            // Indicate that map should focus on current location upon arrival
+            try { sessionStorage.setItem('droppoint-focus-current', '1'); } catch {}
             router.push('/map');
           }}
           aria-label="Map"

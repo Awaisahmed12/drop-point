@@ -15,7 +15,7 @@ export const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
 export const GOOGLE_MAP_LIBRARIES = ["places"] as Libraries;
 
 export const DEFAULT_ZOOM = 12;
-export const SEARCH_ZOOM = 19;
+export const SEARCH_ZOOM = 17; // slightly wider on mobile for context
 // Friendlier zoom level when jumping to current location (neighborhood view)
 export const CURRENT_LOCATION_ZOOM = 15;
 // Closer follow-up zoom for current location (street-level but not max)
