@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { useUserProperties, type PropertyWithFileCount } from '../hooks/useUserProperties';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 
@@ -7,12 +10,14 @@ interface ListViewProps {
   isOpen: boolean;
   onPropertySelect: (property: PropertyWithFileCount) => void;
   onClose: () => void;
+  variant?: 'modal' | 'page';
 }
 
 export const ListView = ({ 
   isOpen,
   onPropertySelect, 
-  onClose
+  onClose,
+  variant = 'modal'
 }: ListViewProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +55,10 @@ export const ListView = ({
 
   // Auto-focus search when modal opens (desktop only)
   useEffect(() => {
-    if (isOpen && !isMobile && searchInputRef.current) {
+    if (!isOpen) return;
+    // avoid focusing on touch devices to prevent mobile keyboard popups
+    const isTouch = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window);
+    if (!isTouch && !isMobile && searchInputRef.current) {
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 100);
@@ -66,28 +74,8 @@ export const ListView = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div
-      className={`fixed inset-0 z-40 flex ${mobileClasses.modal} justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in`}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-      aria-modal="true"
-      role="dialog"
-    >
-      <div 
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl flex flex-col border border-blue-100 relative overflow-hidden"
-        style={{ 
-          borderRadius: '1.5rem', 
-          ...getModalDimensions(),
-          maxWidth: isMobile ? 'calc(100vw - 24px)' : undefined,
-          margin: isMobile ? '12px' : undefined,
-          // Shorten height to clear bottom nav
-          maxHeight: isMobile ? 'calc(100dvh - 96px)' : undefined,
-        }}
-      >
+  const content = (
+    <>
         {/* Header - matches PropertyDetailsModal style */}
         <div className="modal-header-refined flex items-center justify-between px-5 py-4 rounded-t-3xl flex-shrink-0">
           <div className="flex flex-col min-w-0 flex-1 mr-4">
@@ -105,14 +93,22 @@ export const ListView = ({
             </p>
           </div>
           
-          {/* Close button - matches PropertyDetailsModal */}
-          <button
-            className={`close-button ${isMobile ? 'p-2.5' : 'p-2.5'} rounded-full cursor-pointer flex-shrink-0 hover:bg-gray-100 transition-colors`}
-            onClick={onClose}
-            title="Close"
-          >
-            <XMarkIcon className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} />
-          </button>
+          {/* Page variant has no close button; show a subtle back link on mobile */}
+          {variant === 'modal' ? (
+            <button
+              className={`close-button ${isMobile ? 'p-2.5' : 'p-2.5'} rounded-full cursor-pointer flex-shrink-0 hover:bg-gray-100 transition-colors`}
+              onClick={onClose}
+              title="Close"
+            >
+              <XMarkIcon className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} />
+            </button>
+          ) : (
+            <div className="flex-shrink-0">
+              <Link href="/map" className="hidden sm:inline-flex px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50">
+                Back to Map
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Search Bar - integrated into modal */}
@@ -146,7 +142,7 @@ export const ListView = ({
         {/* Properties List - matches PropertyDetailsModal scrollable area */}
         <div className="flex-1 overflow-y-auto file-list overflow-x-visible mobile-scroll" style={{ 
           minHeight: '200px',
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+          paddingBottom: variant === 'modal' ? 'env(safe-area-inset-bottom, 0px)' : '0'
         }}>
           {loading ? (
             // Loading State - matches PropertyDetailsModal style
@@ -181,12 +177,16 @@ export const ListView = ({
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No properties yet</h3>
                 <p className="text-gray-500 mb-6">Start by selecting a property on the map and uploading some files.</p>
-                <button
-                  onClick={onClose}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-                >
-                  Back to Map
-                </button>
+                {variant === 'page' ? (
+                  <Link href="/map" className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors">Back to Map</Link>
+                ) : (
+                  <button
+                    onClick={onClose}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    Back to Map
+                  </button>
+                )}
               </div>
             </div>
           ) : sortedProperties.length === 0 ? (
@@ -211,18 +211,29 @@ export const ListView = ({
                     key={property.id}
                     onClick={() => {
                       onPropertySelect(property);
-                      onClose();
+                      if (variant === 'modal') onClose();
                     }}
                     className={`flex items-center justify-between ${isMobile ? 'px-4 py-4' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-2 cursor-pointer group`}
                     style={{ minHeight: isMobile ? '72px' : '56px' }}
                   >
                     <div className="flex items-center min-w-0 flex-1">
-                      {/* Property Icon - like folder icon in PropertyDetailsModal */}
-                      <div className={`${isMobile ? 'w-10 h-10' : 'w-8 h-8'} rounded-lg bg-blue-100 flex items-center justify-center mr-4 flex-shrink-0`}>
-                        <svg className={`${isMobile ? 'w-6 h-6' : 'w-5 h-5'} text-blue-600`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2V7z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 21v-4a2 2 0 012-2h4a2 2 0 012 2v4" />
-                        </svg>
+                      {/* Street View thumbnail */}
+                      <div className={`${isMobile ? 'w-16 h-16' : 'w-14 h-14'} rounded-lg overflow-hidden bg-gray-200 mr-4 flex-shrink-0 border border-gray-100`}>
+                        <Image
+                          src={`https://maps.googleapis.com/maps/api/streetview?size=${isMobile ? '160x160' : '140x140'}&location=${property.lat},${property.lng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`}
+                          alt="Street View preview"
+                          width={isMobile ? 160 : 140}
+                          height={isMobile ? 160 : 140}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                          onError={(e) => {
+                            const t = e.currentTarget as HTMLImageElement;
+                            if (t.dataset.fallback !== '1') {
+                              t.dataset.fallback = '1';
+                              t.src = `https://maps.googleapis.com/maps/api/staticmap?center=${property.lat},${property.lng}&zoom=17&size=${isMobile ? '160x160' : '140x140'}&maptype=roadmap&markers=color:blue%7C${property.lat},${property.lng}&key=${GOOGLE_MAPS_API_KEY}`;
+                            }
+                          }}
+                        />
                       </div>
                       
                       <div className="flex-1 min-w-0">
@@ -283,6 +294,37 @@ export const ListView = ({
             </div>
           )}
         </div>
+    </>
+  );
+
+  return variant === 'modal' ? (
+    <div
+      className={`fixed inset-0 z-40 flex ${mobileClasses.modal} justify-center bg-black/40 backdrop-blur-sm transition-all animate-fade-in`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      aria-modal="true"
+      role="dialog"
+    >
+      <div 
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl flex flex-col border border-blue-100 relative overflow-hidden"
+        style={{ 
+          borderRadius: '1.5rem', 
+          ...getModalDimensions(),
+          maxWidth: isMobile ? 'calc(100vw - 24px)' : undefined,
+          margin: isMobile ? '12px' : undefined,
+          maxHeight: isMobile ? 'calc(100dvh - 96px)' : undefined,
+        }}
+      >
+        {content}
+      </div>
+    </div>
+  ) : (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="bg-white rounded-3xl shadow-sm w-full flex flex-col border border-blue-100 overflow-hidden">
+        {content}
       </div>
     </div>
   );

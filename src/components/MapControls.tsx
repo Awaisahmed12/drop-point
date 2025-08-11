@@ -8,7 +8,6 @@ interface MapControlsProps {
   onCurrentLocationClick?: () => void;
   currentLocationLoading?: boolean;
   showPropertyInfoCard?: boolean;
-  onListViewClick?: () => void;
 }
 
 export const MapControls = ({ 
@@ -17,8 +16,6 @@ export const MapControls = ({
   showDropdown = false,
   onCurrentLocationClick,
   currentLocationLoading = false,
-  showPropertyInfoCard = false,
-  onListViewClick
 }: MapControlsProps) => {
   // Desktop map type controls (left side) - now with 3 options
   const desktopMapControls = (
@@ -73,34 +70,30 @@ export const MapControls = ({
         Account
       </Link>
       {/* List View Button */}
-      {onListViewClick && (
-        <button
-          className="px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm"
-          onClick={onListViewClick}
-          style={{ 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-          }}
+      <Link
+        className="px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm"
+        href="/list"
+        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+      >
+        <svg 
+          width="16" 
+          height="16" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
         >
-          <svg 
-            width="16" 
-            height="16" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <line x1="8" y1="6" x2="21" y2="6"></line>
-            <line x1="8" y1="12" x2="21" y2="12"></line>
-            <line x1="8" y1="18" x2="21" y2="18"></line>
-            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-            <line x1="3" y1="18" x2="3.01" y2="18"></line>
-          </svg>
-          List
-        </button>
-      )}
+          <line x1="8" y1="6" x2="21" y2="6"></line>
+          <line x1="8" y1="12" x2="21" y2="12"></line>
+          <line x1="8" y1="18" x2="21" y2="18"></line>
+          <line x1="3" y1="6" x2="3.01" y2="6"></line>
+          <line x1="3" y1="12" x2="3.01" y2="12"></line>
+          <line x1="3" y1="18" x2="3.01" y2="18"></line>
+        </svg>
+        List
+      </Link>
       
       {/* Current Location Button */}
       <button
@@ -155,7 +148,7 @@ export const MapControls = ({
 
   // Keep only the map-type toggle as a floating side button on mobile
   const mobileControls = shouldShowMobileControls && (
-    <div className="absolute right-4 top-20 z-30 sm:hidden flex flex-col gap-2">
+    <div className="absolute right-4 top-24 z-30 sm:hidden flex flex-col gap-2">
       <button
         className="w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl cursor-pointer"
         onClick={() => {
@@ -202,7 +195,7 @@ export const MapControls = ({
           style={{
             // Ensure the button sits clearly ABOVE the PropertyInfoCard header/X
             // Slightly lower for optimal reach
-            bottom: showPropertyInfoCard ? '280px' : '110px'
+            bottom: '280px'
           }}>
       <button
         className={`relative w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl active:scale-[0.98] cursor-pointer ${

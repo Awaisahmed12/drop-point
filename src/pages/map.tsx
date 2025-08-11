@@ -6,7 +6,6 @@ import { useMobileViewport } from '../hooks/useMobileViewport';
 import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
 import { supabase } from '../utils/supabaseClient';
 import { useRouter } from 'next/router';
-import { ListView } from '../components/ListView';
 import { MoveModal } from '../components/MoveModal';
 import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
 import { getAddressFromCache, saveAddressToCache } from '../../utils/propertyCache';
@@ -438,25 +437,7 @@ export default function MapPage() {
 
 
 
-  // Handle zoom changes
-  const handleZoomChange = useCallback(() => {
-    if (map) {
-      const currentZoom = map.getZoom();
-      if (currentZoom !== undefined) {
-        setZoom(currentZoom);
-        
-        // Clear any selected new pin if zoomed out too far
-        // if (currentZoom < PROPERTY_SELECTION_MIN_ZOOM) {
-        //   if (selectedProperty && !selectedProperty.id) {
-        //     setSelectedProperty(null);
-        //     setAddress('');
-        //     setAddressLoading(false);
-        //     setSnappedLatLng(null);
-        //   }
-        // }
-      }
-    }
-  }, [map]);
+  // (Removed) Per-tick zoom sync to avoid jank; zoom is now synced on 'idle'
 
   // Simplified user interaction handler (mainly for cleanup on zoom changes)
   // const handleUserInteraction = useCallback(async () => {
@@ -1496,23 +1477,8 @@ export default function MapPage() {
   // Add state for current location loading
   const [currentLocationLoading, setCurrentLocationLoading] = useState(false);
 
-  // Add state for ListView modal
-  const [showListView, setShowListView] = useState(false);
+  // Track if property details were opened from the List page
   const [cameFromListView, setCameFromListView] = useState(false);
-
-  // List view navigation handler
-  const handleListViewClick = useCallback(() => {
-    setShowListView(true);
-  }, []);
-
-  // Enhanced close handler that returns to list view if needed
-  const handleDetailsModalClose = useCallback(() => {
-    setShowDetailsModal(false);
-    if (cameFromListView) {
-      setCameFromListView(false);
-      setShowListView(true);
-    }
-  }, [cameFromListView]);
 
   // Current location handler
   const handleCurrentLocationClick = useCallback(() => {
@@ -1693,6 +1659,15 @@ export default function MapPage() {
     window.addEventListener('droppoint-focus-current-request', handler);
     return () => window.removeEventListener('droppoint-focus-current-request', handler);
   }, [handleCurrentLocationClick]);
+
+  // Support toggling map type when user taps Map tab while already on the Map page
+  useEffect(() => {
+    const toggleHandler = () => {
+      setMapType((prev) => (prev === 'roadmap' ? 'hybrid' : prev === 'hybrid' ? 'satellite' : 'roadmap'));
+    };
+    window.addEventListener('droppoint-toggle-map-type', toggleHandler);
+    return () => window.removeEventListener('droppoint-toggle-map-type', toggleHandler);
+  }, []);
 
   // Handle map click to drop new pin
   const handleMapClick = useCallback(async (event: google.maps.MapMouseEvent) => {
@@ -1882,6 +1857,23 @@ export default function MapPage() {
     // Do not open modal immediately; wait for user to confirm via selection card
   }, [getCachedPropertyData, cachePropertyData]);
 
+  // Close details modal; navigate back to list if initiated from there
+  const handleDetailsModalClose = useCallback(() => {
+    setShowDetailsModal(false);
+    try {
+      const cameFrom = typeof window !== 'undefined' ? sessionStorage.getItem('droppoint-came-from-list') : null;
+      if (cameFrom === '1') {
+        sessionStorage.removeItem('droppoint-came-from-list');
+        router.push('/list');
+        return;
+      }
+    } catch {}
+    if (cameFromListView) {
+      setCameFromListView(false);
+      router.push('/list');
+    }
+  }, [cameFromListView, router]);
+
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center bg-gray-50 ${mobileClasses.fullScreen}`}
@@ -1911,15 +1903,23 @@ export default function MapPage() {
         <GoogleMap
           mapContainerStyle={containerStyle}
           center={mapCenter}
-          zoom={zoom}
           onLoad={(mapInstance) => {
             console.log('🗺️ [MAP] Map loaded successfully');
             console.log('🗺️ [MAP] Initial center:', mapCenter);
             console.log('🗺️ [MAP] Initial zoom:', zoom);
             setMap(mapInstance);
+            // Set initial zoom once; let gestures control subsequent zoom levels
+            if (typeof zoom === 'number') {
+              mapInstance.setZoom(zoom);
+            }
             // Mark first idle when map stabilizes
             mapInstance.addListener('idle', () => {
               setMapFirstIdle(true);
+              // Sync zoom only after interactions settle to avoid jank on mobile
+              const z = mapInstance.getZoom();
+              if (z !== undefined && z !== null) {
+                setZoom(z);
+              }
             });
           }}
           onClick={handleMapClick}
@@ -1932,7 +1932,7 @@ export default function MapPage() {
             currentLocationStageRef.current = 'none';
           }}
           onZoomChanged={() => {
-            handleZoomChange();
+            // Avoid per-tick zoom state updates during pinch to keep interactions smooth
             // Ignore zoom changes until we've resolved initial center
             if (!initialCenterResolved) return;
             if (programmaticZoomChangesRef.current > 0) {
@@ -2020,14 +2020,11 @@ export default function MapPage() {
             onCurrentLocationClick={handleCurrentLocationClick}
             currentLocationLoading={currentLocationLoading}
             showPropertyInfoCard={Boolean(selectedProperty && address)}
-            onListViewClick={handleListViewClick}
           />
         )}
 
         {/* Mobile bottom nav */}
-        <MobileBottomNav
-          onList={() => router.push('/list')}
-        />
+        <MobileBottomNav onList={() => router.push('/list')} />
 
         {/* Show PropertyInfoCard for both newly dropped and existing pins */}
         {selectedProperty && address && (
@@ -2171,90 +2168,8 @@ export default function MapPage() {
           }}
         />
       )}
-      {/* ListView Modal */}
-      <ListView
-        isOpen={showListView}
-        onClose={() => setShowListView(false)}
-        onPropertySelect={async (property) => {
-          // Close the modal first
-          setShowListView(false);
-          
-          // Set the property data for immediate use (like PropertySwitcher)
-          setSavedProperty(property);
-          setAddress(property.address);
-          setSnappedLatLng({ lat: property.lat, lng: property.lng });
-          
-          // Background map updates (silent, no UI disruption)
-          setMapCenter({ lat: property.lat, lng: property.lng });
-          setZoom(SEARCH_ZOOM);
-          if (map) {
-            map.panTo({ lat: property.lat, lng: property.lng });
-            map.setZoom(SEARCH_ZOOM);
-          }
-          
-          // Load property data and open modal immediately (like PropertySwitcher)
-          try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              setFoldersLoading(true);
-              setFilesLoading(true);
-              
-              // Open modal immediately with loading state
-              setCameFromListView(true);
-              setShowDetailsModal(true);
-              
-              // Check cache first
-              const cached = await getCachedPropertyData(property.address);
-              if (cached) {
-                setFolders(cached.folders);
-                setPropertyFiles(cached.files);
-                setFoldersLoading(false);
-                setFilesLoading(false);
-              } else {
-                // Fetch fresh data in background
-                const [folderResult, filesResult] = await Promise.all([
-                  supabase
-                    .from('property_folders')
-                    .select('*')
-                    .eq('property_id', property.id)
-                    .eq('user_id', user.id)
-                    .is('deleted_at', null)
-                    .order('created_at', { ascending: true }),
-                  supabase
-                    .from('property_files')
-                    .select('*')
-                    .eq('property_id', property.id)
-                    .order('uploaded_at', { ascending: false })
-                ]);
-
-                if (folderResult.data) {
-                  setFolders(folderResult.data);
-                }
-                if (filesResult.data) {
-                  setPropertyFiles(filesResult.data);
-                }
-                
-                // Cache the data
-                if (folderResult.data && filesResult.data) {
-                  await cachePropertyData(property.address, filesResult.data, folderResult.data);
-                }
-                
-                setFoldersLoading(false);
-                setFilesLoading(false);
-              }
-              
-              // Reset folder selection
-              setSelectedFolder('master');
-            }
-          } catch (error) {
-            console.error('Error loading property data:', error);
-            setFoldersLoading(false);
-            setFilesLoading(false);
-          }
-        }}
-      />
+      {/* ListView modal removed; list is a dedicated page now */}
 
     </div>
   );
 }
- 

@@ -26,11 +26,13 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList }) => {
           className="py-3 flex flex-col items-center justify-center text-gray-700 hover:bg-gray-50"
           aria-label="Map"
           onClick={(e) => {
-            try { sessionStorage.setItem('droppoint-focus-current', '1'); } catch {}
-            // If already on /map, prevent navigation and request focus current
             if (router && router.pathname === '/map') {
+              // Already on map: toggle the map view instead of focusing current location
               e.preventDefault();
-              window.dispatchEvent(new Event('droppoint-focus-current-request'));
+              window.dispatchEvent(new Event('droppoint-toggle-map-type'));
+            } else {
+              // Navigating to map from another tab: optionally focus current location
+              try { sessionStorage.setItem('droppoint-focus-current', '1'); } catch {}
             }
           }}
         >
