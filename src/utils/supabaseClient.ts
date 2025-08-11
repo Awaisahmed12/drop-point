@@ -16,6 +16,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+export const getSiteUrl = (): string => {
+  const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (envUrl && typeof envUrl === 'string') return envUrl.replace(/\/$/, '');
+  if (typeof window !== 'undefined') return window.location.origin.replace(/\/$/, '');
+  return '';
+};
+
 // Utility function to get a secure signed URL for a file (expires in 1 hour)
 export const getFileSignedUrl = async (
   propertyId: string, 

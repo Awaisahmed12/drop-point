@@ -5,6 +5,13 @@ import Image from 'next/image';
 import { EyeIcon } from './EyeIcon';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 
+const getSiteUrl = (): string => {
+  const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (envUrl && typeof envUrl === 'string') return envUrl.replace(/\/$/, '');
+  if (typeof window !== 'undefined') return window.location.origin.replace(/\/$/, '');
+  return '';
+};
+
 export default function UserAuthForm() {
   const router = useRouter();
   const { getMobileStyles, mobileClasses } = useMobileViewport();
@@ -38,7 +45,14 @@ export default function UserAuthForm() {
     }
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const siteUrl = getSiteUrl();
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: siteUrl ? `${siteUrl}/auth/callback` : undefined,
+          },
+        });
         if (error) throw error;
         setMessage('Check your email for a confirmation link.');
       } else {
