@@ -424,9 +424,10 @@ export const PropertyDetailsModal = ({
       // For files, append the original extension back to the new name
       let finalName = newName;
       if ('file_name' in item) {
-        const [, originalExt] = splitFileNameAndExt(item.file_name);
-        if (originalExt && !newName.includes('.')) {
-          finalName = `${newName}.${originalExt}`;
+        const [, originalExtWithDot] = splitFileNameAndExt(item.file_name);
+        if (originalExtWithDot && !newName.includes('.')) {
+          // originalExtWithDot already contains the leading dot
+          finalName = `${newName}${originalExtWithDot}`;
         }
       }
       
@@ -2534,6 +2535,18 @@ export const PropertyDetailsModal = ({
                   const val = e.target.value;
                   setNewFolderName(val);
                   setFolderErrorPopup(folderNameError(val));
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && isFolderNameValid && !isCreatingFolder) {
+                    e.preventDefault();
+                    handleCreateFolder();
+                  }
+                  if (e.key === 'Escape' && !isCreatingFolder) {
+                    e.preventDefault();
+                    setCreatingFolder(false);
+                    setNewFolderName('');
+                    setFolderErrorPopup(null);
+                  }
                 }}
                 autoFocus
                 disabled={isCreatingFolder}
