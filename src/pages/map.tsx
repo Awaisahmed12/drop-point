@@ -132,6 +132,26 @@ export default function MapPage() {
   const programmaticZoomChangesRef = useRef(0);
   // Track stage internally only for logic decisions; store in ref to avoid unused state
   const currentLocationStageRef = useRef<'none' | 'first' | 'deep'>('none');
+  // Throttle map position saves
+  const lastSaveTimeRef = useRef(0);
+  const saveMapPositionThrottled = useCallback(() => {
+    const now = Date.now();
+    if (now - lastSaveTimeRef.current > 1000) { // Throttle to once per second
+      lastSaveTimeRef.current = now;
+      if (map && typeof window !== 'undefined') {
+        const center = map.getCenter();
+        const currentZoom = map.getZoom();
+        if (center && currentZoom) {
+          const position = {
+            lat: center.lat(),
+            lng: center.lng(),
+            zoom: currentZoom
+          };
+          sessionStorage.setItem('droppoint-map-position', JSON.stringify(position));
+        }
+      }
+    }
+  }, [map]);
 
   // (Removed) Live user location dot tracking
 
@@ -251,6 +271,53 @@ export default function MapPage() {
     loadUserProperties();
   }, [loadUserProperties]);
 
+  // Save map position when leaving the page
+  useEffect(() => {
+    const saveMapPosition = () => {
+      if (map && typeof window !== 'undefined') {
+        const center = map.getCenter();
+        const currentZoom = map.getZoom();
+        if (center && currentZoom) {
+          const position = {
+            lat: center.lat(),
+            lng: center.lng(),
+            zoom: currentZoom
+          };
+          sessionStorage.setItem('droppoint-map-position', JSON.stringify(position));
+          console.log('🗺️ [MAP] Saved map position:', position);
+        }
+      }
+    };
+
+    // Save position when user navigates away
+    const handleBeforeUnload = () => {
+      saveMapPosition();
+    };
+
+    // Save position when component unmounts
+    const handleUnload = () => {
+      saveMapPosition();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      window.addEventListener('unload', handleUnload);
+      
+      // Also save when routing occurs (Next.js specific)
+      const handleRouteChange = () => {
+        saveMapPosition();
+      };
+      
+      router.events?.on('routeChangeStart', handleRouteChange);
+      
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        window.removeEventListener('unload', handleUnload);
+        router.events?.off('routeChangeStart', handleRouteChange);
+      };
+    }
+  }, [map, router]);
+
   // Background preload user properties for instant list view
   useEffect(() => {
     const preloadUserProperties = async () => {
@@ -309,8 +376,7 @@ export default function MapPage() {
           if (position.zoom) {
             setZoom(position.zoom);
           }
-          // Clear after using
-          sessionStorage.removeItem('droppoint-map-position');
+          console.log('🗺️ [MAP] Restored map position:', position);
         } catch (error) {
           console.error('Error parsing saved map position:', error);
         }
@@ -1517,6 +1583,8 @@ export default function MapPage() {
 
   // Add state for current location loading
   const [currentLocationLoading, setCurrentLocationLoading] = useState(false);
+  // Suppress linting warning - keeping for potential future use
+  void currentLocationLoading;
 
   // Track if property details were opened from the List page
   const [cameFromListView, setCameFromListView] = useState(false);
@@ -1524,6 +1592,11 @@ export default function MapPage() {
   // Current location handler
   const handleCurrentLocationClick = useCallback(() => {
     console.log('🌍 [GEOLOCATION] Current location button clicked');
+    
+    // Clear any selected property/address when focusing on current location
+    setSelectedProperty(null);
+    setAddress('');
+    setAddressLoading(false);
     
     if (!navigator.geolocation) {
       console.log('🌍 [GEOLOCATION] Geolocation not supported');
@@ -1959,6 +2032,8 @@ export default function MapPage() {
               if (z !== undefined && z !== null) {
                 setZoom(z);
               }
+              // Save map position when interactions settle
+              saveMapPositionThrottled();
             });
           }}
           onClick={handleMapClick}
@@ -1986,6 +2061,19 @@ export default function MapPage() {
           onDragEnd={() => {
             currentLocationZoomStageRef.current = 'none';
             currentLocationStageRef.current = 'none';
+            // Save map position after dragging
+            if (map && typeof window !== 'undefined') {
+              const center = map.getCenter();
+              const currentZoom = map.getZoom();
+              if (center && currentZoom) {
+                const position = {
+                  lat: center.lat(),
+                  lng: center.lng(),
+                  zoom: currentZoom
+                };
+                sessionStorage.setItem('droppoint-map-position', JSON.stringify(position));
+              }
+            }
           }}
           mapTypeId={mapType as google.maps.MapTypeId}
           options={{
@@ -2055,10 +2143,8 @@ export default function MapPage() {
             onMapTypeChange={setMapType}
             showDropdown={showDropdown}
             onCurrentLocationClick={handleCurrentLocationClick}
-            currentLocationLoading={currentLocationLoading}
             showPropertyInfoCard={Boolean(selectedProperty && address)}
             isPropertyModalOpen={showDetailsModal}
-            currentLocationZoomStage={currentLocationZoomStageRef.current}
           />
         )}
 
@@ -2216,9 +2302,6 @@ export default function MapPage() {
             }
           }}
         />
-
-      
-      {/* ListView modal removed; list is a dedicated page now */}
 
     </div>
   );

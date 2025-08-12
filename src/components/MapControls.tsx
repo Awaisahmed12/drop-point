@@ -6,10 +6,8 @@ interface MapControlsProps {
   isMobile?: boolean;
   showDropdown?: boolean;
   onCurrentLocationClick?: () => void;
-  currentLocationLoading?: boolean;
   showPropertyInfoCard?: boolean;
   isPropertyModalOpen?: boolean;
-  currentLocationZoomStage?: 'none' | 'first' | 'deep';
 }
 
 export const MapControls = ({ 
@@ -17,9 +15,7 @@ export const MapControls = ({
   onMapTypeChange, 
   showDropdown = false,
   onCurrentLocationClick,
-  currentLocationLoading = false,
   isPropertyModalOpen = false,
-  currentLocationZoomStage = 'none',
 }: MapControlsProps) => {
   // Desktop map type controls (left side) - now with 3 options
   const desktopMapControls = (
@@ -101,47 +97,31 @@ export const MapControls = ({
       
       {/* Current Location Button */}
       <button
-        className={`px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm ${
-          currentLocationLoading ? 'opacity-75' : ''
-        }`}
+        className={`px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm`}
         onClick={onCurrentLocationClick}
-        disabled={currentLocationLoading}
         style={{ 
           boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
         }}
       >
-        {currentLocationLoading ? (
-          /* Loading spinner */
-          <svg 
-            width="16" 
-            height="16" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-            className="animate-spin"
-          >
-            <path d="M21 12a9 9 0 11-6.219-8.56"/>
-          </svg>
-        ) : (
-          /* Current location GPS pin icon */
-          <svg 
-            width="16" 
-            height="16" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3"></circle>
-          </svg>
-        )}
-        {currentLocationLoading ? 'Locating...' : 'Current Location'}
+        {/* Always show static crosshairs/target icon - handles both recenter and deep zoom */}
+        <svg 
+          width="16" 
+          height="16" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="2" x2="12" y2="6"></line>
+          <line x1="12" y1="18" x2="12" y2="22"></line>
+          <line x1="2" y1="12" x2="6" y2="12"></line>
+          <line x1="18" y1="12" x2="22" y2="12"></line>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+        Current Location
       </button>
     </div>
   );
@@ -202,68 +182,31 @@ export const MapControls = ({
             bottom: '280px'
           }}>
       <button
-        className={`relative w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl active:scale-[0.98] cursor-pointer ${
-          currentLocationLoading ? 'opacity-75' : ''
-        }`}
+        className={`relative w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl active:scale-[0.98] cursor-pointer`}
         onClick={onCurrentLocationClick}
-        disabled={currentLocationLoading}
         style={{ 
           boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
         }}
       >
-        {currentLocationLoading ? (
-          <svg 
-            width="16" 
-            height="16" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-            className="animate-spin"
-          >
-            <path d="M21 12a9 9 0 11-6.219-8.56"/>
-          </svg>
-        ) : (
-         currentLocationZoomStage === 'first' ? (
-           // Show magnifying glass icon - next action will deep zoom
-           <svg 
-             width="16" 
-             height="16" 
-             viewBox="0 0 24 24" 
-             fill="none" 
-             stroke="currentColor" 
-             strokeWidth="2" 
-             strokeLinecap="round" 
-             strokeLinejoin="round"
-           >
-             <circle cx="11" cy="11" r="8"></circle>
-             <path d="m21 21-4.35-4.35"></path>
-             <circle cx="11" cy="11" r="3"></circle>
-           </svg>
-         ) : (
-           // Show crosshairs/target icon - indicates "recenter to current location"
-            <svg 
-              width="16" 
-              height="16" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-             <circle cx="12" cy="12" r="10"></circle>
-             <line x1="12" y1="2" x2="12" y2="6"></line>
-             <line x1="12" y1="18" x2="12" y2="22"></line>
-             <line x1="2" y1="12" x2="6" y2="12"></line>
-             <line x1="18" y1="12" x2="22" y2="12"></line>
-             <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-         )
-        )}
-      </button>
+         {/* Current location GPS pin icon */}
+         <svg 
+           width="16" 
+           height="16" 
+           viewBox="0 0 24 24" 
+           fill="none" 
+           stroke="currentColor" 
+           strokeWidth="2" 
+           strokeLinecap="round" 
+           strokeLinejoin="round"
+         >
+           <circle cx="12" cy="12" r="10"></circle>
+           <line x1="12" y1="2" x2="12" y2="6"></line>
+           <line x1="12" y1="18" x2="12" y2="22"></line>
+           <line x1="2" y1="12" x2="6" y2="12"></line>
+           <line x1="18" y1="12" x2="22" y2="12"></line>
+           <circle cx="12" cy="12" r="3"></circle>
+         </svg>
+        </button>
     </div>
   );
 
