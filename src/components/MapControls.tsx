@@ -18,7 +18,6 @@ export const MapControls = ({
   showDropdown = false,
   onCurrentLocationClick,
   currentLocationLoading = false,
-  showPropertyInfoCard = false,
   isPropertyModalOpen = false,
   currentLocationZoomStage = 'none',
 }: MapControlsProps) => {
@@ -213,7 +212,6 @@ export const MapControls = ({
         }}
       >
         {currentLocationLoading ? (
-          /* Loading spinner */
           <svg 
             width="16" 
             height="16" 
@@ -227,37 +225,43 @@ export const MapControls = ({
           >
             <path d="M21 12a9 9 0 11-6.219-8.56"/>
           </svg>
-       ) : currentLocationZoomStage === 'first' ? (
-         /* Deep zoom icon - when next tap will do deep zoom */
-          <svg 
-            width="16" 
-            height="16" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-           <circle cx="11" cy="11" r="8"></circle>
-           <path d="m21 21-4.35-4.35"></path>
-           <circle cx="11" cy="11" r="3"></circle>
-         </svg>
-       ) : (
-         /* Current location GPS pin icon - default state */
-         <svg 
-           width="16" 
-           height="16" 
-           viewBox="0 0 24 24" 
-           fill="none" 
-           stroke="currentColor" 
-           strokeWidth="2" 
-           strokeLinecap="round" 
-           strokeLinejoin="round"
-         >
-           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-           <circle cx="12" cy="10" r="3"></circle>
-          </svg>
+        ) : (
+         currentLocationZoomStage === 'first' ? (
+           // Show magnifying glass icon - next action will deep zoom
+           <svg 
+             width="16" 
+             height="16" 
+             viewBox="0 0 24 24" 
+             fill="none" 
+             stroke="currentColor" 
+             strokeWidth="2" 
+             strokeLinecap="round" 
+             strokeLinejoin="round"
+           >
+             <circle cx="11" cy="11" r="8"></circle>
+             <path d="m21 21-4.35-4.35"></path>
+             <circle cx="11" cy="11" r="3"></circle>
+           </svg>
+         ) : (
+           // Show crosshairs/target icon - indicates "recenter to current location"
+            <svg 
+              width="16" 
+              height="16" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+             <circle cx="12" cy="12" r="10"></circle>
+             <line x1="12" y1="2" x2="12" y2="6"></line>
+             <line x1="12" y1="18" x2="12" y2="22"></line>
+             <line x1="2" y1="12" x2="6" y2="12"></line>
+             <line x1="18" y1="12" x2="22" y2="12"></line>
+             <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+         )
         )}
       </button>
     </div>

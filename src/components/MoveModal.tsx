@@ -61,7 +61,7 @@ export const MoveModal: React.FC<MoveModalProps> = ({
     if (open) {
       console.log('📦 [MOVE-MODAL] Opened', { currentItemId, currentItemType, currentFolderId, initialSelected: selected });
     }
-  }, [open]);
+  }, [open, currentItemId, currentItemType, currentFolderId, selected]);
 
   React.useEffect(() => {
     console.log('📦 [MOVE-MODAL] Selected target changed:', selected);

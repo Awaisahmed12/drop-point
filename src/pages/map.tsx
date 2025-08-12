@@ -128,6 +128,7 @@ export default function MapPage() {
 
   // Track staged zoom behavior for current location (first -> deep)
   const currentLocationZoomStageRef = useRef<'none' | 'first' | 'deep'>('none');
+  const [currentLocationZoomStage, setCurrentLocationZoomStage] = useState<'none' | 'first' | 'deep'>('none');
   // Count of pending programmatic zoom changes to ignore in onZoomChanged
   const programmaticZoomChangesRef = useRef(0);
   // Track stage internally only for logic decisions; store in ref to avoid unused state
@@ -361,7 +362,7 @@ export default function MapPage() {
             .limit(1);
           if (properties && properties.length > 0) {
             setMapCenter({ lat: properties[0].lat, lng: properties[0].lng });
-            setZoom(13);
+            setZoom(14); // Same as DEFAULT_ZOOM, lower than recenter zoom (17) - wide view
             setInitialCenterResolved(true);
             return;
           }
@@ -389,10 +390,10 @@ export default function MapPage() {
             resolved = true;
             window.clearTimeout(fallbackTimer);
             setMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
-            setZoom(CURRENT_LOCATION_ZOOM);
+            setZoom(DEFAULT_ZOOM);
             // We are at primary at current location; pre-arm deep (next tap goes deep)
-            currentLocationZoomStageRef.current = 'first';
-            currentLocationStageRef.current = 'first';
+            currentLocationZoomStageRef.current = 'none';
+            currentLocationStageRef.current = 'none';
             setInitialCenterResolved(true);
           },
           () => {
@@ -1543,36 +1544,34 @@ export default function MapPage() {
         console.log('🌍 [GEOLOCATION] New center:', newCenter);
         
         // Keep it simple: always perform a visible action.
-        const initialZoom = CURRENT_LOCATION_ZOOM;
+        const mediumZoom = CURRENT_LOCATION_ZOOM;
         const deepZoom = CURRENT_LOCATION_ZOOM_DEEP;
         const currentZoom = map?.getZoom?.() ?? zoom;
         const centerNowA = map?.getCenter?.();
         const isCloseToLocation = centerNowA
           ? (Math.abs(centerNowA.lat() - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(centerNowA.lng() - newCenter.lng) < COORDINATE_THRESHOLD)
           : (Math.abs(mapCenter.lat - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(mapCenter.lng - newCenter.lng) < COORDINATE_THRESHOLD);
-        const isAtInitialZoom = Math.abs((currentZoom || 0) - initialZoom) < 0.25;
+        const isAtMediumZoom = Math.abs((currentZoom || 0) - mediumZoom) < 0.25;
 
-        let targetZoom = initialZoom;
-        if (!isCloseToLocation) {
-          // If we've moved away, first click always snaps back to current location at initial zoom
-          targetZoom = initialZoom;
+        let targetZoom = mediumZoom;
+        if (currentLocationZoomStageRef.current === 'none' || !isCloseToLocation) {
+          // If stage is 'none' (reset after user interaction) or moved away, always go to medium zoom first
+          targetZoom = mediumZoom;
           currentLocationZoomStageRef.current = 'first';
           currentLocationStageRef.current = 'first';
-        } else if (isAtInitialZoom) {
-          // Already at current location and initial zoom → deep zoom
+        } else if (currentLocationZoomStageRef.current === 'first' && isAtMediumZoom) {
+          // Already at medium zoom and in 'first' stage → deep zoom
           targetZoom = deepZoom;
           currentLocationZoomStageRef.current = 'deep';
           currentLocationStageRef.current = 'deep';
         } else {
-          // At current location but deeper than initial → go back to initial
-          targetZoom = initialZoom;
+          // Default: go to medium zoom
+          targetZoom = mediumZoom;
           currentLocationZoomStageRef.current = 'first';
           currentLocationStageRef.current = 'first';
         }
 
         // Update map center and zoom programmatically (avoid resetting stage)
-        // Mark one programmatic zoom so onZoomChanged doesn't reset stage
-        programmaticZoomChangesRef.current += 1;
         // If user is already very close to the target center, avoid an extra panTo
         const centerNowB = map?.getCenter?.();
         const isClose = centerNowB
@@ -1690,7 +1689,7 @@ export default function MapPage() {
         maximumAge: 60000 // Cache location for 1 minute
       }
     );
-  }, [map, isPropertyDataCached, cachePropertyData, zoom, mapCenter.lat, mapCenter.lng]);
+  }, [map, isPropertyDataCached, cachePropertyData, zoom, mapCenter.lat, mapCenter.lng, currentLocationZoomStageRef.current]);
 
   // Support in-app focus current location requests (from bottom nav Map when already on map)
   useEffect(() => {
@@ -1969,8 +1968,7 @@ export default function MapPage() {
             // Google Maps will handle the zoom automatically
             // Just update our click tracking to prevent pin drops
             lastClickTimeRef.current = Date.now();
-            currentLocationZoomStageRef.current = 'none';
-            currentLocationStageRef.current = 'none';
+            // Don't reset stage on double-click zoom
           }}
           onZoomChanged={() => {
             // Avoid per-tick zoom state updates during pinch to keep interactions smooth
@@ -1980,8 +1978,7 @@ export default function MapPage() {
               programmaticZoomChangesRef.current -= 1;
               return;
             }
-            currentLocationZoomStageRef.current = 'none';
-            currentLocationStageRef.current = 'none';
+            // Don't reset stage on zoom - let users zoom without losing button state
           }}
           onDragStart={() => {
             currentLocationZoomStageRef.current = 'none';
