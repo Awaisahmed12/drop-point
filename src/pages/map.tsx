@@ -128,7 +128,6 @@ export default function MapPage() {
 
   // Track staged zoom behavior for current location (first -> deep)
   const currentLocationZoomStageRef = useRef<'none' | 'first' | 'deep'>('none');
-  const [currentLocationZoomStage, setCurrentLocationZoomStage] = useState<'none' | 'first' | 'deep'>('none');
   // Count of pending programmatic zoom changes to ignore in onZoomChanged
   const programmaticZoomChangesRef = useRef(0);
   // Track stage internally only for logic decisions; store in ref to avoid unused state
@@ -1689,7 +1688,7 @@ export default function MapPage() {
         maximumAge: 60000 // Cache location for 1 minute
       }
     );
-  }, [map, isPropertyDataCached, cachePropertyData, zoom, mapCenter.lat, mapCenter.lng, currentLocationZoomStageRef.current]);
+  }, [map, isPropertyDataCached, cachePropertyData, zoom, mapCenter.lat, mapCenter.lng]);
 
   // Support in-app focus current location requests (from bottom nav Map when already on map)
   useEffect(() => {
