@@ -34,6 +34,7 @@ interface PropertyDetailsModalProps {
   onFileUpload: (files: FileList) => Promise<void>;
   onFileDelete: (file: PropertyFile) => void;
   onFileRename: (item: PropertyFile | PropertyFolder, newName: string) => void;
+  onFileMove?: (file: PropertyFile, targetFolderId: string | null) => Promise<void>;
   onFolderCreate: (name: string) => void;
   onFolderDelete: (folder: PropertyFolder) => void;
   
@@ -64,6 +65,7 @@ export const PropertyDetailsModal = ({
   onFileUpload,
   onFileDelete,
   onFileRename,
+  onFileMove,
   onFolderCreate,
   onFolderDelete,
   pendingUploads,
@@ -1391,7 +1393,7 @@ export const PropertyDetailsModal = ({
                                         e.stopPropagation();
                                         setRenamingFileId(folder.id);
                                         setRenamingFileName(folder.name);
-                                        setFileMenuId(null);
+                                        setFolderMenuId(null);
                                       }}
                                     >
                                       <div className="flex items-center gap-2">
@@ -1406,6 +1408,7 @@ export const PropertyDetailsModal = ({
                                       onClick={e => {
                                         e.stopPropagation();
                                         onFolderDelete(folder);
+                                        setFolderMenuId(null);
                                       }}
                                     >
                                       <div className="flex items-center gap-2">
@@ -1541,7 +1544,7 @@ export const PropertyDetailsModal = ({
                                         e.stopPropagation();
                                         setRenamingFileId(folder.id);
                                         setRenamingFileName(folder.name);
-                                        setFileMenuId(null);
+                                        setFolderMenuId(null);
                                       }}
                                     >
                                       <div className="flex items-center gap-2">
@@ -1712,10 +1715,7 @@ export const PropertyDetailsModal = ({
                                         e.stopPropagation();
                                         setRenamingFileId(file.id);
                                         setRenamingFileName(getFileNameWithoutExtension(file.file_name));
-                                        setTimeout(() => {
-                                          setFileMenuId(null);
-                                          setFileMenuId(null);
-                                        }, 50);
+                                        setFileMenuId(null);
                                       }}
                                     >
                                       <div className="flex items-center gap-2">
@@ -1890,6 +1890,7 @@ export const PropertyDetailsModal = ({
                                   className={`${isMobile ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
                                   onClick={e => {
                                     e.stopPropagation();
+                                    console.log('🧭 [FILE-MENU] Toggle for file', file.id);
                                     setFileMenuId(null);
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
@@ -2018,7 +2019,7 @@ export const PropertyDetailsModal = ({
                                         e.stopPropagation();
                                         setRenamingFileId(folder.id);
                                         setRenamingFileName(folder.name);
-                                        setFileMenuId(null);
+                                        setFolderMenuId(null);
                                       }}
                                     >
                                       <div className="flex items-center gap-2">
@@ -2323,10 +2324,17 @@ export const PropertyDetailsModal = ({
                   </div>
                   <button
                     onClick={() => {
-                      // Dismiss all pending uploads
-                      pendingUploads.forEach(upload => onDismiss(upload.id));
+                      // Cancel active uploads and dismiss the rest
+                      pendingUploads.forEach(upload => {
+                        if (upload.status === 'uploading') {
+                          upload.cancel?.();
+                        } else {
+                          onDismiss(upload.id);
+                        }
+                      });
                     }}
                     className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                    title="Clear"
                   >
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -2434,15 +2442,17 @@ export const PropertyDetailsModal = ({
                           </svg>
                         </button>
                       )}
-                      <button
-                        onClick={() => onDismiss(upload.id)}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors group"
-                        title="Dismiss"
-                      >
-                        <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      {upload.status !== 'uploading' && (
+                        <button
+                          onClick={() => onDismiss(upload.id)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors group"
+                          title="Dismiss"
+                        >
+                          <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2588,8 +2598,19 @@ export const PropertyDetailsModal = ({
           currentItemId={moveFileTarget.id}
           currentItemType="file"
           currentFolderId={moveFileTarget.folder_id}
-          onMove={async () => {
-            // Implementation would be handled by parent component
+          onMove={async (targetFolderId) => {
+            console.log('📦 [MOVE-MODAL-CHILD] onMove called with targetFolderId:', targetFolderId);
+            if (onFileMove && moveFileTarget) {
+              try {
+                await onFileMove(moveFileTarget, targetFolderId);
+                console.log('📦 [MOVE-MODAL-CHILD] Move completed successfully');
+              } catch (error) {
+                console.error('📦 [MOVE-MODAL-CHILD] Move failed:', error);
+                // Error handling is done in the parent onFileMove function
+              }
+            } else {
+              console.warn('📦 [MOVE-MODAL-CHILD] onFileMove prop not provided or moveFileTarget is null');
+            }
             setShowMoveModal(false);
             setMoveFileTarget(null);
           }}

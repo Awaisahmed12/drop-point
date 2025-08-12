@@ -57,6 +57,16 @@ export const MoveModal: React.FC<MoveModalProps> = ({
   const [selected, setSelected] = useState<string | null>(currentFolderId ?? null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (open) {
+      console.log('📦 [MOVE-MODAL] Opened', { currentItemId, currentItemType, currentFolderId, initialSelected: selected });
+    }
+  }, [open]);
+
+  React.useEffect(() => {
+    console.log('📦 [MOVE-MODAL] Selected target changed:', selected);
+  }, [selected]);
+
   // Find the folder being moved (if moving a folder)
   const currentFolder = useMemo(() =>
     currentItemType === 'folder' ? folders.find(f => f.id === currentItemId) : null,
@@ -263,7 +273,10 @@ export const MoveModal: React.FC<MoveModalProps> = ({
         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
           <button
             className="flex-1 bg-gray-200 text-gray-700 rounded-xl px-4 py-3 font-semibold text-base transition-all duration-200 hover:bg-gray-300 hover:shadow-sm active:scale-95"
-            onClick={onCancel}
+            onClick={() => {
+              console.log('📦 [MOVE-MODAL] Cancel clicked');
+              onCancel();
+            }}
             type="button"
           >
             Cancel
@@ -275,8 +288,23 @@ export const MoveModal: React.FC<MoveModalProps> = ({
                 : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl'
             }`}
             onClick={() => {
-              if (moveDisabled) return;
-              onMove(selected);
+              console.log('📦 [MOVE-MODAL] Move Here clicked', { selected, moveDisabled, currentItemId, currentItemType, currentFolderId });
+              const target = selected === undefined ? null : selected;
+              console.log('📦 [MOVE-MODAL] Calling onMove with target:', target, 'moveDisabled:', moveDisabled);
+              onMove(target);
+              try {
+                window.dispatchEvent(new CustomEvent('droppoint-move-request', {
+                  detail: {
+                    itemId: currentItemId,
+                    itemType: currentItemType,
+                    currentFolderId,
+                    targetFolderId: target,
+                  }
+                }));
+                console.log('📦 [MOVE-MODAL] Dispatched droppoint-move-request', { target });
+              } catch (err) {
+                console.warn('📦 [MOVE-MODAL] Failed to dispatch move event', err);
+              }
             }}
             type="button"
             disabled={!!moveDisabled}

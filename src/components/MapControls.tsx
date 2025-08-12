@@ -8,6 +8,8 @@ interface MapControlsProps {
   onCurrentLocationClick?: () => void;
   currentLocationLoading?: boolean;
   showPropertyInfoCard?: boolean;
+  isPropertyModalOpen?: boolean;
+  currentLocationZoomStage?: 'none' | 'first' | 'deep';
 }
 
 export const MapControls = ({ 
@@ -16,6 +18,9 @@ export const MapControls = ({
   showDropdown = false,
   onCurrentLocationClick,
   currentLocationLoading = false,
+  showPropertyInfoCard = false,
+  isPropertyModalOpen = false,
+  currentLocationZoomStage = 'none',
 }: MapControlsProps) => {
   // Desktop map type controls (left side) - now with 3 options
   const desktopMapControls = (
@@ -190,7 +195,7 @@ export const MapControls = ({
   // Smart positioning: Calculate exact clearance above PropertyInfoCard
   // PropertyInfoCard: bottom-6 (24px) + ~144px height = 168px total
   // Add 52px padding for comfortable separation = 220px minimum clearance
-  const mobileCurrentLocationButton = shouldShowMobileControls && onCurrentLocationClick && (
+  const mobileCurrentLocationButton = shouldShowMobileControls && onCurrentLocationClick && !isPropertyModalOpen && (
     <div className="absolute right-4 z-50 sm:hidden" 
           style={{
             // Ensure the button sits clearly ABOVE the PropertyInfoCard header/X
@@ -222,8 +227,8 @@ export const MapControls = ({
           >
             <path d="M21 12a9 9 0 11-6.219-8.56"/>
           </svg>
-        ) : (
-          /* Current location GPS pin icon */
+       ) : currentLocationZoomStage === 'first' ? (
+         /* Deep zoom icon - when next tap will do deep zoom */
           <svg 
             width="16" 
             height="16" 
@@ -234,8 +239,24 @@ export const MapControls = ({
             strokeLinecap="round" 
             strokeLinejoin="round"
           >
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3"></circle>
+           <circle cx="11" cy="11" r="8"></circle>
+           <path d="m21 21-4.35-4.35"></path>
+           <circle cx="11" cy="11" r="3"></circle>
+         </svg>
+       ) : (
+         /* Current location GPS pin icon - default state */
+         <svg 
+           width="16" 
+           height="16" 
+           viewBox="0 0 24 24" 
+           fill="none" 
+           stroke="currentColor" 
+           strokeWidth="2" 
+           strokeLinecap="round" 
+           strokeLinejoin="round"
+         >
+           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+           <circle cx="12" cy="10" r="3"></circle>
           </svg>
         )}
       </button>

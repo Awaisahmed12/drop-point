@@ -6,7 +6,6 @@ import { useMobileViewport } from '../hooks/useMobileViewport';
 import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
 import { supabase } from '../utils/supabaseClient';
 import { useRouter } from 'next/router';
-import { MoveModal } from '../components/MoveModal';
 import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
 import { getAddressFromCache, saveAddressToCache } from '../../utils/propertyCache';
 import { getUserUsageBytes } from '../utils/usage';
@@ -138,10 +137,6 @@ export default function MapPage() {
 
   // Add state for renaming files
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
-
-  // Add state for move modal
-  const [showMoveModal, setShowMoveModal] = useState(false);
-  const [moveFileTarget, setMoveFileTarget] = useState<PropertyFile | null>(null);
 
   // Sorting moved to PropertyDetailsModal
 
@@ -366,7 +361,7 @@ export default function MapPage() {
             .limit(1);
           if (properties && properties.length > 0) {
             setMapCenter({ lat: properties[0].lat, lng: properties[0].lng });
-            setZoom(10);
+            setZoom(13);
             setInitialCenterResolved(true);
             return;
           }
@@ -1036,16 +1031,62 @@ export default function MapPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      if (!savedProperty || !savedProperty.id) {
-        alert('Please save the property before creating folders.');
+
+      // Resolve property id locally
+      let propertyId: string | null = savedProperty?.id ?? null;
+
+      // Ensure property is saved before creating folders
+      if (!propertyId) {
+        if (!savedProperty) {
+          alert('Please select a property first.');
+          return;
+        }
+        try {
+          const { data: newProperty, error: saveError } = await supabase
+            .from('properties')
+            .insert([{
+              user_id: user.id,
+              address: savedProperty.address,
+              lat: savedProperty.lat,
+              lng: savedProperty.lng,
+              label: savedProperty.label,
+              notes: savedProperty.notes,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
+
+          if (saveError || !newProperty) {
+            console.error('📁 [FOLDERS] Error auto-saving property before folder creation:', saveError);
+            alert('Failed to save property. Please try again.');
+            return;
+          }
+
+          // Update state and capture id for immediate use
+          setSavedProperty(newProperty);
+          propertyId = newProperty.id;
+
+          // Optional: refresh pins (non-blocking)
+          loadUserProperties();
+        } catch (err) {
+          console.error('📁 [FOLDERS] Unexpected error auto-saving property:', err);
+          alert('Failed to save property. Please try again.');
+          return;
+        }
+      }
+
+      if (!propertyId) {
+        alert('Failed to resolve property. Please try again.');
         return;
       }
+
       const parentId = selectedFolder === 'master' ? null : selectedFolder;
 
       const { data, error } = await supabase
         .from('property_folders')
         .insert({
-          property_id: savedProperty.id,
+          property_id: propertyId,
           user_id: user.id,
           parent_id: parentId,
           name: trimmed,
@@ -2020,6 +2061,8 @@ export default function MapPage() {
             onCurrentLocationClick={handleCurrentLocationClick}
             currentLocationLoading={currentLocationLoading}
             showPropertyInfoCard={Boolean(selectedProperty && address)}
+            isPropertyModalOpen={showDetailsModal}
+            currentLocationZoomStage={currentLocationZoomStageRef.current}
           />
         )}
 
@@ -2087,6 +2130,68 @@ export default function MapPage() {
           }}
           onFileDelete={handleDeleteFile}
           onFileRename={handleRename}
+          onFileMove={async (file: PropertyFile, targetFolderId: string | null) => {
+            console.log('📦 [MOVE] onMove invoked:', { fileId: file.id, fromFolder: file.folder_id, toFolder: targetFolderId });
+            const movingToDifferentFolder = file.folder_id !== targetFolderId;
+            let newName = file.file_name;
+            if (movingToDifferentFolder) {
+              newName = sanitizeFileName(getUniqueFileName(file.file_name, targetFolderId, propertyFiles));
+            }
+            if (!newName) {
+              alert('Invalid file name. Please rename your file and try again.');
+              return;
+            }
+
+            if (newName !== file.file_name) {
+              const oldPath = `${file.property_id}/${file.file_name}`;
+              const newPath = `${file.property_id}/${newName}`;
+              console.log('📦 [MOVE] Renaming in storage:', { oldPath, newPath });
+              const { error: copyError } = await supabase.storage.from('property-files').copy(oldPath, newPath);
+              if (copyError) {
+                console.error('📦 [MOVE] Storage copy error:', copyError);
+                alert('Failed to move file in storage.');
+                return;
+              }
+              const { error: removeError } = await supabase.storage.from('property-files').remove([oldPath]);
+              if (removeError) {
+                console.warn('📦 [MOVE] Storage remove warning:', removeError);
+              }
+              const { error: dbError } = await supabase.from('property_files').update({
+                folder_id: targetFolderId,
+                file_name: newName,
+                file_url: newPath,
+              }).eq('id', file.id);
+              if (dbError) {
+                console.error('📦 [MOVE] DB update error:', dbError);
+                alert('Failed to update file metadata.');
+                return;
+              }
+              // Optimistic UI update
+              setPropertyFiles(prev => prev.map(f => f.id === file.id ? { ...f, folder_id: targetFolderId, file_name: newName, file_url: newPath } : f));
+            } else if (movingToDifferentFolder) {
+              const { error: dbError } = await supabase.from('property_files').update({ folder_id: targetFolderId }).eq('id', file.id);
+              if (dbError) {
+                console.error('📦 [MOVE] DB move error:', dbError);
+                alert('Failed to move file.');
+                return;
+              }
+              // Optimistic UI update
+              setPropertyFiles(prev => prev.map(f => f.id === file.id ? { ...f, folder_id: targetFolderId } : f));
+            } else {
+              console.log('📦 [MOVE] No-op (same folder)');
+            }
+
+            // Refresh from server for consistency
+            const result = await supabase
+              .from('property_files')
+              .select('*')
+              .eq('property_id', file.property_id)
+              .order('uploaded_at', { ascending: false });
+            if (result.error) {
+              console.warn('📦 [MOVE] Refresh error:', result.error);
+            }
+            if (result.data) setPropertyFiles(result.data);
+          }}
           onFolderCreate={handleCreateFolderByName}
           onFolderDelete={handleDeleteFolder}
           pendingUploads={pendingUploads}
@@ -2117,57 +2222,6 @@ export default function MapPage() {
         />
 
       
-      {/* MoveModal for files */}
-      {showMoveModal && moveFileTarget && (
-        <MoveModal
-          open={showMoveModal}
-          folders={folders}
-          currentItemId={moveFileTarget.id}
-          currentItemType="file"
-          currentFolderId={moveFileTarget.folder_id}
-          onMove={async (targetFolderId) => {
-            // Only rename if moving to a different folder
-            let newName = moveFileTarget.file_name;
-            if (moveFileTarget.folder_id !== targetFolderId) {
-              newName = getUniqueFileName(moveFileTarget.file_name, targetFolderId, propertyFiles);
-              newName = sanitizeFileName(newName);
-            }
-            if (!newName) {
-              alert('Invalid file name. Please rename your file and try again.');
-              return;
-            }
-            // If name changed, update both storage and DB
-            if (newName !== moveFileTarget.file_name) {
-              // Rename in storage: copy to new name, then delete old
-              const oldPath = `${moveFileTarget.property_id}/${moveFileTarget.file_name}`;
-              const newPath = `${moveFileTarget.property_id}/${newName}`;
-              await supabase.storage.from('property-files').copy(oldPath, newPath);
-              await supabase.storage.from('property-files').remove([oldPath]);
-              await supabase.from('property_files').update({
-                folder_id: targetFolderId,
-                file_name: newName,
-                file_url: newPath,
-              }).eq('id', moveFileTarget.id);
-            } else {
-              // Just update folder_id
-              await supabase.from('property_files').update({ folder_id: targetFolderId }).eq('id', moveFileTarget.id);
-            }
-            setShowMoveModal(false);
-            setMoveFileTarget(null);
-            // Refresh files
-            const result = await supabase
-              .from('property_files')
-              .select('*')
-              .eq('property_id', moveFileTarget.property_id)
-              .order('uploaded_at', { ascending: false });
-            if (result.data) setPropertyFiles(result.data);
-          }}
-          onCancel={() => {
-            setShowMoveModal(false);
-            setMoveFileTarget(null);
-          }}
-        />
-      )}
       {/* ListView modal removed; list is a dedicated page now */}
 
     </div>
