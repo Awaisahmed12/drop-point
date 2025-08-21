@@ -657,63 +657,123 @@ export default function MapPage() {
     const isUserProperty = prediction.types?.includes('user_property') || prediction.user_property;
     
     if (isUserProperty) {
-      // Handle user property selection directly
-      const propertyId = prediction.property_id;
-      if (propertyId) {
-        console.log('🏠 User property selected:', prediction.description);
-        
-        // Get the property details from database
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: property } = await supabase
-            .from('properties')
-            .select('*')
-            .eq('id', propertyId)
-            .eq('user_id', user.id)
-            .single();
-          
-          if (property) {
-            const coords = { lat: property.lat, lng: property.lng };
-            setMapCenter(coords);
-            setZoom(SEARCH_ZOOM);
+      console.log('🏠 User property selected:', prediction.description);
+      
+      // Handle synthetic user property predictions (place_id starts with 'user_property_')
+      if (prediction.place_id.startsWith('user_property_')) {
+        const propertyId = prediction.property_id;
+        if (propertyId) {
+          // Get the property details from database
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: property } = await supabase
+              .from('properties')
+              .select('*')
+              .eq('id', propertyId)
+              .eq('user_id', user.id)
+              .single();
             
-            // Set address directly from database
-            setAddress(property.address);
-            setSnappedLatLng({ lat: property.lat, lng: property.lng });
-            setAddressLoading(false);
-            
-            // Cache the address
-            saveAddressToCache(property.lat, property.lng, property.address, { lat: property.lat, lng: property.lng });
-            
-            // Try to prefetch property data
-            const isCached = await isPropertyDataCached(property.address);
-            if (!isCached) {
-              const [folderResult, filesResult] = await Promise.all([
-                supabase
-                  .from('property_folders')
-                  .select('*')
-                  .eq('property_id', property.id)
-                  .eq('user_id', user.id)
-                  .is('deleted_at', null)
-                  .order('created_at', { ascending: true }),
-                supabase
-                  .from('property_files')
-                  .select('*')
-                  .eq('property_id', property.id)
-                  .order('uploaded_at', { ascending: false })
-              ]);
+            if (property) {
+              const coords = { lat: property.lat, lng: property.lng };
+              setMapCenter(coords);
+              setZoom(SEARCH_ZOOM);
+              
+              // Set address directly from database
+              setAddress(property.address);
+              setSnappedLatLng({ lat: property.lat, lng: property.lng });
+              setAddressLoading(false);
+              
+              // Cache the address
+              saveAddressToCache(property.lat, property.lng, property.address, { lat: property.lat, lng: property.lng });
+              
+              // Try to prefetch property data
+              const isCached = await isPropertyDataCached(property.address);
+              if (!isCached) {
+                const [folderResult, filesResult] = await Promise.all([
+                  supabase
+                    .from('property_folders')
+                    .select('*')
+                    .eq('property_id', property.id)
+                    .eq('user_id', user.id)
+                    .is('deleted_at', null)
+                    .order('created_at', { ascending: true }),
+                  supabase
+                    .from('property_files')
+                    .select('*')
+                    .eq('property_id', property.id)
+                    .order('uploaded_at', { ascending: false })
+                ]);
 
-              if (folderResult.data && filesResult.data) {
-                await cachePropertyData(property.address, filesResult.data, folderResult.data);
+                if (folderResult.data && filesResult.data) {
+                  await cachePropertyData(property.address, filesResult.data, folderResult.data);
+                }
               }
+              
+              if (map) {
+                map.panTo(coords);
+                map.setZoom(SEARCH_ZOOM);
+              }
+              
+              return; // Exit early for user properties
             }
+          }
+        }
+      } else {
+        // Handle Google prediction that matches a user property
+        const propertyId = prediction.property_id;
+        if (propertyId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: property } = await supabase
+              .from('properties')
+              .select('*')
+              .eq('id', propertyId)
+              .eq('user_id', user.id)
+              .single();
             
-            if (map) {
-              map.panTo(coords);
-              map.setZoom(SEARCH_ZOOM);
+            if (property) {
+              const coords = { lat: property.lat, lng: property.lng };
+              setMapCenter(coords);
+              setZoom(SEARCH_ZOOM);
+              
+              // Set address directly from database
+              setAddress(property.address);
+              setSnappedLatLng({ lat: property.lat, lng: property.lng });
+              setAddressLoading(false);
+              
+              // Cache the address
+              saveAddressToCache(property.lat, property.lng, property.address, { lat: property.lat, lng: property.lng });
+              
+              // Try to prefetch property data
+              const isCached = await isPropertyDataCached(property.address);
+              if (!isCached) {
+                const [folderResult, filesResult] = await Promise.all([
+                  supabase
+                    .from('property_folders')
+                    .select('*')
+                    .eq('property_id', property.id)
+                    .eq('user_id', user.id)
+                    .is('deleted_at', null)
+                    .order('created_at', { ascending: true }),
+                  supabase
+                    .from('property_files')
+                    .select('*')
+                    .eq('property_id', property.id)
+                    .order('uploaded_at', { ascending: false })
+                ]);
+
+                if (folderResult.data && filesResult.data) {
+                  await cachePropertyData(property.address, filesResult.data, folderResult.data);
+                }
+              }
+              
+              if (map) {
+                map.panTo(coords);
+                map.setZoom(SEARCH_ZOOM);
+              }
+              
+              return; // Exit early for user properties
             }
-            
-            return; // Exit early for user properties
           }
         }
       }

@@ -78,10 +78,11 @@ export const MapSearch = ({
       updateShowDropdown(newPredictions.length > 0);
       updateShowQuickAccess(false);
     } else {
-      onPredictionsChange([]);
-      updateShowDropdown(false);
-      // Always show quick access when input is empty and focused
-      updateShowQuickAccess(true);
+      // When input is empty, fetch user's recent properties as predictions
+      const recentPredictions = await fetchPredictions(''); // Empty input will trigger user properties
+      onPredictionsChange(recentPredictions);
+      updateShowDropdown(recentPredictions.length > 0);
+      updateShowQuickAccess(false);
     }
     setSelectedIndex(0);
   };
@@ -131,12 +132,15 @@ export const MapSearch = ({
   };
 
   // Handle input focus
-  const handleFocus = () => {
+  const handleFocus = async () => {
     if (inputValue && !justSelectedRef.current) {
       updateShowDropdown(predictions.length > 0);
     } else if (!inputValue) {
-      // Show quick access when focusing on empty input
-      updateShowQuickAccess(true);
+      // Fetch recent properties when focusing on empty input
+      const recentPredictions = await fetchPredictions('');
+      onPredictionsChange(recentPredictions);
+      updateShowDropdown(recentPredictions.length > 0);
+      updateShowQuickAccess(false);
     }
   };
 
@@ -148,12 +152,14 @@ export const MapSearch = ({
   };
 
   // Handle clear button
-  const handleClear = () => {
+  const handleClear = async () => {
     onInputChange('');
-    updateShowDropdown(false);
-    onPredictionsChange([]);
+    // Fetch recent properties after clearing
+    const recentPredictions = await fetchPredictions('');
+    onPredictionsChange(recentPredictions);
+    updateShowDropdown(recentPredictions.length > 0);
     setSelectedIndex(0);
-    updateShowQuickAccess(true); // Show quick access after clearing
+    updateShowQuickAccess(false);
     inputRef.current?.focus();
   };
 
@@ -208,6 +214,11 @@ export const MapSearch = ({
             ref={dropdownRef}
             className="absolute z-30 w-full bg-white border border-gray-200 rounded-b-lg shadow-lg mt-1 max-h-60 overflow-auto"
           >
+            {!inputValue.trim() && (
+              <div className="px-4 py-2 border-b border-gray-100 text-sm font-semibold text-gray-600 bg-gray-50">
+                Recent Properties
+              </div>
+            )}
             {predictions.map((prediction, i) => {
               const isUserProperty = prediction.isUserProperty || prediction.types?.includes('user_property');
               

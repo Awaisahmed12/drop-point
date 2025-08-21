@@ -311,13 +311,14 @@ src/
 - Provides explicit zoom controls for users who prefer buttons over pinch-to-zoom gestures
 - Properly positioned to avoid overlapping with other UI elements
 
-**Quick Access Properties:**
-- Implemented **Google Maps-style quick access** showing top 4 most recently visited properties
-- Appears under the search bar when focused but empty (just like Google Maps recent locations)
-- Shows property names, addresses, file counts, and intuitive property icons
-- Automatically sorts by last accessed/updated timestamps for maximum relevance
-- Seamlessly integrates with map - clicking a property centers map and shows selection card
-- **Smart Search Behavior**: Shows recent properties when empty, Google Maps suggestions when typing, and returns to recent properties when search is cleared
+**Blended Search Experience (Google Maps + User Properties):**
+- **Seamless Integration**: User's saved properties are blended directly into Google Maps search suggestions for unified experience
+- **Priority Ranking**: User properties appear first in suggestions, ranked by most recently updated/accessed
+- **Smart Matching**: Matches both property addresses and custom names/labels when searching
+- **Visual Distinction**: User properties show with blue accent, house icon, and "My Property" label
+- **Intelligent Display**: Shows custom property names prominently with full address as secondary text
+- **Empty Search**: When search is empty or focused, shows recent properties as suggestions (top 8 most recent)
+- **Deduplication**: Prevents duplicate entries when Google Maps returns user's own properties
 - **Map Interaction Protection**: Prevents pin dropping when search is focused, automatically unfocuses search when clicking elsewhere on map
 - **Immediate State Updates**: Search suggestions and recent properties disappear instantly when clicking outside, preventing race conditions
 
