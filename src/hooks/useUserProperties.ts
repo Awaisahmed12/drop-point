@@ -1,13 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabaseClient';
-import type { Property } from '../../types';
-
-export interface PropertyWithFileCount extends Property {
-  file_count: number;
-  last_accessed?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+import type { PropertyWithFileCount } from '../../types';
 
 export interface UseUserPropertiesReturn {
   properties: PropertyWithFileCount[];

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { useUserProperties, type PropertyWithFileCount } from '../hooks/useUserProperties';
+import { useUserProperties } from '../hooks/useUserProperties';
+import type { PropertyWithFileCount } from '../../types';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 
 interface PropertySwitcherProps {

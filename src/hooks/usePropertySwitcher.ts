@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import type { PropertyFile, PropertyFolder } from '../../types';
-import type { PropertyWithFileCount } from './useUserProperties';
+import type { PropertyWithFileCount } from '../../types';
 
 interface UsePropertySwitcherProps {
   onMapMove?: (lat: number, lng: number) => void;

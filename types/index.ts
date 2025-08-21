@@ -12,6 +12,14 @@ export type Property = {
   thumbnail_url?: string | null;
 };
 
+// Property with file count for list views and property switching
+export type PropertyWithFileCount = Property & {
+  file_count: number;
+  last_accessed?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 // PropertyFile type matching the property_files table
 export type PropertyFile = {
   id: string;

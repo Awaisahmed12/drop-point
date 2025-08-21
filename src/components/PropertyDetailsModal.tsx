@@ -8,7 +8,7 @@ import { PropertySwitcher } from './PropertySwitcher';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
-import type { PropertyWithFileCount } from '../hooks/useUserProperties';
+import type { PropertyWithFileCount } from '../../types';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
 import { getFileSignedUrl } from '../utils/supabaseClient';

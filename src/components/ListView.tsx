@@ -3,7 +3,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
-import { useUserProperties, type PropertyWithFileCount } from '../hooks/useUserProperties';
+import { useUserProperties } from '../hooks/useUserProperties';
+import type { PropertyWithFileCount } from '../../types';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 
 interface ListViewProps {

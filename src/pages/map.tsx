@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
 import { useMobileViewport } from '../hooks/useMobileViewport';
-import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
+import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload, PropertyWithFileCount } from '../../types';
 import { supabase } from '../utils/supabaseClient';
 import { useRouter } from 'next/router';
 import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
@@ -14,6 +14,7 @@ import { MapSearch } from '../components/MapSearch';
 import { MapControls } from '../components/MapControls';
 import { PropertyInfoCard } from '../components/PropertyInfoCard';
 import { MobileBottomNav } from '../components/MobileBottomNav';
+import { CurrentLocationIndicator } from '../components/CurrentLocationIndicator';
 
 import { 
   containerStyle, 
@@ -1586,6 +1587,9 @@ export default function MapPage() {
   // Suppress linting warning - keeping for potential future use
   void currentLocationLoading;
 
+  // Track property card height for mobile controls positioning
+  const [propertyCardHeight, setPropertyCardHeight] = useState(0);
+
   // Track if property details were opened from the List page
   const [cameFromListView, setCameFromListView] = useState(false);
 
@@ -1763,6 +1767,25 @@ export default function MapPage() {
     );
   }, [map, isPropertyDataCached, cachePropertyData, zoom, mapCenter.lat, mapCenter.lng]);
 
+  // Zoom handlers for mobile controls
+  const handleZoomIn = useCallback(() => {
+    if (map) {
+      const currentZoom = map.getZoom() || zoom;
+      const newZoom = Math.min(currentZoom + 1, 21); // Max zoom is 21
+      map.setZoom(newZoom);
+      setZoom(newZoom);
+    }
+  }, [map, zoom]);
+
+  const handleZoomOut = useCallback(() => {
+    if (map) {
+      const currentZoom = map.getZoom() || zoom;
+      const newZoom = Math.max(currentZoom - 1, 1); // Min zoom is 1
+      map.setZoom(newZoom);
+      setZoom(newZoom);
+    }
+  }, [map, zoom]);
+
   // Support in-app focus current location requests (from bottom nav Map when already on map)
   useEffect(() => {
     const handler = () => {
@@ -1784,6 +1807,12 @@ export default function MapPage() {
   // Handle map click to drop new pin
   const handleMapClick = useCallback(async (event: google.maps.MapMouseEvent) => {
     if (!event.latLng) return;
+    
+    // Don't drop pins if search is focused or if search elements are visible
+    if (showDropdown || document.activeElement?.tagName === 'INPUT') {
+      console.log('📍 [PINS] Search focused - ignoring map click');
+      return;
+    }
     
     const lat = event.latLng.lat();
     const lng = event.latLng.lng();
@@ -1969,6 +1998,32 @@ export default function MapPage() {
     // Do not open modal immediately; wait for user to confirm via selection card
   }, [getCachedPropertyData, cachePropertyData]);
 
+  // Handle property selection from quick access
+  const handleQuickAccessPropertySelect = useCallback(async (property: PropertyWithFileCount) => {
+    console.log('🚀 [QUICK_ACCESS] Property selected:', property.address);
+    
+    // Convert PropertyWithFileCount to Property
+    const propertyObj: Property = {
+      id: property.id,
+      address: property.address,
+      lat: property.lat,
+      lng: property.lng,
+      label: property.label,
+      notes: property.notes,
+    };
+    
+    // Center map on the selected property
+    if (map) {
+      map.panTo({ lat: property.lat, lng: property.lng });
+      map.setZoom(SEARCH_ZOOM); // Use same zoom as search
+    }
+    setMapCenter({ lat: property.lat, lng: property.lng });
+    setZoom(SEARCH_ZOOM);
+    
+    // Handle the property selection (same as clicking a pin)
+    await handlePropertyPinClick(propertyObj);
+  }, [map, handlePropertyPinClick, showDropdown]);
+
   // Close details modal; navigate back to list if initiated from there
   const handleDetailsModalClose = useCallback(() => {
     setShowDetailsModal(false);
@@ -2012,7 +2067,14 @@ export default function MapPage() {
       ) : loadError ? (
         <div className="absolute inset-0 flex items-center justify-center text-red-600">Failed to load map.</div>
       ) : (
-        <GoogleMap
+        <div onClick={() => {
+          setShowDropdown(false);
+          // Also blur any focused input to ensure search is completely unfocused
+          if (document.activeElement?.tagName === 'INPUT') {
+            (document.activeElement as HTMLElement).blur();
+          }
+        }}>
+          <GoogleMap
           mapContainerStyle={containerStyle}
           center={mapCenter}
           onLoad={(mapInstance) => {
@@ -2123,8 +2185,13 @@ export default function MapPage() {
             />
           )}
 
-          {/* Mobile live location indicator removed */}
+          {/* Current location indicator with blue dot and accuracy circle */}
+          <CurrentLocationIndicator 
+            map={map}
+            isVisible={true}
+          />
         </GoogleMap>
+        </div>
       )}
         {/* Defer overlays until map is first idle to avoid layout flashes */}
         {(mapFirstIdle || !isLoaded) && (
@@ -2135,6 +2202,7 @@ export default function MapPage() {
           predictions={predictions}
           onPredictionsChange={setPredictions}
           onShowDropdownChange={setShowDropdown}
+          onPropertySelect={handleQuickAccessPropertySelect}
           />
         )}
         {(mapFirstIdle || !isLoaded) && (
@@ -2145,6 +2213,9 @@ export default function MapPage() {
             onCurrentLocationClick={handleCurrentLocationClick}
             showPropertyInfoCard={Boolean(selectedProperty && address)}
             isPropertyModalOpen={showDetailsModal}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            propertyCardHeight={selectedProperty && address ? propertyCardHeight : 0}
           />
         )}
 
@@ -2156,12 +2227,63 @@ export default function MapPage() {
           <PropertyInfoCard
             address={address}
             addressLoading={addressLoading}
+            property={selectedProperty}
             onMouseEnter={() => {}}
             onMouseLeave={() => {}}
             onClose={() => {
               setSelectedProperty(null);
               setAddress('');
+              setPropertyCardHeight(0); // Reset height when card is closed
             }}
+            onPropertyUpdate={(updatedProperty) => {
+              setSelectedProperty(updatedProperty);
+              setSavedProperty(updatedProperty);
+              // Update the property in the userProperties list
+              setUserProperties(prev => 
+                prev.map(p => p.id === updatedProperty.id ? updatedProperty : p)
+              );
+            }}
+            onPropertySave={async (propertyToSave) => {
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                  console.error('No user found for property save');
+                  return;
+                }
+
+                // Save the property to database
+                const { data: savedPropertyData, error } = await supabase
+                  .from('properties')
+                  .insert({
+                    user_id: user.id,
+                    address: propertyToSave.address,
+                    lat: propertyToSave.lat,
+                    lng: propertyToSave.lng,
+                    label: propertyToSave.label,
+                    notes: propertyToSave.notes
+                  })
+                  .select()
+                  .single();
+
+                if (error) {
+                  console.error('Error saving property:', error);
+                  return;
+                }
+
+                // Update the property with the new ID
+                const savedProperty = { ...propertyToSave, id: savedPropertyData.id };
+                setSelectedProperty(savedProperty);
+                setSavedProperty(savedProperty);
+                
+                // Add to userProperties list
+                setUserProperties(prev => [...prev, savedProperty]);
+                
+                console.log('🏠 [PROPERTY] Property saved successfully:', savedProperty);
+              } catch (error) {
+                console.error('Error saving property:', error);
+              }
+            }}
+            onHeightChange={setPropertyCardHeight}
             onSelect={async () => {
               if (!selectedProperty.id) {
                 // New, unsaved property: initialize and open modal
@@ -2193,6 +2315,7 @@ export default function MapPage() {
               // Hide the selection card once modal is opened
               setSelectedProperty(null);
               setAddress('');
+              setPropertyCardHeight(0); // Reset height when card is closed
             }}
           />
         )}

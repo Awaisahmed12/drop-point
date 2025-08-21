@@ -303,15 +303,46 @@ src/
 
 ## 🎯 Recent Updates & Features
 
+### **Enhanced Map Controls & Mobile UX ✅ COMPLETED (Latest Update)**
+
+**Mobile Zoom Controls:**
+- Added **+ and - zoom buttons** positioned directly under the current location re-centering button on mobile
+- Styled consistently with existing Google Maps-style controls
+- Provides explicit zoom controls for users who prefer buttons over pinch-to-zoom gestures
+- Properly positioned to avoid overlapping with other UI elements
+
+**Quick Access Properties:**
+- Implemented **Google Maps-style quick access** showing top 4 most recently visited properties
+- Appears under the search bar when focused but empty (just like Google Maps recent locations)
+- Shows property names, addresses, file counts, and intuitive property icons
+- Automatically sorts by last accessed/updated timestamps for maximum relevance
+- Seamlessly integrates with map - clicking a property centers map and shows selection card
+- **Smart Search Behavior**: Shows recent properties when empty, Google Maps suggestions when typing, and returns to recent properties when search is cleared
+- **Map Interaction Protection**: Prevents pin dropping when search is focused, automatically unfocuses search when clicking elsewhere on map
+- **Immediate State Updates**: Search suggestions and recent properties disappear instantly when clicking outside, preventing race conditions
+
+**Property Renaming Feature:**
+- Enhanced PropertyInfoCard to support **custom property names** for both saved and unsaved properties
+- Added edit button (pencil icon) next to property names for all properties
+- When custom name is set, **real address appears subtly underneath** in smaller, lighter text
+- **Auto-save on Rename**: Renaming an unsaved property automatically saves it to the database and locks in the pin
+- Saves changes to database for saved properties and updates local state for unsaved ones
+- Updates UI in real-time with proper error handling
+- **Smart X Button Behavior**: X button is hidden during property renaming to prevent accidental closure
+- **Improved X Button Positioning**: Moved to left side to prevent interference with zoom controls, especially on wide property cards
+- Enhanced X button aesthetics with rounded background, better positioning, and smooth hover effects
+
+**Accurate Current Location Blue Dot:**
+- Implemented **CurrentLocationIndicator component** using Google Maps API best practices
+- Creates custom blue dot matching Google Maps design (Google Blue #4285F4 with white border)
+- Uses `navigator.geolocation.watchPosition` for continuous, accurate location tracking
+- Includes **accuracy circle** showing location uncertainty radius
+- **Commercial-friendly**: Uses Google Maps API features and custom canvas drawing
+- Proper permission handling and automatic cleanup to prevent memory leaks
+
 ### **Selection Card for Existing Pins + Background Prefetch ✅ COMPLETED**
 
 ### **Current Location Zoom Tuning ✅ COMPLETED**
-
-### **Mobile Blue Dot (Live Location) ✅ COMPLETED**
-
-- When location permission is granted, a live blue dot appears at the user's current location.
-- Includes a subtle accuracy ring that updates in real-time.
-- Efficient geolocation watch starts only after permission and is cleaned up automatically.
 
 - Adjusted current location zoom to a friendlier neighborhood level on both web and mobile.
 - Uses a dedicated `CURRENT_LOCATION_ZOOM` constant for consistent behavior.

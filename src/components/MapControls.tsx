@@ -8,6 +8,9 @@ interface MapControlsProps {
   onCurrentLocationClick?: () => void;
   showPropertyInfoCard?: boolean;
   isPropertyModalOpen?: boolean;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  propertyCardHeight?: number;
 }
 
 export const MapControls = ({ 
@@ -16,6 +19,9 @@ export const MapControls = ({
   showDropdown = false,
   onCurrentLocationClick,
   isPropertyModalOpen = false,
+  onZoomIn,
+  onZoomOut,
+  propertyCardHeight = 0,
 }: MapControlsProps) => {
   // Desktop map type controls (left side) - now with 3 options
   const desktopMapControls = (
@@ -172,15 +178,32 @@ export const MapControls = ({
 
   // Current location button for mobile (separate positioning at bottom)
   // Smart positioning: Calculate exact clearance above PropertyInfoCard
-  // PropertyInfoCard: bottom-6 (24px) + ~144px height = 168px total
-  // Add 52px padding for comfortable separation = 220px minimum clearance
+  // Adaptive positioning based on property card height, with search bar as upper limit
+  const calculateMobileButtonPosition = () => {
+    const baseOffset = 88; // Bottom nav height
+    const cardPadding = 52; // Padding above card
+    const searchBarHeight = 96; // Search bar area height (top-6 = 24px + input height + padding)
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    
+    // If property card is visible, position above it
+    if (propertyCardHeight > 0) {
+      const bottomPosition = baseOffset + propertyCardHeight + cardPadding;
+      const maxBottomPosition = viewportHeight - searchBarHeight - 200; // 200px = button stack height
+      
+      // Use the smaller value to ensure we don't hit the search bar
+      return Math.min(bottomPosition, maxBottomPosition);
+    }
+    
+    // Default position when no card
+    return 280;
+  };
+
   const mobileCurrentLocationButton = shouldShowMobileControls && onCurrentLocationClick && !isPropertyModalOpen && (
-    <div className="absolute right-4 z-50 sm:hidden" 
+    <div className="absolute right-4 z-50 sm:hidden flex flex-col gap-2" 
           style={{
-            // Ensure the button sits clearly ABOVE the PropertyInfoCard header/X
-            // Slightly lower for optimal reach
-            bottom: '280px'
+            bottom: `${calculateMobileButtonPosition()}px`
           }}>
+      {/* Current Location Button */}
       <button
         className={`relative w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl active:scale-[0.98] cursor-pointer`}
         onClick={onCurrentLocationClick}
@@ -207,6 +230,59 @@ export const MapControls = ({
            <circle cx="12" cy="12" r="3"></circle>
          </svg>
         </button>
+      
+      {/* Zoom In Button */}
+      {onZoomIn && (
+        <button
+          className={`relative w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl active:scale-[0.98] cursor-pointer`}
+          onClick={onZoomIn}
+          style={{ 
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+          }}
+          aria-label="Zoom in"
+        >
+          {/* Plus icon */}
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="3" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      )}
+      
+      {/* Zoom Out Button */}
+      {onZoomOut && (
+        <button
+          className={`relative w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl active:scale-[0.98] cursor-pointer`}
+          onClick={onZoomOut}
+          style={{ 
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+          }}
+          aria-label="Zoom out"
+        >
+          {/* Minus icon */}
+          <svg 
+            width="16" 
+            height="16" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="3" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      )}
     </div>
   );
 
