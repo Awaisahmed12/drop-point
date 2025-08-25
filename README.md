@@ -90,6 +90,10 @@ DropPoint is a map-based document management platform for real estate profession
 - Touch-optimized interface (44px+ touch targets)
 - Responsive layout for all screen sizes
 - iOS web app optimizations
+- **🎯 Thumb-Friendly Map Controls**: Mobile map controls positioned lower for better thumb accessibility
+- **🚫 Smart Control Hiding**: Map controls automatically hide during property interactions (pin drops, property viewing, modal open)
+- **📱 Mobile-Optimized Positioning**: Controls positioned at 180px from bottom for comfortable thumb reach
+- **🎭 Context-Aware UI**: Controls disappear when not needed, providing clean interface during property management
 
 ### **Enhanced User Experience**
 - Global cursor pointer rules for all clickable elements
@@ -738,6 +742,10 @@ The PropertySwitcher allows users to quickly switch between their saved properti
 - POI-free experience (no distracting business markers)
 - Enhanced mobile viewport handling
 - Improved touch targets and interactions
+- **🎯 Thumb-Optimized Controls**: Map controls positioned at 180px from bottom for comfortable thumb reach
+- **🚫 Context-Aware Visibility**: Controls automatically hide during property interactions (pin drops, property viewing, modal open)
+- **📱 Smart Control Management**: Uses `selectedProperty`, `isPropertyModalOpen`, and `showPropertyInfoCard` states to determine visibility
+- **🎭 Clean Interface**: Provides distraction-free experience when users are focused on property management
 
 ### **Upload System Enhancements**
 - Streamlined progress indicators

@@ -2266,7 +2266,7 @@ export default function MapPage() {
           />
         )}
         {(mapFirstIdle || !isLoaded) && (
-          <MapControls 
+                    <MapControls
             mapType={mapType}
             onMapTypeChange={setMapType}
             showDropdown={showDropdown}
@@ -2276,6 +2276,7 @@ export default function MapPage() {
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             propertyCardHeight={selectedProperty && address ? propertyCardHeight : 0}
+            selectedProperty={selectedProperty}
           />
         )}
 

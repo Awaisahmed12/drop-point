@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Property } from '../../types';
 
 interface MapControlsProps {
   mapType: string;
@@ -11,6 +12,7 @@ interface MapControlsProps {
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   propertyCardHeight?: number;
+  selectedProperty?: Property | null; // Add selectedProperty to props
 }
 
 export const MapControls = ({ 
@@ -18,10 +20,12 @@ export const MapControls = ({
   onMapTypeChange, 
   showDropdown = false,
   onCurrentLocationClick,
+  showPropertyInfoCard = false,
   isPropertyModalOpen = false,
   onZoomIn,
   onZoomOut,
   propertyCardHeight = 0,
+  selectedProperty = null, // Add selectedProperty parameter
 }: MapControlsProps) => {
   // Desktop map type controls (left side) - now with 3 options
   const desktopMapControls = (
@@ -134,7 +138,8 @@ export const MapControls = ({
 
   // Mobile controls (right side, circular, Google Maps style)
   // Show when not actively searching or when dropdown is not visible
-  const shouldShowMobileControls = !showDropdown;
+  // AND when no property interaction is happening
+  const shouldShowMobileControls = !showDropdown && !selectedProperty && !isPropertyModalOpen && !showPropertyInfoCard;
 
   // Keep only the map-type toggle as a floating side button on mobile
   const mobileControls = shouldShowMobileControls && (
@@ -179,6 +184,7 @@ export const MapControls = ({
   // Current location button for mobile (separate positioning at bottom)
   // Smart positioning: Calculate exact clearance above PropertyInfoCard
   // Adaptive positioning based on property card height, with search bar as upper limit
+  // Positioned much lower for better thumb accessibility
   const calculateMobileButtonPosition = () => {
     const baseOffset = 88; // Bottom nav height
     const cardPadding = 52; // Padding above card
@@ -194,11 +200,11 @@ export const MapControls = ({
       return Math.min(bottomPosition, maxBottomPosition);
     }
     
-    // Default position when no card
-    return 280;
+    // Default position when no card - positioned much lower for better thumb accessibility
+    return 180; // Changed from 280 to 180 for better thumb reach
   };
 
-  const mobileCurrentLocationButton = shouldShowMobileControls && onCurrentLocationClick && !isPropertyModalOpen && (
+  const mobileCurrentLocationButton = shouldShowMobileControls && onCurrentLocationClick && (
     <div className="absolute right-4 z-50 sm:hidden flex flex-col gap-2" 
           style={{
             bottom: `${calculateMobileButtonPosition()}px`
