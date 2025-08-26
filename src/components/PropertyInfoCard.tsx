@@ -131,7 +131,10 @@ export const PropertyInfoCard = ({
           <button
             aria-label="Close"
             className="absolute top-3 right-3 p-1 text-gray-500 hover:text-gray-700 transition-colors duration-200"
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent event from bubbling up to map
+              onClose();
+            }}
             title="Close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
