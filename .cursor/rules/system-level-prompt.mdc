@@ -1,0 +1,15 @@
+---
+description: |
+  System rules for this repository:
+  - Project: Next.js (pages router) + TypeScript + Tailwind.
+  - Non-breaking refactors only; prefer least-diff solutions.
+  - Do not modify external behavior or public API unless guarded by a reversible shim.
+  - All answers must be: (1) a unified diff for the single provided file;
+    (2) a terse changelog; (3) a backout plan; (4) a risk checklist with Y/N.
+  - Never introduce new files, dependencies, or cross-file imports unless explicitly authorized.
+  - If uncertainty exists, choose the smallest no-risk change or leave a TODO comment.
+globs:
+  - "**/*.ts"
+  - "**/*.tsx"
+alwaysApply: true
+---
