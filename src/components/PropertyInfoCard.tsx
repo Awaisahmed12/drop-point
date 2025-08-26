@@ -157,6 +157,15 @@ export const PropertyInfoCard = ({
                     type="text"
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isSaving) {
+                        e.preventDefault();
+                        handleSaveName();
+                      } else if (e.key === 'Escape' && !isSaving) {
+                        e.preventDefault();
+                        handleCancelEdit();
+                      }
+                    }}
                     className="w-full px-3 py-2 text-lg font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder={streetAddress || "Enter property name"}
                     autoFocus

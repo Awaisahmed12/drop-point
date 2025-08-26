@@ -6,6 +6,7 @@ import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { useUserProperties } from '../hooks/useUserProperties';
 import type { PropertyWithFileCount } from '../../types';
 import { useMobileViewport } from '../hooks/useMobileViewport';
+import { supabase } from '../utils/supabaseClient';
 
 interface ListViewProps {
   isOpen: boolean;
@@ -21,10 +22,16 @@ export const ListView = ({
   variant = 'modal'
 }: ListViewProps) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [propertyMenuId, setPropertyMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{[key: string]: {top?: number, bottom?: number, left?: number, right?: number}}>({});
+  const [renamingPropertyId, setRenamingPropertyId] = useState<string | null>(null);
+  const [renamingPropertyName, setRenamingPropertyName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const propertyMenuRef = useRef<HTMLDivElement>(null);
   
   const { isMobile, getModalDimensions, mobileClasses } = useMobileViewport();
-  const { properties, loading, error } = useUserProperties();
+  const { properties, loading, error, refreshProperties } = useUserProperties();
 
   // Parse address for clean display (same as PropertyDetailsModal)
   const parseAddress = (fullAddress: string) => {
@@ -45,7 +52,13 @@ export const ListView = ({
   // Filter and sort properties
   const filteredProperties = properties.filter(property => {
     if (!searchQuery.trim()) return true;
-    return property.address.toLowerCase().includes(searchQuery.toLowerCase().trim());
+    
+    const query = searchQuery.toLowerCase().trim();
+    const addressLower = property.address.toLowerCase();
+    const labelLower = property.label?.toLowerCase() || '';
+    
+    // Search by custom name (label) first, then by address
+    return labelLower.includes(query) || addressLower.includes(query);
   });
 
   const sortedProperties = filteredProperties.sort((a, b) => {
@@ -70,8 +83,105 @@ export const ListView = ({
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery('');
+      setPropertyMenuId(null);
+      setRenamingPropertyId(null);
+      setRenamingPropertyName('');
     }
   }, [isOpen]);
+
+  // Calculate menu position
+  const calculateMenuPosition = (button: HTMLElement, propertyId: string) => {
+    const rect = button.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    if (spaceBelow >= 200) {
+      // Position below
+      setMenuPosition(prev => ({
+        ...prev,
+        [propertyId]: {
+          top: rect.bottom + 8,
+          left: rect.left - 150 + rect.width // Align right edge
+        }
+      }));
+    } else if (spaceAbove >= 200) {
+      // Position above
+      setMenuPosition(prev => ({
+        ...prev,
+        [propertyId]: {
+          bottom: window.innerHeight - rect.top + 8,
+          left: rect.left - 150 + rect.width // Align right edge
+        }
+      }));
+    } else {
+      // Position to the right
+      setMenuPosition(prev => ({
+        ...prev,
+        [propertyId]: {
+          top: rect.top,
+          left: rect.right + 8
+        }
+      }));
+    }
+  };
+
+  // Handle click outside to close menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (propertyMenuRef.current && !propertyMenuRef.current.contains(event.target as Node)) {
+        setPropertyMenuId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handle property rename
+  const handleRename = async (property: PropertyWithFileCount, newName: string) => {
+    try {
+      setIsSaving(true);
+      
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('No active session');
+        return;
+      }
+
+      const trimmedName = newName.trim();
+      if (!trimmedName) {
+        console.error('Property name cannot be empty');
+        return;
+      }
+
+      // Update the property label in the database
+      const { error } = await supabase
+        .from('properties')
+        .update({ label: trimmedName })
+        .eq('id', property.id)
+        .eq('user_id', session.user.id);
+
+      if (error) {
+        console.error('Error renaming property:', error);
+        return;
+      }
+
+      // Close rename mode
+      setRenamingPropertyId(null);
+      setRenamingPropertyName('');
+      setPropertyMenuId(null);
+      
+      // Refresh properties to show the new name in the UI
+      await refreshProperties();
+      
+      console.log('Property renamed successfully:', trimmedName);
+    } catch (error) {
+      console.error('Error renaming property:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -123,7 +233,7 @@ export const ListView = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search properties..."
+                              placeholder="Search by custom name or address..."
               className={`w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-gray-900 placeholder-gray-400 ${
                 isMobile ? 'text-base' : 'text-sm'
               }`}
@@ -208,17 +318,23 @@ export const ListView = ({
                 const { streetAddress, locationInfo } = parseAddress(property.address);
                 
                 return (
-                  <div
-                    key={property.id}
-                    onClick={() => {
-                      onPropertySelect(property);
-                      if (variant === 'modal') onClose();
-                    }}
-                    className={`flex items-center justify-between ${isMobile ? 'px-4 py-4' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-2 cursor-pointer group`}
-                    style={{ minHeight: isMobile ? '72px' : '56px' }}
-                  >
-                    <div className="flex items-center min-w-0 flex-1">
-                      {/* Street View thumbnail */}
+                                     <div
+                     key={property.id}
+                     onClick={() => {
+                       // Don't allow property selection when renaming
+                       if (renamingPropertyId === property.id) return;
+                       onPropertySelect(property);
+                       if (variant === 'modal') onClose();
+                     }}
+                     className={`flex items-center justify-between ${isMobile ? 'px-4 py-4' : 'px-3 py-3'} rounded-lg transition border border-gray-100 mb-2 ${
+                       renamingPropertyId === property.id 
+                         ? 'cursor-default bg-gray-50' 
+                         : 'cursor-pointer hover:bg-gray-100 group'
+                     }`}
+                     style={{ minHeight: isMobile ? '72px' : '56px' }}
+                   >
+                                         <div className="flex items-center min-w-0 flex-1">
+                       {/* Street View thumbnail */}
                       <div className={`${isMobile ? 'w-16 h-16' : 'w-14 h-14'} rounded-lg overflow-hidden bg-gray-200 mr-4 flex-shrink-0 border border-gray-100`}>
                         <Image
                           src={`https://maps.googleapis.com/maps/api/streetview?size=${isMobile ? '160x160' : '140x140'}&location=${property.lat},${property.lng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`}
@@ -237,58 +353,199 @@ export const ListView = ({
                         />
                       </div>
                       
-                      <div className="flex-1 min-w-0">
-                        {/* Street Address - matches PropertyDetailsModal styling */}
-                        <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-lg' : 'text-base'} group-hover:text-blue-600 transition-colors`}>
-                          {streetAddress || property.address}
-                        </div>
-                        
-                        {/* Location Info and File Count */}
-                        <div className={`${isMobile ? 'text-sm mt-1' : 'text-xs mt-0.5'} text-gray-500`}>
-                          {isMobile ? (
-                            // Mobile: Stack location and file count vertically for better readability
-                            <div className="space-y-1">
-                              {locationInfo && (
-                                <div className="truncate">{locationInfo}</div>
-                              )}
-                              <div className="text-gray-600 font-medium">
-                                {property.file_count} file{property.file_count === 1 ? '' : 's'}
+                                                                  {/* Normal Property Display */}
+                     <div className="flex-1 min-w-0">
+                       {/* Custom Name or Street Address - matches PropertyDetailsModal styling */}
+                       <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-lg' : 'text-base'} group-hover:text-blue-600 transition-colors`}>
+                         {property.label || streetAddress || property.address}
+                       </div>
+                       
+                       {/* Show real address below custom name, or just location info if no custom name */}
+                       {property.label && (
+                         <div className={`${isMobile ? 'text-sm mt-1' : 'text-xs mt-0.5'} text-gray-500 italic`}>
+                           {streetAddress}
+                         </div>
+                       )}
+                       
+                       {/* Location Info and File Count */}
+                       <div className={`${isMobile ? 'text-sm mt-1' : 'text-xs mt-0.5'} text-gray-500`}>
+                         {isMobile ? (
+                           // Mobile: Stack location and file count vertically for better readability
+                           <div className="space-y-1">
+                             {locationInfo && (
+                               <div className="truncate">{locationInfo}</div>
+                             )}
+                             <div className="text-gray-600 font-medium">
+                               {property.file_count} file{property.file_count === 1 ? '' : 's'}
+                             </div>
+                           </div>
+                         ) : (
+                           // Desktop: Keep inline with dots
+                           <div className="flex items-center gap-2">
+                             {locationInfo && (
+                               <>
+                                 <span className="truncate">{locationInfo}</span>
+                                 <span>•</span>
+                               </>
+                             )}
+                             <span>{property.file_count} file{property.file_count === 1 ? '' : 's'}</span>
+                             {property.last_accessed && (
+                               <>
+                                 <span>•</span>
+                                 <span>Last accessed {new Date(property.last_accessed).toLocaleDateString()}</span>
+                               </>
+                             )}
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                     </div>
+                     
+
+                     
+                                          {/* Three-dot menu - matches PropertyDetailsModal style */}
+                     <div className="ml-4 flex-shrink-0 relative">
+                       <button
+                         className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200 transition-colors"
+                         style={{ minWidth: 24, minHeight: 24 }}
+                                                   onClick={e => {
+                            e.stopPropagation();
+                            setPropertyMenuId(null);
+                            const newMenuId = propertyMenuId === property.id ? null : property.id;
+                            setPropertyMenuId(newMenuId);
+                            if (newMenuId && property.id) {
+                              calculateMenuPosition(e.currentTarget, property.id);
+                            }
+                          }}
+                         title="Property actions"
+                       >
+                         <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                           <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                         </svg>
+                       </button>
+                       
+                       {/* Property Actions Menu */}
+                       {propertyMenuId === property.id && (
+                         <div 
+                           ref={propertyMenuRef} 
+                           className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
+                           style={{
+                             zIndex: 999999,
+                             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                             ...(property.id ? menuPosition[property.id] : {})
+                           }}
+                         >
+                                                       <button
+                              className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
+                              onClick={e => {
+                                e.stopPropagation();
+                                onPropertySelect(property);
+                                if (variant === 'modal') onClose();
+                                setPropertyMenuId(null);
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                View Property
                               </div>
-                            </div>
-                          ) : (
-                            // Desktop: Keep inline with dots
-                            <div className="flex items-center gap-2">
-                              {locationInfo && (
-                                <>
-                                  <span className="truncate">{locationInfo}</span>
-                                  <span>•</span>
-                                </>
-                              )}
-                              <span>{property.file_count} file{property.file_count === 1 ? '' : 's'}</span>
-                              {property.last_accessed && (
-                                <>
-                                  <span>•</span>
-                                  <span>Last accessed {new Date(property.last_accessed).toLocaleDateString()}</span>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Arrow - matches PropertyDetailsModal style */}
-                    <div className="ml-4 flex-shrink-0">
-                      <svg 
-                        className={`${isMobile ? 'w-6 h-6' : 'w-5 h-5'} text-gray-300 group-hover:text-blue-600 transition-colors`}
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
+                            </button>
+                                                         <button
+                               className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-all duration-150"
+                               onClick={e => {
+                                 e.stopPropagation();
+                                 setRenamingPropertyId(property.id);
+                                 setRenamingPropertyName(property.label || '');
+                                 setPropertyMenuId(null);
+                               }}
+                             >
+                              <div className="flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Rename
+                              </div>
+                            </button>
+
+                           <button
+                             className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150"
+                             onClick={e => {
+                               e.stopPropagation();
+                               // Copy address to clipboard
+                               navigator.clipboard.writeText(property.address);
+                               setPropertyMenuId(null);
+                             }}
+                           >
+                             <div className="flex items-center gap-2">
+                               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H8zM16 8h2a2 2 0 012 2v8a2 2 0 01-2 2h-2M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H8z" />
+                               </svg>
+                               Copy Address
+                             </div>
+                           </button>
+                         </div>
+                       )}
+                     </div>
+                     
+                     {/* Rename Popup - appears when renaming this property */}
+                     {renamingPropertyId === property.id && (
+                       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                         <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 border border-gray-200">
+                           <div className="text-center mb-6">
+                             <h3 className="text-lg font-semibold text-gray-900 mb-2">Rename Property</h3>
+                             <p className="text-sm text-gray-500">Enter a new name for this property</p>
+                           </div>
+                           
+                           <div className="space-y-4">
+                             <input
+                               type="text"
+                               value={renamingPropertyName}
+                               onChange={(e) => setRenamingPropertyName(e.target.value)}
+                               onKeyDown={(e) => {
+                                 if (e.key === 'Enter' && !isSaving) {
+                                   handleRename(property, renamingPropertyName);
+                                 } else if (e.key === 'Escape') {
+                                   setRenamingPropertyId(null);
+                                   setRenamingPropertyName('');
+                                 }
+                               }}
+                               className="w-full px-4 py-3 text-lg font-medium text-gray-900 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                               placeholder="Enter property name"
+                               autoFocus
+                               disabled={isSaving}
+                             />
+                             
+                             <div className="flex gap-3">
+                               <button
+                                 className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                 onClick={() => {
+                                   setRenamingPropertyId(null);
+                                   setRenamingPropertyName('');
+                                 }}
+                                 disabled={isSaving}
+                               >
+                                 Cancel
+                               </button>
+                               <button
+                                 className="flex-1 px-4 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                 onClick={() => handleRename(property, renamingPropertyName)}
+                                 disabled={isSaving}
+                               >
+                                 {isSaving ? 'Saving...' : 'Save'}
+                               </button>
+                             </div>
+                           </div>
+                           
+                           <div className="mt-4 text-center">
+                             <p className="text-xs text-gray-400">
+                               Press Enter to save, Escape to cancel
+                             </p>
+                           </div>
+                         </div>
+                       </div>
+                     )}
                   </div>
                 );
               })}

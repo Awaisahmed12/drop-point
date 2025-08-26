@@ -105,9 +105,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const addressLower = prop.address.toLowerCase();
           const labelLower = prop.label?.toLowerCase() || '';
           
-          return addressLower.includes(inputLower) || 
-                 labelLower.includes(inputLower) ||
-                 inputLower.length > 2 && (addressLower.includes(inputLower) || labelLower.includes(inputLower));
+          // Enhanced matching: prioritize exact matches, then partial matches
+          // Check if input matches the beginning of label or address (higher priority)
+          const labelStartsWith = labelLower.startsWith(inputLower);
+          const addressStartsWith = addressLower.startsWith(inputLower);
+          
+          // Check if input is contained anywhere in label or address
+          const labelContains = labelLower.includes(inputLower);
+          const addressContains = addressLower.includes(inputLower);
+          
+          // Return true if any match is found
+          return labelStartsWith || addressStartsWith || labelContains || addressContains;
         })
       : userProperties.slice(0, 8); // For empty input, return top 8 recent properties
 
@@ -116,6 +124,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const addressParts = prop.address.split(',');
       const mainText = prop.label ? `${prop.label}` : addressParts[0];
       const secondaryText = prop.label ? prop.address : addressParts.slice(1).join(',').trim();
+      
+      // Calculate match score for better ranking
+      const addressLower = prop.address.toLowerCase();
+      const labelLower = prop.label?.toLowerCase() || '';
+      const inputLower = input.toLowerCase();
+      
+      let matchScore = 0;
+      
+      // Highest priority: exact label match
+      if (labelLower === inputLower) matchScore += 1000;
+      // High priority: label starts with input
+      else if (labelLower.startsWith(inputLower)) matchScore += 500;
+      // Medium priority: label contains input
+      else if (labelLower.includes(inputLower)) matchScore += 300;
+      
+      // Address matching (lower priority than label)
+      if (addressLower.startsWith(inputLower)) matchScore += 200;
+      else if (addressLower.includes(inputLower)) matchScore += 100;
+      
+      // Recency bonus (most recent properties get slight boost)
+      const recencyBonus = Math.max(0, 50 - (index * 2)); // 50 for first, 48 for second, etc.
+      matchScore += recencyBonus;
       
       return {
         description: prop.address,
@@ -132,7 +162,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         terms: [],
         matched_substrings: [],
         reference: `user_${prop.id}`,
-        ranking: index // Use index as ranking (earlier = more recent)
+        ranking: matchScore // Use calculated match score for ranking
       } as google.maps.places.AutocompletePrediction & { 
         user_property: boolean; 
         property_id: string; 
@@ -192,7 +222,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return !hasUserPropertyVersion;
     });
 
-    // Sort predictions: user properties first (by recency), then Google predictions
+    // Sort predictions: user properties first (by match score), then Google predictions
     const sortedPredictions = uniquePredictions.sort((a, b) => {
       const aIsUser = a.types?.includes('user_property') || false;
       const bIsUser = b.types?.includes('user_property') || false;
@@ -201,11 +231,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (aIsUser && !bIsUser) return -1;
       if (!aIsUser && bIsUser) return 1;
       
-      // Among user properties, sort by ranking (recency)
+      // Among user properties, sort by ranking (match score - higher is better)
       if (aIsUser && bIsUser) {
-        const aRanking = (a as unknown as { ranking?: number }).ranking || 999;
-        const bRanking = (b as unknown as { ranking?: number }).ranking || 999;
-        return aRanking - bRanking;
+        const aRanking = (a as unknown as { ranking?: number }).ranking || 0;
+        const bRanking = (b as unknown as { ranking?: number }).ranking || 0;
+        return bRanking - aRanking; // Higher scores first
       }
       
       // Google predictions maintain their original order

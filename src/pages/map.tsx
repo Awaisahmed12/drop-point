@@ -2082,7 +2082,16 @@ export default function MapPage() {
     
     // Handle the property selection (same as clicking a pin)
     await handlePropertyPinClick(propertyObj);
-  }, [map, handlePropertyPinClick, showDropdown]);
+  }, [map, handlePropertyPinClick]);
+
+  // Handle map container click - close dropdown and blur inputs
+  const handleMapContainerClick = useCallback(() => {
+    setShowDropdown(false);
+    // Also blur any focused input to ensure search is completely unfocused
+    if (document.activeElement?.tagName === 'INPUT') {
+      (document.activeElement as HTMLElement).blur();
+    }
+  }, []);
 
   // Close details modal; navigate back to list if initiated from there
   const handleDetailsModalClose = useCallback(() => {
@@ -2127,13 +2136,7 @@ export default function MapPage() {
       ) : loadError ? (
         <div className="absolute inset-0 flex items-center justify-center text-red-600">Failed to load map.</div>
       ) : (
-        <div onClick={() => {
-          setShowDropdown(false);
-          // Also blur any focused input to ensure search is completely unfocused
-          if (document.activeElement?.tagName === 'INPUT') {
-            (document.activeElement as HTMLElement).blur();
-          }
-        }}>
+        <div onClick={handleMapContainerClick}>
           <GoogleMap
           mapContainerStyle={containerStyle}
           center={mapCenter}

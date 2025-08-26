@@ -26,7 +26,13 @@ export const PropertySwitcher = ({
   // Filter properties based on search query (keep current property but we'll handle it specially)
   const filteredProperties = properties.filter(property => {
     if (!searchQuery) return true;
-    return property.address.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const query = searchQuery.toLowerCase();
+    const addressLower = property.address.toLowerCase();
+    const labelLower = property.label?.toLowerCase() || '';
+    
+    // Search by custom name (label) first, then by address
+    return labelLower.includes(query) || addressLower.includes(query);
   });
 
   // Sort by last accessed (most recent first)
@@ -158,7 +164,7 @@ export const PropertySwitcher = ({
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Search properties..."
+                placeholder="Search by custom name or address..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base placeholder-gray-600"
@@ -200,9 +206,19 @@ export const PropertySwitcher = ({
                         <div className={`font-semibold text-sm ${
                           isCurrentProperty ? 'text-blue-700' : 'text-gray-900'
                         }`}>
-                          {streetAddress || property.address}
+                          {property.label || streetAddress || property.address}
                         </div>
-                        {locationInfo && (
+                        
+                        {/* Show real address below custom name, or just location info if no custom name */}
+                        {property.label && (
+                          <div className={`text-xs mt-1 ${
+                            isCurrentProperty ? 'text-blue-600' : 'text-gray-500'
+                          } italic`}>
+                            {streetAddress}
+                          </div>
+                        )}
+                        
+                        {locationInfo && !property.label && (
                           <div className={`text-xs mt-1 ${
                             isCurrentProperty ? 'text-blue-600' : 'text-gray-500'
                           }`}>
@@ -250,7 +266,7 @@ export const PropertySwitcher = ({
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Search properties..."
+                placeholder="Search by custom name or address..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm placeholder-gray-600"
@@ -290,9 +306,19 @@ export const PropertySwitcher = ({
                         <div className={`font-medium text-sm ${
                           isCurrentProperty ? 'text-blue-700' : 'text-gray-900'
                         }`}>
-                          {streetAddress || property.address}
+                          {property.label || streetAddress || property.address}
                         </div>
-                        {locationInfo && (
+                        
+                        {/* Show real address below custom name, or just location info if no custom name */}
+                        {property.label && (
+                          <div className={`text-xs mt-0.5 ${
+                            isCurrentProperty ? 'text-blue-600' : 'text-gray-500'
+                          } italic`}>
+                            {streetAddress}
+                          </div>
+                        )}
+                        
+                        {locationInfo && !property.label && (
                           <div className={`text-xs mt-0.5 ${
                             isCurrentProperty ? 'text-blue-600' : 'text-gray-500'
                           }`}>

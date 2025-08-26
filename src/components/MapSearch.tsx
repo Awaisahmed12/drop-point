@@ -15,17 +15,17 @@ interface MapSearchProps {
 
 // Helper function to check if a prediction is a user property
 const isUserProperty = (prediction: Prediction): boolean => {
-  return prediction.isUserProperty || prediction.types?.includes('user_property') || false;
+  return prediction.isUserProperty || prediction.user_property || false;
 };
 
 // Helper function to get main text from prediction
 const getMainText = (prediction: Prediction): string => {
-  return prediction.structured_formatting?.main_text || prediction.description.split(',')[0];
+  return prediction.displayText || prediction.structured_formatting?.main_text || prediction.description.split(',')[0];
 };
 
 // Helper function to get secondary text from prediction
 const getSecondaryText = (prediction: Prediction): string => {
-  return prediction.structured_formatting?.secondary_text || prediction.description.split(',').slice(1).join(',');
+  return prediction.secondaryText || prediction.structured_formatting?.secondary_text || prediction.description.split(',').slice(1).join(',');
 };
 
 export const MapSearch = ({ 
@@ -58,8 +58,6 @@ export const MapSearch = ({
 
   // Fetch predictions from the autocomplete API with auth token
   const fetchPredictions = useCallback(async (input: string): Promise<Prediction[]> => {
-    if (!input.trim()) return [];
-    
     try {
       // Get the current session to include auth token
       const response = await fetch(`/api/autocomplete?input=${encodeURIComponent(input)}`, {
@@ -70,10 +68,16 @@ export const MapSearch = ({
       
       if (response.ok) {
         const data = await response.json();
-        const predictions: Prediction[] = data.predictions.map((p: google.maps.places.AutocompletePrediction) => ({
+        const predictions: Prediction[] = data.predictions.map((p: google.maps.places.AutocompletePrediction & { user_property?: boolean; property_id?: string }) => ({
           description: p.description,
           place_id: p.place_id,
-          isUserProperty: p.structured_formatting?.main_text?.includes('[Saved]') || false,
+          isUserProperty: p.user_property || false,
+          property_id: p.property_id || null,
+          // Preserve the structured formatting for display
+          structured_formatting: p.structured_formatting,
+          // Use custom name if available, otherwise fall back to description
+          displayText: p.structured_formatting?.main_text || p.description,
+          secondaryText: p.structured_formatting?.secondary_text || '',
         }));
         return predictions;
       }

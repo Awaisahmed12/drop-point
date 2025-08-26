@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 Act as my proactive senior engineer. As I chat or type ideas, you immediately write the code, no questions unless absolutely necessary (e.g., unclear logic, external API limits, or real-world constraints).
 

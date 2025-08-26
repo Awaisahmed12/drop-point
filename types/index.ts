@@ -49,6 +49,9 @@ export type Prediction = {
   user_property?: boolean;
   property_id?: string;
   isUserProperty?: boolean;
+  // Enhanced display fields
+  displayText?: string;
+  secondaryText?: string;
 };
 
 // Upload file status type

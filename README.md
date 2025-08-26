@@ -64,6 +64,9 @@ DropPoint is a map-based document management platform for real estate profession
     - **Memory Management**: Proper cleanup and efficient state management
   - **Hook Compliance**: Fixed React Rules of Hooks violations for stable rendering and performance
   - **Code Quality**: Refactored MapSearch component with helper functions, useCallback optimization, and improved maintainability
+  - **Search Enhancement**: Fixed custom property name search functionality - now "home" will find properties with custom names
+  - **List View Integration**: Enhanced ListView and PropertySwitcher to prominently display custom names with search functionality
+  - **Enhanced ListView Actions**: Replaced arrow with three-dot menu providing View Property, Rename, and Copy Address actions with clean popup rename experience
   - **Build Optimization**: ✅ Production build successful with TypeScript strict mode compliance
   - **Context Menu Fixes**: Corrected file vs folder delete operations for proper functionality
 
@@ -337,6 +340,7 @@ src/
 - **Smart X Button Behavior**: X button is hidden during property renaming to prevent accidental closure
 - **Improved X Button Positioning**: Moved to left side to prevent interference with zoom controls, especially on wide property cards
 - Enhanced X button aesthetics with rounded background, better positioning, and smooth hover effects
+- **Keyboard Shortcuts**: Press Enter to save or Escape to cancel during property renaming for improved workflow efficiency
 
 **Accurate Current Location Blue Dot:**
 - Implemented **CurrentLocationIndicator component** using Google Maps API best practices

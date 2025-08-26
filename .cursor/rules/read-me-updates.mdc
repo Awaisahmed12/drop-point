@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 After every code update, bug fix, feature addition, or problem resolution, please update the @README.md file tohe current state of the project. This file should always serve as a clear, living guide to:
 
