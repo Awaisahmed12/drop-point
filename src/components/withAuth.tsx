@@ -11,19 +11,17 @@ export function withAuth<P extends object>(
   WrappedComponent: React.ComponentType<P>,
   options: WithAuthOptions = {}
 ) {
-  const { redirectTo = '/', requireAuth = true } = options;
+  const { requireAuth = true } = options;
 
   return function AuthenticatedComponent(props: P) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
     useEffect(() => {
       const checkAuth = async () => {
         try {
           const { data: { session } } = await supabase.auth.getSession();
           const authenticated = !!session;
-          setIsAuthenticated(authenticated);
 
           if (requireAuth && !authenticated) {
             // User needs to be authenticated but isn't - redirect to login
@@ -50,7 +48,6 @@ export function withAuth<P extends object>(
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         async (event, session) => {
           const authenticated = !!session;
-          setIsAuthenticated(authenticated);
 
           if (requireAuth && !authenticated) {
             router.replace('/');

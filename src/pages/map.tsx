@@ -1905,89 +1905,56 @@ function MapPage() {
         setSelectedProperty(null);
       }
 
-      setAddressLoading(true);
+      // Create new property immediately at exact coordinates
+      const newProperty: Property = {
+        id: null, // Will be assigned when saved
+        address: `Location (${lat.toFixed(6)}, ${lng.toFixed(6)})`, // Default address with coordinates
+        lat,
+        lng,
+        label: null,
+        notes: null,
+      };
       
+      // Set as current property and show info card
+      setSelectedProperty(newProperty);
+      setAddress(newProperty.address);
+      setSnappedLatLng({ lat, lng });
+      
+      console.log('📍 [PINS] New pin created at exact coordinates');
+      
+      // Optionally try to get a human-readable address in the background
+      setAddressLoading(true);
       try {
-        // Get address for the new pin location
         const res = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
         
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        
-        const data = await res.json();
-        
-        if (data.results && data.results[0]) {
-          const address = data.results[0].formatted_address;
-          const snapped = data.results[0].geometry.location;
-          const snappedLatLng = { lat: snapped.lat, lng: snapped.lng };
+        if (res.ok) {
+          const data = await res.json();
           
-          console.log('📍 [PINS] New pin address:', address);
-          
-          // Create new property for pin
-          const newProperty: Property = {
-            id: null, // Will be assigned when saved
-            address,
-            lat: snappedLatLng.lat,
-            lng: snappedLatLng.lng,
-            label: null,
-            notes: null,
-          };
-          
-          // Set as current property and show info card
-          setSelectedProperty(newProperty);
-          setAddress(address);
-          setSnappedLatLng(snappedLatLng);
-          
-          // Cache the address
-          saveAddressToCache(lat, lng, address, snappedLatLng);
-          
-          console.log('📍 [PINS] New pin ready for property creation');
-        } else {
-          console.log('📍 [PINS] No address found for pin location');
-          setAddress('Location not found');
-          
-          // Still create a property with coordinates but no address
-          const newProperty: Property = {
-            id: null,
-            address: 'Location not found',
-            lat,
-            lng,
-            label: null,
-            notes: null,
-          };
-          
-          setSelectedProperty(newProperty);
+          if (data.results && data.results[0]) {
+            const address = data.results[0].formatted_address;
+            console.log('📍 [PINS] Address found:', address);
+            
+            // Update the property with the found address
+            const updatedProperty: Property = {
+              ...newProperty,
+              address,
+            };
+            
+            setSelectedProperty(updatedProperty);
+            setAddress(address);
+            
+            // Cache the address
+            saveAddressToCache(lat, lng, address, { lat, lng });
+          }
         }
       } catch (error) {
-        console.error('📍 [PINS] Error creating pin:', error);
-        
-        let errorAddress = 'Error getting location';
-        
-        // Check if it's a JSON parsing error
-        if (error instanceof SyntaxError && error.message.includes('JSON')) {
-          console.error('📍 [PINS] JSON parsing error - likely API key issue');
-          errorAddress = 'Address lookup failed - check API key';
-        }
-        
-        setAddress(errorAddress);
-        
-        // Still create a property with coordinates but error address
-        const newProperty: Property = {
-          id: null,
-          address: errorAddress,
-          lat,
-          lng,
-          label: null,
-          notes: null,
-        };
-        
-        setSelectedProperty(newProperty);
+        console.log('📍 [PINS] Address lookup failed, keeping coordinates:', error);
+        // Keep the original property with coordinates - no error handling needed
       } finally {
         setAddressLoading(false);
       }
     }, 250); // Wait 250ms to detect double-click
-  }, [selectedProperty]);
+  }, [selectedProperty, showDropdown]);
 
   // Handle property pin click - show selection card and prefetch in background
   const handlePropertyPinClick = useCallback(async (property: Property) => {

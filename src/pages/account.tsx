@@ -212,7 +212,7 @@ function AccountPage() {
                 <div className="space-y-3">
                   {userType && (
                     <div>
-                      <div className="text-sm text-gray-500">I'm a...</div>
+                      <div className="text-sm text-gray-500">I&apos;m a...</div>
                       <div className="text-base font-medium text-gray-900">{userType}</div>
                     </div>
                   )}
@@ -224,7 +224,7 @@ function AccountPage() {
                   )}
                   {useCase && (
                     <div>
-                      <div className="text-sm text-gray-500">I'll use DropPoint for...</div>
+                      <div className="text-sm text-gray-500">I&apos;ll use DropPoint for...</div>
                       <div className="text-base font-medium text-gray-900">{useCase}</div>
                     </div>
                   )}
@@ -236,7 +236,7 @@ function AccountPage() {
                 <div className="space-y-4">
                   {/* User Type */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">I'm a...</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">I&apos;m a...</label>
                     <div className="grid grid-cols-2 gap-2">
                       {['Real Estate Agent', 'Property Manager', 'Investor', 'Homeowner', 'Developer', 'Other'].map((type) => (
                         <button
@@ -278,7 +278,7 @@ function AccountPage() {
 
                   {/* Use Case */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">I'll use DropPoint for...</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">I&apos;ll use DropPoint for...</label>
                     <div className="grid grid-cols-2 gap-2">
                       {['Document storage', 'Client management', 'Property tracking', 'Portfolio organization', 'Team collaboration', 'Personal use'].map((use) => (
                         <button

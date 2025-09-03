@@ -43,7 +43,7 @@ export default function UserAuthForm() {
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const passwordsMismatch = isSignUp && confirmPassword && password !== confirmPassword;
+  // const passwordsMismatch = isSignUp && confirmPassword && password !== confirmPassword;
 
   // Password requirements validation
   const validatePasswordRequirements = (pwd: string) => {
@@ -132,7 +132,7 @@ export default function UserAuthForm() {
     try {
       if (isSignUp) {
         const siteUrl = getSiteUrl();
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: { 
@@ -205,7 +205,7 @@ export default function UserAuthForm() {
         <div className="flex flex-col items-center gap-3">
           <Image src="/logo.png" alt="DropPoint Logo" width={80} height={80} className="w-20 h-20 object-contain mb-2" priority />
           <h1 className="text-2xl font-bold text-blue-700">Welcome to DropPoint!</h1>
-          <p className="text-sm text-gray-600 text-center">We've sent a confirmation link to your email</p>
+          <p className="text-sm text-gray-600 text-center">We&apos;ve sent a confirmation link to your email</p>
         </div>
 
         <div className="space-y-4">
