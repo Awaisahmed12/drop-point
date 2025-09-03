@@ -1,8 +1,9 @@
 import Head from 'next/head';
 import UserAuthForm from '../components/UserAuthForm';
 import { useMobileViewport } from '../hooks/useMobileViewport';
+import { withAuth } from '../components/withAuth';
 
-export default function Home() {
+function LoginPage() {
   const { getMobileStyles, mobileClasses } = useMobileViewport();
 
   return (
@@ -22,3 +23,6 @@ export default function Home() {
     </>
   );
 }
+
+// Wrap with auth protection - redirect authenticated users to /map
+export default withAuth(LoginPage, { requireAuth: false });

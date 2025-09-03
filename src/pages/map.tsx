@@ -15,6 +15,7 @@ import { MapControls } from '../components/MapControls';
 import { PropertyInfoCard } from '../components/PropertyInfoCard';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { CurrentLocationIndicator } from '../components/CurrentLocationIndicator';
+import { withAuth } from '../components/withAuth';
 
 import { 
   containerStyle, 
@@ -69,7 +70,7 @@ const createPropertyPinIcon = (selected: boolean = false) => ({
   anchor: new google.maps.Point(16, 38),
 });
 
-export default function MapPage() {
+function MapPage() {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'droppoint-google-maps',
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -2493,3 +2494,6 @@ export default function MapPage() {
     </div>
   );
 }
+
+// Wrap with auth protection - require authentication
+export default withAuth(MapPage, { requireAuth: true });

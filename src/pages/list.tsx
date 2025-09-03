@@ -5,8 +5,9 @@ import { MobileBottomNav } from '../components/MobileBottomNav';
 import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
 import type { Property, PropertyFile, PropertyFolder } from '../../types';
 import { supabase } from '../utils/supabaseClient';
+import { withAuth } from '../components/withAuth';
 
-export default function ListPage() {
+function ListPage() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [savedProperty, setSavedProperty] = useState<Property | null>(null);
   const [snappedLatLng, setSnappedLatLng] = useState<{ lat: number; lng: number } | null>(null);
@@ -119,5 +120,8 @@ export default function ListPage() {
     </div>
   );
 }
+
+// Wrap with auth protection - require authentication
+export default withAuth(ListPage, { requireAuth: true });
 
 

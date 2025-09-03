@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { supabase } from '../utils/supabaseClient';
 import { getUserUsageBytes, formatBytes } from '../utils/usage';
 import { FREE_TIER_MAX_BYTES, FREE_TIER_GB } from '../../constants';
+import { withAuth } from '../components/withAuth';
 
-export default function AccountPage() {
+function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [usageBytes, setUsageBytes] = useState(0);
   const [email, setEmail] = useState<string | null>(null);
@@ -25,7 +26,6 @@ export default function AccountPage() {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        window.location.href = '/';
         return;
       }
       setEmail(user.email ?? null);
@@ -343,5 +343,8 @@ export default function AccountPage() {
     </div>
   );
 }
+
+// Wrap with auth protection - require authentication
+export default withAuth(AccountPage, { requireAuth: true });
 
 
