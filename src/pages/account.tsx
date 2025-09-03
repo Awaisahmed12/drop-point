@@ -13,6 +13,13 @@ export default function AccountPage() {
   const [firstName, setFirstName] = useState<string>("");
   const [lastName, setLastName] = useState<string>("");
   const [isEditingName, setIsEditingName] = useState(false);
+  
+  // Profile enrichment fields
+  const [userType, setUserType] = useState<string>('');
+  const [propertyCount, setPropertyCount] = useState<string>('');
+  const [useCase, setUseCase] = useState<string>('');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -26,12 +33,58 @@ export default function AccountPage() {
       const metaLast = (user.user_metadata?.last_name as string) || "";
       setFirstName(metaFirst);
       setLastName(metaLast);
+      
+      // Load profile enrichment data
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('user_type, property_count, use_case')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (profile) {
+          setUserType(profile.user_type || '');
+          setPropertyCount(profile.property_count || '');
+          setUseCase(profile.use_case || '');
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+      
       const total = await getUserUsageBytes(user.id);
       setUsageBytes(total);
       setLoading(false);
     };
     init();
   }, []);
+
+  const handleSaveProfile = async () => {
+    setProfileLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({
+            user_type: userType || null,
+            property_count: propertyCount || null,
+            use_case: useCase || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
+
+        if (error) {
+          console.error('Error saving profile:', error);
+        } else {
+          setIsEditingProfile(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   const limitGB = FREE_TIER_GB;
   const pct = Math.min(100, Math.round((usageBytes / FREE_TIER_MAX_BYTES) * 100));
@@ -136,6 +189,131 @@ export default function AccountPage() {
                   Log out
                 </button>
               </div>
+            </div>
+
+            {/* Profile Enrichment Section */}
+            <div className="bg-white rounded-2xl shadow border p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="text-lg font-semibold text-gray-900">Help us know you better</div>
+                  <div className="text-sm text-gray-500">Optional - helps us improve DropPoint for you</div>
+                </div>
+                {!isEditingProfile && (
+                  <button
+                    className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium"
+                    onClick={() => setIsEditingProfile(true)}
+                  >
+                    {userType || propertyCount || useCase ? 'Edit' : 'Add details'}
+                  </button>
+                )}
+              </div>
+
+              {!isEditingProfile ? (
+                <div className="space-y-3">
+                  {userType && (
+                    <div>
+                      <div className="text-sm text-gray-500">I'm a...</div>
+                      <div className="text-base font-medium text-gray-900">{userType}</div>
+                    </div>
+                  )}
+                  {propertyCount && (
+                    <div>
+                      <div className="text-sm text-gray-500">I manage about...</div>
+                      <div className="text-base font-medium text-gray-900">{propertyCount}</div>
+                    </div>
+                  )}
+                  {useCase && (
+                    <div>
+                      <div className="text-sm text-gray-500">I'll use DropPoint for...</div>
+                      <div className="text-base font-medium text-gray-900">{useCase}</div>
+                    </div>
+                  )}
+                  {!userType && !propertyCount && !useCase && (
+                    <div className="text-sm text-gray-400 italic">No additional details added yet</div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* User Type */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">I'm a...</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['Real Estate Agent', 'Property Manager', 'Investor', 'Homeowner', 'Developer', 'Other'].map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setUserType(type)}
+                          className={`p-3 rounded-lg border-2 transition-all text-sm ${
+                            userType === type
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Property Count */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">I manage about...</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['1-5 properties', '6-20 properties', '21-100 properties', '100+ properties'].map((count) => (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={() => setPropertyCount(count)}
+                          className={`p-3 rounded-lg border-2 transition-all text-sm ${
+                            propertyCount === count
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                          }`}
+                        >
+                          {count}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Use Case */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">I'll use DropPoint for...</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['Document storage', 'Client management', 'Property tracking', 'Portfolio organization', 'Team collaboration', 'Personal use'].map((use) => (
+                        <button
+                          key={use}
+                          type="button"
+                          onClick={() => setUseCase(use)}
+                          className={`p-3 rounded-lg border-2 transition-all text-sm ${
+                            useCase === use
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                          }`}
+                        >
+                          {use}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => setIsEditingProfile(false)}
+                      className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveProfile}
+                      disabled={profileLoading}
+                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
+                    >
+                      {profileLoading ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-white rounded-2xl shadow border p-5">
