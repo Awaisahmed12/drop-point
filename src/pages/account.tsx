@@ -238,7 +238,7 @@ function AccountPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">I&apos;m a...</label>
                     <div className="grid grid-cols-2 gap-2">
-                      {['Real Estate Agent', 'Property Manager', 'Investor', 'Homeowner', 'Developer', 'Other'].map((type) => (
+                      {['Real Estate Agent', 'Property Manager', 'Investor', 'Homeowner', 'Developer', 'Admin', 'Other'].map((type) => (
                         <button
                           key={type}
                           type="button"
@@ -315,6 +315,24 @@ function AccountPage() {
                 </div>
               )}
             </div>
+
+            {/* Admin Section */}
+            {userType === 'Admin' && (
+              <div className="bg-white rounded-2xl shadow border p-5">
+                <div className="text-lg font-semibold text-gray-900 mb-3">Admin Tools</div>
+                <div className="space-y-3">
+                  <Link 
+                    href="/admin"
+                    className="block w-full bg-blue-600 text-white py-3 px-4 rounded-lg text-center font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    Configuration Management
+                  </Link>
+                  <p className="text-sm text-gray-600">
+                    Manage application settings and feature toggles.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="bg-white rounded-2xl shadow border p-5">
               <div className="mb-3 flex items-center justify-between">

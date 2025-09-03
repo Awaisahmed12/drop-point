@@ -102,4 +102,26 @@ export interface PendingUpload {
 
 // Sort field type
 export type SortField = 'name' | 'date' | 'size';
-export type SortDirection = 'asc' | 'desc'; 
+export type SortDirection = 'asc' | 'desc';
+
+// Admin Configuration types
+export type AdminConfiguration = {
+  id: string;
+  key: string;
+  value: any; // JSONB value
+  description?: string;
+  category: string;
+  is_active: boolean;
+  created_by?: string;
+  updated_by?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// Specific configuration types
+export type StreetViewConfig = {
+  enabled: boolean;
+};
+
+// Configuration categories
+export type ConfigCategory = 'ui' | 'performance' | 'features' | 'general'; 

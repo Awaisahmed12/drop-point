@@ -60,7 +60,7 @@ export function withAuth<P extends object>(
       return () => {
         subscription.unsubscribe();
       };
-    }, [router, requireAuth]);
+    }, [router]);
 
     if (isLoading) {
       return (

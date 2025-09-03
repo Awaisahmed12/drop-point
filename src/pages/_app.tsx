@@ -4,6 +4,7 @@ import Head from "next/head";
 import { useEffect } from "react";
 import Router from "next/router";
 import { CookieConsentBanner } from "../components/CookieConsentBanner";
+import { ConfigProvider } from "../contexts/ConfigContext";
 
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
@@ -72,7 +73,7 @@ export default function App({ Component, pageProps }: AppProps) {
   }, []);
 
   return (
-    <>
+    <ConfigProvider>
       <Head>
         {/* Mobile viewport optimization */}
         <meta 
@@ -82,6 +83,6 @@ export default function App({ Component, pageProps }: AppProps) {
       </Head>
       <Component {...pageProps} />
       <CookieConsentBanner />
-    </>
+    </ConfigProvider>
   );
 }

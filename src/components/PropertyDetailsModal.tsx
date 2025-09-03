@@ -7,6 +7,7 @@ import { FileThumbnail } from './FileThumbnail';
 import { PropertySwitcher } from './PropertySwitcher';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
+import { useConfig } from '../contexts/ConfigContext';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
 import type { PropertyWithFileCount } from '../../types';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
@@ -127,6 +128,9 @@ export const PropertyDetailsModal = ({
     getMobileStyles,
     mobileClasses 
   } = useMobileViewport();
+
+  // Configuration hook
+  const { streetViewEnabled, propertyImageEnabled } = useConfig();
 
   // Property switching hook
   const { switchToProperty } = usePropertySwitcher({
@@ -1117,28 +1121,43 @@ export const PropertyDetailsModal = ({
             minHeight: '200px', // Minimum height for content
             // Let content naturally size on mobile instead of fixed height restrictions
           }}>
-            {/* Property preview: switch to satellite map on very skinny layouts, otherwise Street View */}
-            <div className={`relative w-full ${isMobile ? 'h-28' : 'h-32'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
-              <Image
-                src={
-                  // Use Street View on mobile where aspect fits; use satellite map on desktop to avoid skinny distortion
-                  isMobile
-                    ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`
-                    : `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`
-                }
-                alt="Property preview"
-                layout="fill"
-                objectFit="cover"
-                priority
-                unoptimized
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  if (target && target.src.indexOf('streetview') !== -1) {
-                    target.src = `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`;
-                  }
-                }}
-              />
-            </div>
+            {/* Property preview: Street View, Satellite Map, or no image based on configuration */}
+            {propertyImageEnabled && (
+              streetViewEnabled ? (
+                <div className={`relative w-full ${isMobile ? 'h-28' : 'h-32'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
+                  <Image
+                    src={
+                      // Use Street View on mobile where aspect fits; use satellite map on desktop to avoid skinny distortion
+                      isMobile
+                        ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`
+                        : `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`
+                    }
+                    alt="Property preview"
+                    layout="fill"
+                    objectFit="cover"
+                    priority
+                    unoptimized
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      if (target && target.src.indexOf('streetview') !== -1) {
+                        target.src = `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`;
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className={`relative w-full ${isMobile ? 'h-28' : 'h-32'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
+                  <Image
+                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
+                    alt="Property satellite view"
+                    layout="fill"
+                    objectFit="cover"
+                    priority
+                    unoptimized
+                  />
+                </div>
+              )
+            )}
 
             {/* All other content comes after satellite image */}
             <div className="bg-white sticky top-0 z-50 border-b border-gray-100">
