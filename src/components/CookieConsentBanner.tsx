@@ -28,7 +28,12 @@ export const CookieConsentBanner: React.FC = () => {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[1000] px-4 pb-4">
+    <div 
+      className="fixed inset-x-0 bottom-0 z-[1000] px-4 pb-4"
+      style={{
+        paddingBottom: `calc(1rem + env(safe-area-inset-bottom, 0px))`
+      }}
+    >
       <div className="mx-auto max-w-3xl rounded-2xl border border-gray-200 bg-white/95 backdrop-blur shadow-xl p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="text-sm text-gray-700 leading-relaxed">

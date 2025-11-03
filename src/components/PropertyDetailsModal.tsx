@@ -9,6 +9,7 @@ import { FileMenu } from './FileMenu';
 import { FolderMenu } from './FolderMenu';
 import { RenameInput } from './RenameInput';
 import { useMobileViewport } from '../hooks/useMobileViewport';
+import { useResponsiveValue, useResponsiveClass } from '../hooks/useResponsiveValue';
 import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
@@ -255,6 +256,10 @@ export const PropertyDetailsModal = ({
 
   // Parse the current property address
   const { streetAddress, locationInfo } = parseAddress(property?.address || '');
+  
+  // Get display name (custom name/label takes priority over address)
+  const displayName = property?.label || streetAddress || property?.address || '';
+  const showRealAddress = property?.label && property.label.trim() !== streetAddress;
 
   // Auto-dismiss successful uploads after 1.5 seconds
   useEffect(() => {
@@ -360,6 +365,18 @@ export const PropertyDetailsModal = ({
   
   // Use transition for non-urgent state updates to improve input responsiveness
   const [isPending, startTransition] = useTransition();
+  
+  // Responsive values
+  const titleSize = useResponsiveValue('text-base', 'text-xl');
+  const locationSize = useResponsiveValue('text-xs', 'text-base');
+  const buttonPadding = useResponsiveValue('p-2', 'p-2.5');
+  const iconSize = useResponsiveValue('w-4 h-4', 'w-5 h-5');
+  const headerHeight = useResponsiveValue('h-28', 'h-32');
+  const searchPadding = useResponsiveValue('px-4 py-4 text-base', 'px-4 py-2 text-sm');
+  const searchIconPos = useResponsiveValue('top-4 w-5 h-5', 'top-2.5 w-4 h-4');
+  const tableHeaderPadding = useResponsiveValue('py-3', 'py-2');
+  const listItemPadding = useResponsiveValue('px-4 py-2.5', 'px-3 py-3');
+  const listItemMinHeight = useResponsiveValue('56px', '56px');
 
   // Sorting logic - Folders first, then files (standard document management practice)
   const sortedItems = useMemo(() => {
@@ -1097,15 +1114,31 @@ export const PropertyDetailsModal = ({
         <div className="modal-header-refined flex items-center justify-between px-5 py-3 rounded-t-3xl flex-shrink-0">
           <div className="flex items-center min-w-0 flex-1 mr-4">
             <div className="flex flex-col min-w-0 flex-1">
-              {/* Street Address - Primary */}
-              <h1 className={`property-title ${isMobile ? 'text-base' : 'text-xl'} font-semibold leading-tight mb-0.5`} 
+              {/* Custom Name or Street Address - Primary */}
+              <h1 className={`property-title ${titleSize} font-semibold leading-tight mb-0.5`} 
                   style={{ letterSpacing: '-0.02em' }}
-                  title={streetAddress}>
-                {streetAddress || property?.address}
+                  title={displayName}>
+                {displayName}
               </h1>
+              {/* Real Address (when custom name is used) */}
+              {showRealAddress && (
+                <p className={`property-location ${locationSize} font-medium leading-snug`} 
+                   style={{ letterSpacing: '-0.005em' }}
+                   title={streetAddress}>
+                  {streetAddress}
+                </p>
+              )}
               {/* Location Info - Secondary */}
-              {locationInfo && (
-                <p className={`property-location ${isMobile ? 'text-xs' : 'text-base'} font-medium leading-snug`} 
+              {locationInfo && !showRealAddress && (
+                <p className={`property-location ${locationSize} font-medium leading-snug`} 
+                   style={{ letterSpacing: '-0.005em' }}
+                   title={locationInfo}>
+                  {locationInfo}
+                </p>
+              )}
+              {/* Location Info (when custom name is shown) */}
+              {locationInfo && showRealAddress && (
+                <p className={`property-location ${locationSize} font-medium leading-snug text-gray-500`} 
                    style={{ letterSpacing: '-0.005em' }}
                    title={locationInfo}>
                   {locationInfo}
@@ -1129,13 +1162,13 @@ export const PropertyDetailsModal = ({
           <div className="flex items-center gap-3">
             {/* View Toggle Button */}
             <button
-              className={`${isMobile ? 'p-2' : 'p-2.5'} rounded-full cursor-pointer flex-shrink-0 hover:bg-gray-100 transition-colors`}
+              className={`${buttonPadding} rounded-full cursor-pointer flex-shrink-0 hover:bg-gray-100 transition-colors`}
               onClick={toggleViewMode}
               title={`Switch to ${viewMode === 'list' ? 'grid' : 'list'} view`}
             >
               {viewMode === 'list' ? (
                 // Grid icon when in list mode
-                <svg className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className={`${iconSize} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <rect x="3" y="3" width="7" height="7" />
                   <rect x="14" y="3" width="7" height="7" />
                   <rect x="14" y="14" width="7" height="7" />
@@ -1143,7 +1176,7 @@ export const PropertyDetailsModal = ({
                 </svg>
               ) : (
                 // List icon when in grid mode
-                <svg className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className={`${iconSize} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <line x1="8" y1="6" x2="21" y2="6" />
                   <line x1="8" y1="12" x2="21" y2="12" />
                   <line x1="8" y1="18" x2="21" y2="18" />
@@ -1156,7 +1189,7 @@ export const PropertyDetailsModal = ({
             
             {/* Close button with better spacing and styling */}
             <button
-              className={`close-button ${isMobile ? 'p-2' : 'p-2.5'} rounded-full cursor-pointer flex-shrink-0 hover:bg-gray-100 transition-colors`}
+              className={`close-button ${buttonPadding} rounded-full cursor-pointer flex-shrink-0 hover:bg-gray-100 transition-colors`}
               onClick={() => {
                 onClose();
                 setCreatingFolder(false);
@@ -1181,7 +1214,7 @@ export const PropertyDetailsModal = ({
             {/* Property preview: Street View, Satellite Map, or no image based on configuration */}
             {propertyImageEnabled && (
               streetViewEnabled ? (
-                <div className={`relative w-full ${isMobile ? 'h-28' : 'h-32'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
+                <div className={`relative w-full ${headerHeight} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
                   <Image
                     key={`property-image-${property?.id || 'new'}-${snappedLatLng?.lat}-${snappedLatLng?.lng}`}
                     src={
@@ -1204,7 +1237,7 @@ export const PropertyDetailsModal = ({
                   />
                 </div>
               ) : (
-                <div className={`relative w-full ${isMobile ? 'h-28' : 'h-32'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
+                <div className={`relative w-full ${headerHeight} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
                   <Image
                     key={`property-image-${property?.id || 'new'}-${snappedLatLng?.lat}-${snappedLatLng?.lng}`}
                     src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
@@ -1280,21 +1313,21 @@ export const PropertyDetailsModal = ({
                     placeholder="Search files and folders..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className={`w-full ${isMobile ? 'px-4 py-4 text-base' : 'px-4 py-2 text-sm'} bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-10 ${searchQuery ? 'pr-10' : ''} text-black placeholder-gray-400`}
+                    className={`w-full ${searchPadding} bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-10 ${searchQuery ? 'pr-10' : ''} text-black placeholder-gray-400`}
                     style={{
                       // Prevent zoom on iOS
                       fontSize: isMobile ? '16px' : undefined,
                       minHeight: isMobile ? '48px' : 'auto',
                     }}
                   />
-                  <svg className={`absolute left-3 ${isMobile ? 'top-4 w-5 h-5' : 'top-2.5 w-4 h-4'} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <svg className={`absolute left-3 ${searchIconPos} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <circle cx="11" cy="11" r="8" />
                     <path d="m21 21-4.35-4.35" />
                   </svg>
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className={`absolute right-3 ${isMobile ? 'top-4 w-5 h-5' : 'top-2.5 w-4 h-4'} text-gray-400 hover:text-gray-600 transition-colors rounded-full flex items-center justify-center`}
+                      className={`absolute right-3 ${searchIconPos} text-gray-400 hover:text-gray-600 transition-colors rounded-full flex items-center justify-center`}
                       title="Clear search"
                     >
                       <svg className="w-full h-full" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1306,7 +1339,7 @@ export const PropertyDetailsModal = ({
               </div>
 
               {/* Column Headers - Sticky and always visible */}
-              <div className={`hidden sm:grid grid-cols-12 gap-4 px-3 ${isMobile ? 'py-3' : 'py-2'} text-sm border-b border-gray-200 bg-white ${viewMode === 'grid' ? 'sm:hidden' : ''}`}>
+              <div className={`hidden sm:grid grid-cols-12 gap-4 px-3 ${tableHeaderPadding} text-sm border-b border-gray-200 bg-white ${viewMode === 'grid' ? 'sm:hidden' : ''}`}>
                 <button
                   className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
                   onClick={() => toggleSort('name')}
@@ -1444,8 +1477,8 @@ export const PropertyDetailsModal = ({
 
                             {/* Mobile Folder Layout */}
                             <div
-                              className={`sm:hidden flex items-center justify-between ${isMobile ? 'px-4 py-2.5' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
-                              style={{ cursor: 'pointer', minHeight: isMobile ? '56px' : '56px' }}
+                              className={`sm:hidden flex items-center justify-between ${listItemPadding} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
+                              style={{ cursor: 'pointer', minHeight: listItemMinHeight }}
                               onClick={() => {
                                 // If any menu is open, close it instead of navigating to folder
                                 if (fileMenuId || folderMenuId) {
@@ -1641,7 +1674,7 @@ export const PropertyDetailsModal = ({
                                   onClose={() => setFileMenuId(null)}
                                   onRename={(file) => {
                                     setRenamingFileId(file.id);
-                                    setRenamingFileName(getFileNameWithoutExtension(file.file_name));
+                                    setRenamingFileName(file.file_name);
                                   }}
                                   onMove={onFileMove ? (file) => {
                                     setMoveFileTarget(file);
@@ -1656,8 +1689,8 @@ export const PropertyDetailsModal = ({
 
                             {/* Mobile File Layout */}
                             <div
-                              className={`sm:hidden flex items-center justify-between ${isMobile ? 'px-4 py-2.5' : 'px-3 py-3'} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
-                              style={{ cursor: 'pointer', minHeight: isMobile ? '56px' : '56px' }}
+                              className={`sm:hidden flex items-center justify-between ${listItemPadding} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
+                              style={{ cursor: 'pointer', minHeight: listItemMinHeight }}
                               onClick={async (e) => {
                                 if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
                                   return;
@@ -1707,7 +1740,6 @@ export const PropertyDetailsModal = ({
                                           await handleRename(file, trimmed);
                                         }
                                       }}
-                                      extension={ext}
                                       placeholder="File name"
                                       variant="full"
                                       isMobile={isMobile}
@@ -1753,7 +1785,7 @@ export const PropertyDetailsModal = ({
                                   onClose={() => setFileMenuId(null)}
                                   onRename={(file) => {
                                     setRenamingFileId(file.id);
-                                    setRenamingFileName(getFileNameWithoutExtension(file.file_name));
+                                    setRenamingFileName(file.file_name);
                                   }}
                                   onMove={onFileMove ? (file) => {
                                     setMoveFileTarget(file);
@@ -1885,6 +1917,7 @@ export const PropertyDetailsModal = ({
                         } else {
                           // Grid File Item
                           const file = item;
+                          const [, ext] = splitFileNameAndExt(file.file_name);
                           return (
                             <div
                               key={`grid-file-${file.id}`}
@@ -1967,7 +2000,7 @@ export const PropertyDetailsModal = ({
                                   onClose={() => setFileMenuId(null)}
                                   onRename={(file) => {
                                     setRenamingFileId(file.id);
-                                    setRenamingFileName(getFileNameWithoutExtension(file.file_name));
+                                    setRenamingFileName(file.file_name);
                                   }}
                                   onMove={onFileMove ? (file) => {
                                     setMoveFileTarget(file);
@@ -2253,6 +2286,7 @@ export const PropertyDetailsModal = ({
         <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0" style={{
           height: isMobile ? '56px' : '70px', // Reduced height for mobile
           minHeight: isMobile ? '56px' : '70px',
+          paddingBottom: isMobile ? 'env(safe-area-inset-bottom, 0px)' : '0px',
           ...getMobileStyles('container')
         }}>
           <button

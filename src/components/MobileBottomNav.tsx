@@ -18,12 +18,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList }) => {
   }, [router]);
 
   return (
-    <div className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200">
+    <div className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200" style={{
+      paddingBottom: `calc(0.75rem + env(safe-area-inset-bottom, 0px))`,
+      paddingTop: '0.5rem'
+    }}>
       <div className="max-w-5xl mx-auto grid grid-cols-3">
         <Link
           href="/map"
           prefetch
-          className="py-3 flex flex-col items-center justify-center text-gray-700 hover:bg-gray-50"
+          className="py-2 flex flex-col items-center justify-center text-gray-700 hover:bg-gray-50"
           aria-label="Map"
           onClick={(e) => {
             if (router && router.pathname === '/map') {
@@ -45,7 +48,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList }) => {
         </Link>
         {onList ? (
           <button
-            className="py-3 flex flex-col items-center justify-center text-gray-700 hover:bg-gray-50"
+            className="py-2 flex flex-col items-center justify-center text-gray-700 hover:bg-gray-50"
             onClick={() => onList()}
             aria-label="List"
           >
@@ -60,7 +63,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList }) => {
             <span className="text-xs">List</span>
           </button>
         ) : (
-          <Link href="/list" prefetch className="py-3 flex flex-col items-center justify-center text-gray-700 hover:bg-gray-50" aria-label="List">
+          <Link href="/list" prefetch className="py-2 flex flex-col items-center justify-center text-gray-700 hover:bg-gray-50" aria-label="List">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="8" y1="6" x2="21" y2="6"></line>
               <line x1="8" y1="12" x2="21" y2="12"></line>
@@ -72,7 +75,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList }) => {
             <span className="text-xs">List</span>
           </Link>
         )}
-        <Link href="/account" prefetch className="py-3 flex flex-col items-center justify-center text-gray-700 hover:bg-gray-50" aria-label="Account">
+        <Link href="/account" prefetch className="py-2 flex flex-col items-center justify-center text-gray-700 hover:bg-gray-50" aria-label="Account">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 21v-2a4 4 0 0 0-3-3.87"></path>
             <path d="M4 21v-2a4 4 0 0 1 3-3.87"></path>

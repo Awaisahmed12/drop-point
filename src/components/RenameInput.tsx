@@ -94,10 +94,10 @@ export const RenameInput: React.FC<RenameInputProps> = ({
   if (variant === 'full') {
     // Mobile version with Cancel/Save buttons
     return (
-      <div className="w-full bg-blue-50 border-2 border-blue-400 rounded-lg p-3">
-        <div className="flex items-center gap-2 mb-3">
+      <div className="w-full max-w-full bg-white border-2 border-blue-400 rounded-xl p-4 shadow-lg overflow-hidden">
+        <div className="mb-4 w-full">
           <input
-            className={inputClassName}
+            className="w-full font-semibold text-gray-900 bg-gray-50 border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             value={value}
             onChange={handleChange}
             onBlur={handleBlur}
@@ -109,17 +109,12 @@ export const RenameInput: React.FC<RenameInputProps> = ({
             }}
             placeholder={placeholder}
             autoFocus={autoFocus}
-            style={{ fontSize: isMobile ? '16px' : 'inherit' }}
+            style={{ fontSize: isMobile ? '16px' : 'inherit', maxWidth: '100%' }}
           />
-          {extension && (
-            <span className={`text-gray-500 ${isMobile ? 'text-base font-medium' : 'text-base font-medium'}`}>
-              .{extension}
-            </span>
-          )}
         </div>
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-3">
           <button
-            className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+            className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors rounded-lg"
             onClick={e => {
               e.stopPropagation();
               onCancel();
@@ -129,7 +124,7 @@ export const RenameInput: React.FC<RenameInputProps> = ({
           </button>
           {onSave && (
             <button
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
               onClick={async e => {
                 e.stopPropagation();
                 await onSave();
