@@ -13,6 +13,7 @@ export const CurrentLocationIndicator = ({
   const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const watchIdRef = useRef<number | null>(null);
+  const hasPositionRef = useRef<boolean>(false); // Track if we've ever received a position
 
   // Start watching position when component mounts and map is available
   useEffect(() => {
@@ -20,13 +21,13 @@ export const CurrentLocationIndicator = ({
       return;
     }
 
-    const startWatching = () => {
-      console.log('🌍 [LOCATION_DOT] Starting location watch');
+    const startWatching = (useHighAccuracy: boolean = true) => {
+      console.log(`🌍 [LOCATION_DOT] Starting location watch (high accuracy: ${useHighAccuracy})`);
 
       const watchOptions: PositionOptions = {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000 // Allow cached position up to 5 seconds
+        enableHighAccuracy: useHighAccuracy,
+        timeout: useHighAccuracy ? 10000 : 15000,
+        maximumAge: useHighAccuracy ? 5000 : 300000 // Allow cached position up to 5 seconds for high accuracy, 5 minutes for low accuracy
       };
 
       watchIdRef.current = navigator.geolocation.watchPosition(
@@ -35,32 +36,87 @@ export const CurrentLocationIndicator = ({
           console.log('🌍 [LOCATION_DOT] Position update:', { 
             lat: latitude, 
             lng: longitude, 
-            accuracy: positionAccuracy 
+            accuracy: positionAccuracy,
+            highAccuracy: useHighAccuracy
           });
           
+          hasPositionRef.current = true; // Mark that we've received a position
           setCurrentPosition({ lat: latitude, lng: longitude });
           setAccuracy(positionAccuracy || null);
         },
         (error) => {
-          console.error('🌍 [LOCATION_DOT] Watch position error:', error);
+          // Handle errors gracefully - don't spam console with transient errors
+          const isTransientError = error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT;
+          
+          if (error.code === error.PERMISSION_DENIED) {
+            console.warn('🌍 [LOCATION_DOT] Location permission denied - stopping watch');
+            if (watchIdRef.current !== null) {
+              navigator.geolocation.clearWatch(watchIdRef.current);
+              watchIdRef.current = null;
+            }
+            return;
+          }
+
+          // For transient errors (POSITION_UNAVAILABLE, TIMEOUT)
+          if (isTransientError) {
+            // If we haven't received a position yet and high accuracy failed, try fallback
+            if (!hasPositionRef.current && useHighAccuracy) {
+              console.warn('🌍 [LOCATION_DOT] Transient location error (will retry with lower accuracy):', error.message);
+              if (watchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+                watchIdRef.current = null;
+              }
+              startWatching(false); // Retry with lower accuracy
+              return;
+            }
+            
+            // If we already have a position, these transient errors are expected and don't need logging
+            // The browser's CoreLocation may report kCLErrorLocationUnknown occasionally - this is normal
+            return;
+          }
+
+          // For other errors, log as warning (not error) since we're keeping last known position
+          console.warn('🌍 [LOCATION_DOT] Location watch error:', error.message);
           // Don't clear position on error - keep last known position
         },
         watchOptions
       );
     };
 
-    // Request permission first, then start watching
-    navigator.geolocation.getCurrentPosition(
-      () => {
-        // Permission granted, start watching
-        startWatching();
-      },
-      (error) => {
-        console.log('🌍 [LOCATION_DOT] Initial permission check failed:', error);
-        // Don't start watching if permission denied
-      },
-      { enableHighAccuracy: true, timeout: 5000 }
-    );
+    // Request permission first, then start watching with fallback
+    const tryGetInitialPosition = (useHighAccuracy: boolean = true) => {
+      navigator.geolocation.getCurrentPosition(
+        () => {
+          // Permission granted, start watching
+          startWatching(useHighAccuracy);
+        },
+        (error) => {
+          // If permission denied, don't retry
+          if (error.code === error.PERMISSION_DENIED) {
+            console.log('🌍 [LOCATION_DOT] Location permission denied');
+            return;
+          }
+
+          // If high accuracy failed with transient error, try with lower accuracy
+          if (useHighAccuracy && (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT)) {
+            console.log('🌍 [LOCATION_DOT] Initial high accuracy failed, trying with lower accuracy...');
+            tryGetInitialPosition(false);
+            return;
+          }
+
+          // Other errors - start watching anyway (watchPosition handles errors gracefully)
+          console.log('🌍 [LOCATION_DOT] Initial position check failed, starting watch anyway:', error.message);
+          startWatching(useHighAccuracy);
+        },
+        { 
+          enableHighAccuracy: useHighAccuracy, 
+          timeout: useHighAccuracy ? 5000 : 10000,
+          maximumAge: useHighAccuracy ? 5000 : 300000
+        }
+      );
+    };
+
+    tryGetInitialPosition();
 
     // Cleanup function
     return () => {
@@ -69,6 +125,7 @@ export const CurrentLocationIndicator = ({
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
       }
+      hasPositionRef.current = false; // Reset position tracking
     };
   }, [map, isVisible]);
 
@@ -116,6 +173,7 @@ export const CurrentLocationIndicator = ({
     };
   };
 
+  
   // Don't render if no position or not visible
   if (!currentPosition || !isVisible || !map) {
     return null;

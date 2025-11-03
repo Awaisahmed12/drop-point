@@ -1669,164 +1669,362 @@ function MapPage() {
       return;
     }
 
-    setCurrentLocationLoading(true);
-    console.log('🌍 [GEOLOCATION] Starting getCurrentPosition...');
+    // Helper function to handle successful position retrieval
+    const handlePositionSuccess = async (position: GeolocationPosition) => {
+      console.log('🌍 [GEOLOCATION] Success:', position.coords);
+      const { latitude, longitude } = position.coords;
+      const newCenter = { lat: latitude, lng: longitude };
+      
+      console.log('🌍 [GEOLOCATION] New center:', newCenter);
+      
+      // Keep it simple: always perform a visible action.
+      const mediumZoom = CURRENT_LOCATION_ZOOM;
+      const deepZoom = CURRENT_LOCATION_ZOOM_DEEP;
+      const currentZoom = map?.getZoom?.() ?? zoom;
+      const centerNowA = map?.getCenter?.();
+      const isCloseToLocation = centerNowA
+        ? (Math.abs(centerNowA.lat() - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(centerNowA.lng() - newCenter.lng) < COORDINATE_THRESHOLD)
+        : (Math.abs(mapCenter.lat - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(mapCenter.lng - newCenter.lng) < COORDINATE_THRESHOLD);
+      const isAtMediumZoom = Math.abs((currentZoom || 0) - mediumZoom) < 0.25;
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        console.log('🌍 [GEOLOCATION] Success:', position.coords);
-        const { latitude, longitude } = position.coords;
-        const newCenter = { lat: latitude, lng: longitude };
+      let targetZoom = mediumZoom;
+      if (currentLocationZoomStageRef.current === 'none' || !isCloseToLocation) {
+        // If stage is 'none' (reset after user interaction) or moved away, always go to medium zoom first
+        targetZoom = mediumZoom;
+        currentLocationZoomStageRef.current = 'first';
+        currentLocationStageRef.current = 'first';
+      } else if (currentLocationZoomStageRef.current === 'first' && isAtMediumZoom) {
+        // Already at medium zoom and in 'first' stage → deep zoom
+        targetZoom = deepZoom;
+        currentLocationZoomStageRef.current = 'deep';
+        currentLocationStageRef.current = 'deep';
+      } else {
+        // Default: go to medium zoom
+        targetZoom = mediumZoom;
+        currentLocationZoomStageRef.current = 'first';
+        currentLocationStageRef.current = 'first';
+      }
+
+      // Update map center and zoom programmatically (avoid resetting stage)
+      // If user is already very close to the target center, avoid an extra panTo
+      const centerNowB = map?.getCenter?.();
+      const isClose = centerNowB
+        ? (Math.abs(centerNowB.lat() - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(centerNowB.lng() - newCenter.lng) < COORDINATE_THRESHOLD)
+        : false;
+      const forcePan = true;
+      setMapCenter(newCenter);
+      setZoom(targetZoom);
+      if (map) {
+        console.log('🌍 [GEOLOCATION] Updating map position...');
+        if (!isClose || forcePan) map.panTo(newCenter);
+        // Track programmatic zoom change
+        programmaticZoomChangesRef.current += 1;
+        map.setZoom(targetZoom);
+      } else {
+        console.log('🌍 [GEOLOCATION] Warning: Map not ready yet');
+      }
+
+      // Clear search input
+      setInputValue('');
+      
+      // Check cache first
+      const cached = getAddressFromCache(latitude, longitude);
+      if (cached) {
+        console.log('🌍 [GEOLOCATION] Using cached address:', cached.address);
+        setAddress(cached.address);
+        setSnappedLatLng(cached.snappedLatLng);
+        setAddressLoading(false);
         
-        console.log('🌍 [GEOLOCATION] New center:', newCenter);
-        
-        // Keep it simple: always perform a visible action.
-        const mediumZoom = CURRENT_LOCATION_ZOOM;
-        const deepZoom = CURRENT_LOCATION_ZOOM_DEEP;
-        const currentZoom = map?.getZoom?.() ?? zoom;
-        const centerNowA = map?.getCenter?.();
-        const isCloseToLocation = centerNowA
-          ? (Math.abs(centerNowA.lat() - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(centerNowA.lng() - newCenter.lng) < COORDINATE_THRESHOLD)
-          : (Math.abs(mapCenter.lat - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(mapCenter.lng - newCenter.lng) < COORDINATE_THRESHOLD);
-        const isAtMediumZoom = Math.abs((currentZoom || 0) - mediumZoom) < 0.25;
+        // Try to prefetch property data if this is a saved property
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: property } = await supabase
+            .from('properties')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('address', cached.address)
+            .maybeSingle();
 
-        let targetZoom = mediumZoom;
-        if (currentLocationZoomStageRef.current === 'none' || !isCloseToLocation) {
-          // If stage is 'none' (reset after user interaction) or moved away, always go to medium zoom first
-          targetZoom = mediumZoom;
-          currentLocationZoomStageRef.current = 'first';
-          currentLocationStageRef.current = 'first';
-        } else if (currentLocationZoomStageRef.current === 'first' && isAtMediumZoom) {
-          // Already at medium zoom and in 'first' stage → deep zoom
-          targetZoom = deepZoom;
-          currentLocationZoomStageRef.current = 'deep';
-          currentLocationStageRef.current = 'deep';
-        } else {
-          // Default: go to medium zoom
-          targetZoom = mediumZoom;
-          currentLocationZoomStageRef.current = 'first';
-          currentLocationStageRef.current = 'first';
-        }
+          if (property) {
+            const isCached = await isPropertyDataCached(cached.address);
+            if (!isCached) {
+              const [folderResult, filesResult] = await Promise.all([
+                supabase
+                  .from('property_folders')
+                  .select('*')
+                  .eq('property_id', property.id)
+                  .eq('user_id', user.id)
+                  .is('deleted_at', null)
+                  .order('created_at', { ascending: true }),
+                supabase
+                  .from('property_files')
+                  .select('*')
+                  .eq('property_id', property.id)
+                  .order('uploaded_at', { ascending: false })
+              ]);
 
-        // Update map center and zoom programmatically (avoid resetting stage)
-        // If user is already very close to the target center, avoid an extra panTo
-        const centerNowB = map?.getCenter?.();
-        const isClose = centerNowB
-          ? (Math.abs(centerNowB.lat() - newCenter.lat) < COORDINATE_THRESHOLD && Math.abs(centerNowB.lng() - newCenter.lng) < COORDINATE_THRESHOLD)
-          : false;
-        const forcePan = true;
-        setMapCenter(newCenter);
-        setZoom(targetZoom);
-        if (map) {
-          console.log('🌍 [GEOLOCATION] Updating map position...');
-          if (!isClose || forcePan) map.panTo(newCenter);
-          // Track programmatic zoom change
-          programmaticZoomChangesRef.current += 1;
-          map.setZoom(targetZoom);
-        } else {
-          console.log('🌍 [GEOLOCATION] Warning: Map not ready yet');
-        }
-
-        // Clear search input
-        setInputValue('');
-        
-        // Check cache first
-        const cached = getAddressFromCache(latitude, longitude);
-        if (cached) {
-          console.log('🌍 [GEOLOCATION] Using cached address:', cached.address);
-          setAddress(cached.address);
-          setSnappedLatLng(cached.snappedLatLng);
-          setAddressLoading(false);
-          
-          // Try to prefetch property data if this is a saved property
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const { data: property } = await supabase
-              .from('properties')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('address', cached.address)
-              .maybeSingle();
-
-            if (property) {
-              const isCached = await isPropertyDataCached(cached.address);
-              if (!isCached) {
-                const [folderResult, filesResult] = await Promise.all([
-                  supabase
-                    .from('property_folders')
-                    .select('*')
-                    .eq('property_id', property.id)
-                    .eq('user_id', user.id)
-                    .is('deleted_at', null)
-                    .order('created_at', { ascending: true }),
-                  supabase
-                    .from('property_files')
-                    .select('*')
-                    .eq('property_id', property.id)
-                    .order('uploaded_at', { ascending: false })
-                ]);
-
-                if (folderResult.data && filesResult.data) {
-                  await cachePropertyData(cached.address, filesResult.data, folderResult.data);
-                }
+              if (folderResult.data && filesResult.data) {
+                await cachePropertyData(cached.address, filesResult.data, folderResult.data);
               }
             }
           }
-        } else {
-          // Fetch address for current location
-          console.log('🌍 [GEOLOCATION] Fetching address for coordinates...');
-          fetchAddress(latitude, longitude);
         }
-        
+      } else {
+        // Fetch address for current location
+        console.log('🌍 [GEOLOCATION] Fetching address for coordinates...');
+        fetchAddress(latitude, longitude);
+      }
+      
+      setCurrentLocationLoading(false);
+      console.log('🌍 [GEOLOCATION] Location update complete');
+    };
+
+    // Helper function to handle errors with fallback
+    const handlePositionError = (error: GeolocationPositionError, isFallback: boolean = false) => {
+      console.log('🌍 [GEOLOCATION] Error:', error);
+      console.log('🌍 [GEOLOCATION] Error details:', {
+        code: error.code,
+        message: error.message,
+        PERMISSION_DENIED: error.PERMISSION_DENIED,
+        POSITION_UNAVAILABLE: error.POSITION_UNAVAILABLE,
+        TIMEOUT: error.TIMEOUT,
+        isFallback
+      });
+
+      // If permission is denied, don't try fallback - show error immediately
+      if (error.code === error.PERMISSION_DENIED) {
         setCurrentLocationLoading(false);
-        console.log('🌍 [GEOLOCATION] Location update complete');
-      },
-      (error) => {
-        setCurrentLocationLoading(false);
-        console.log('🌍 [GEOLOCATION] Error:', error);
-        console.log('🌍 [GEOLOCATION] Error details:', {
-          code: error.code,
-          message: error.message,
-          PERMISSION_DENIED: error.PERMISSION_DENIED,
-          POSITION_UNAVAILABLE: error.POSITION_UNAVAILABLE,
-          TIMEOUT: error.TIMEOUT
-        });
-        
-        // Reset zoom stage on error to allow fresh attempt
         currentLocationZoomStageRef.current = 'none';
         currentLocationStageRef.current = 'none';
-
-        let errorMessage = 'Unable to retrieve your location.';
-        let debugInfo = '';
         
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied. Please enable location permissions in your browser settings.';
-            debugInfo = 'To enable: Click the location icon in your address bar, or go to browser settings > Privacy > Location.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information is unavailable. Please check your GPS and internet connection.';
-            debugInfo = 'Try: 1) Enable GPS/location services 2) Check internet connection 3) Try again in a few seconds';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Location request timed out. Please try again.';
-            debugInfo = 'The location request took too long. Your device might be having trouble getting a GPS fix.';
-            break;
-          default:
-            errorMessage = `Location error (${error.code}): ${error.message}`;
-            debugInfo = 'Unknown geolocation error occurred.';
-        }
-        
-        console.log('🌍 [GEOLOCATION] Debug info:', debugInfo);
-        alert(`${errorMessage}\n\n${debugInfo}`);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000, // Increased timeout to 15 seconds
-        maximumAge: 60000 // Cache location for 1 minute
+        alert('Location access denied. Please enable location permissions in your browser settings.\n\nTo enable: Click the location icon in your address bar, or go to browser settings > Privacy > Location.');
+        return;
       }
-    );
-  }, [map, isPropertyDataCached, cachePropertyData, zoom, mapCenter.lat, mapCenter.lng]);
+
+      // If high accuracy failed with POSITION_UNAVAILABLE or TIMEOUT, try fallback with lower accuracy
+      if (!isFallback && (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT)) {
+        const isLocalhost = typeof window !== 'undefined' && 
+          (window.location.hostname === 'localhost' || 
+           window.location.hostname === '127.0.0.1' || 
+           window.location.hostname === '');
+        
+        console.log('🌍 [GEOLOCATION] High accuracy failed, trying fallback with lower accuracy...');
+        console.log('🌍 [GEOLOCATION] Fallback options: enableHighAccuracy=false, timeout=' + 
+          (isLocalhost ? '30000' : '25000') + 'ms, maximumAge=15min');
+        
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            console.log('🌍 [GEOLOCATION] Fallback succeeded!', position.coords);
+            handlePositionSuccess(position);
+          },
+          (fallbackError) => {
+            console.error('🌍 [GEOLOCATION] Fallback ALSO failed - This indicates a system-level issue!');
+            console.log('🌍 [GEOLOCATION] Fallback error:', fallbackError);
+            console.log('🌍 [GEOLOCATION] Fallback error details:', {
+              code: fallbackError.code,
+              message: fallbackError.message,
+              PERMISSION_DENIED: fallbackError.PERMISSION_DENIED,
+              POSITION_UNAVAILABLE: fallbackError.POSITION_UNAVAILABLE,
+              TIMEOUT: fallbackError.TIMEOUT
+            });
+            console.error('🌍 [GEOLOCATION] Both high accuracy (GPS) AND low accuracy (IP/WiFi) failed.');
+            console.error('🌍 [GEOLOCATION] This means:');
+            console.error('  - Permissions are granted (browser level)');
+            console.error('  - But location services are unavailable (system level)');
+            console.error('  - Check macOS System Preferences > Security & Privacy > Location Services');
+            handlePositionError(fallbackError, true);
+          },
+          {
+            enableHighAccuracy: false, // Allow IP/WiFi-based positioning
+            timeout: isLocalhost ? 30000 : 25000, // Even longer timeout for lower accuracy (30s on localhost, 25s otherwise)
+            maximumAge: 900000 // Accept cached location up to 15 minutes (very lenient)
+          }
+        );
+        return;
+      }
+
+      // Both attempts failed or other error - show alert
+      setCurrentLocationLoading(false);
+      currentLocationZoomStageRef.current = 'none';
+      currentLocationStageRef.current = 'none';
+
+      // Comprehensive diagnostic information
+      const diagnostics = {
+        errorCode: error.code,
+        errorMessage: error.message,
+        wasFallback: isFallback,
+        attempts: isFallback ? 'Both high accuracy and low accuracy failed' : 'Single attempt failed',
+        hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
+        protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+        timestamp: new Date().toISOString()
+      };
+      
+      console.error('🌍 [GEOLOCATION] DIAGNOSTICS - Both attempts failed:', diagnostics);
+      console.error('🌍 [GEOLOCATION] This likely indicates a SYSTEM-LEVEL issue, not our code.');
+      console.error('🌍 [GEOLOCATION] Common causes:');
+      console.error('  1. macOS System Preferences > Security & Privacy > Location Services disabled');
+      console.error('  2. Browser location services blocked at system level');
+      console.error('  3. VPN or network configuration blocking location');
+      console.error('  4. Browser not allowed to use location services');
+      
+      let errorMessage = 'Unable to retrieve your location.';
+      let debugInfo = '';
+      
+      switch (error.code) {
+        case error.POSITION_UNAVAILABLE:
+          errorMessage = 'Location Services Unavailable';
+          const browserName = typeof navigator !== 'undefined' 
+            ? (navigator.userAgent.includes('Chrome') ? 'Chrome' : 
+               navigator.userAgent.includes('Safari') ? 'Safari' : 
+               navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Browser')
+            : 'Browser';
+          
+          debugInfo = `Diagnostics show this is a SYSTEM-LEVEL issue, not an app issue:\n\n` +
+            `✅ Browser permissions: GRANTED\n` +
+            `✅ macOS Location Services: Enabled (confirmed)\n` +
+            `❌ GPS location: Unavailable\n` +
+            `❌ IP/WiFi location: Unavailable\n\n` +
+            `Troubleshooting Steps:\n\n` +
+            `1. Try Safari - Open this site in Safari to test if it's a Chrome-specific issue\n` +
+            `2. Restart Chrome - Close all Chrome windows and reopen\n` +
+            `3. Check System Preferences:\n` +
+            `   • System Preferences > Security & Privacy > Privacy > Location Services\n` +
+            `   • Make sure ${browserName} is checked and enabled\n` +
+            `   • Try unchecking and re-checking ${browserName}\n` +
+            `4. Disable VPN - If you're using a VPN, try disabling it temporarily\n` +
+            `5. Test other sites - Visit maps.google.com and see if it can get your location\n` +
+            `6. Restart macOS - Sometimes location services need a system restart\n\n` +
+            `If Safari works but Chrome doesn't: Chrome may need to be re-authorized.\n` +
+            `If neither works: macOS Location Services may need repair.`;
+          break;
+        case error.TIMEOUT:
+          errorMessage = 'Location request timed out.';
+          debugInfo = 'Both attempts timed out. This suggests location services are slow or blocked.';
+          break;
+        default:
+          errorMessage = `Location error (${error.code}): ${error.message}`;
+          debugInfo = 'An unexpected geolocation error occurred.';
+      }
+      
+      console.log('🌍 [GEOLOCATION] Debug info:', debugInfo);
+      alert(`${errorMessage}\n\n${debugInfo}`);
+    };
+
+    setCurrentLocationLoading(true);
+    
+    console.log('🌍 [GEOLOCATION] Starting location request...');
+    console.log('🌍 [GEOLOCATION] To test geolocation directly in console, run:');
+    console.log('🌍 [GEOLOCATION] navigator.geolocation.getCurrentPosition(pos => console.log("SUCCESS:", pos.coords), err => console.error("ERROR:", err), {enableHighAccuracy: false, timeout: 10000, maximumAge: 86400000})');
+    
+    // Try a different approach: use watchPosition with a timeout instead of getCurrentPosition
+    // watchPosition sometimes works better in certain browsers/situations
+    let watchId: number | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let positionReceived = false;
+    
+    const cleanup = () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+    
+    const attemptWatch = (useHighAccuracy: boolean) => {
+      console.log(`🌍 [GEOLOCATION] Attempting watchPosition (highAccuracy: ${useHighAccuracy})`);
+      
+      const options: PositionOptions = {
+        enableHighAccuracy: useHighAccuracy,
+        timeout: 30000, // 30 second timeout
+        maximumAge: 86400000 // Accept cached up to 24 hours
+      };
+      
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          if (!positionReceived) {
+            positionReceived = true;
+            console.log('🌍 [GEOLOCATION] watchPosition succeeded!', position.coords);
+            cleanup();
+            handlePositionSuccess(position);
+          }
+        },
+        (error) => {
+          if (positionReceived) return; // Already handled
+          
+          console.error(`🌍 [GEOLOCATION] watchPosition error (highAccuracy: ${useHighAccuracy}):`, error);
+          
+          if (error.code === error.PERMISSION_DENIED) {
+            cleanup();
+            handlePositionError(error, false);
+            return;
+          }
+          
+          // If this was low accuracy attempt, try high accuracy
+          if (!useHighAccuracy && (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT)) {
+            cleanup();
+            console.log('🌍 [GEOLOCATION] Low accuracy watch failed, trying high accuracy watch...');
+            attemptWatch(true);
+            return;
+          }
+          
+          // If high accuracy also failed or other error, fall back to getCurrentPosition
+          cleanup();
+          console.log('🌍 [GEOLOCATION] watchPosition failed, trying getCurrentPosition as fallback...');
+          
+          // Final fallback: try getCurrentPosition with simplest options
+          const simpleOptions: PositionOptions = {
+            enableHighAccuracy: false,
+            timeout: 20000,
+            maximumAge: 86400000
+          };
+          
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              console.log('🌍 [GEOLOCATION] getCurrentPosition fallback succeeded!', position.coords);
+              handlePositionSuccess(position);
+            },
+            (error) => {
+              console.error('🌍 [GEOLOCATION] All methods failed:', error);
+              handlePositionError(error, true);
+            },
+            simpleOptions
+          );
+        },
+        options
+      );
+      
+      // Set a timeout to cancel watch if it takes too long
+      timeoutId = setTimeout(() => {
+        if (!positionReceived && watchId !== null) {
+          console.warn('🌍 [GEOLOCATION] WatchPosition timeout, cleaning up...');
+          cleanup();
+          if (!useHighAccuracy) {
+            attemptWatch(true);
+          } else {
+            // Try getCurrentPosition as final fallback
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                console.log('🌍 [GEOLOCATION] Final getCurrentPosition fallback succeeded!', position.coords);
+                handlePositionSuccess(position);
+              },
+              (error) => {
+                console.error('🌍 [GEOLOCATION] All location methods exhausted:', error);
+                handlePositionError(error, true);
+              },
+              { enableHighAccuracy: false, timeout: 15000, maximumAge: 86400000 }
+            );
+          }
+        }
+      }, 35000); // 35 second timeout (slightly longer than watchPosition timeout)
+    };
+    
+    // Start with low accuracy watch
+    attemptWatch(false);
+  }, [map, isPropertyDataCached, cachePropertyData, zoom, mapCenter.lat, mapCenter.lng, fetchAddress]);
 
   // Zoom handlers for mobile controls
   const handleZoomIn = useCallback(() => {
@@ -1905,47 +2103,61 @@ function MapPage() {
         setSelectedProperty(null);
       }
 
-      // Create new property immediately at exact coordinates
-      const newProperty: Property = {
-        id: null, // Will be assigned when saved
-        address: `Location (${lat.toFixed(6)}, ${lng.toFixed(6)})`, // Default address with coordinates
-        lat,
-        lng,
-        label: null,
-        notes: null,
-      };
-      
-      // Set as current property and show info card
-      setSelectedProperty(newProperty);
-      setAddress(newProperty.address);
-      setSnappedLatLng({ lat, lng });
-      
       console.log('📍 [PINS] New pin created at exact coordinates');
       
-      // Optionally try to get a human-readable address in the background
+      // Get a human-readable address for the pin location
       setAddressLoading(true);
       try {
         const res = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
         
-        if (res.ok) {
-          const data = await res.json();
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        
+        if (data.results && data.results[0]) {
+          const address = data.results[0].formatted_address;
           
-          if (data.results && data.results[0]) {
-            const address = data.results[0].formatted_address;
-            console.log('📍 [PINS] Address found:', address);
-            
-            // Update the property with the found address
-            const updatedProperty: Property = {
-              ...newProperty,
-              address,
-            };
-            
-            setSelectedProperty(updatedProperty);
-            setAddress(address);
-            
-            // Cache the address
-            saveAddressToCache(lat, lng, address, { lat, lng });
-          }
+          console.log('📍 [PINS] New pin address:', address);
+          console.log('📍 [PINS] Pin location (exact click):', { lat, lng });
+          
+          // Create new property for pin using EXACT clicked coordinates
+          // Users can drop pins wherever they want, not snapped to geocoding API location
+          const newProperty: Property = {
+            id: null, // Will be assigned when saved
+            address,
+            lat: lat, // Use exact clicked coordinates
+            lng: lng, // Use exact clicked coordinates
+            label: null,
+            notes: null,
+          };
+          
+          // Set as current property and show info card
+          setSelectedProperty(newProperty);
+          setAddress(address);
+          // Don't set snappedLatLng - we're using exact coordinates
+          setSnappedLatLng(null);
+          
+          // Cache the address with exact coordinates
+          saveAddressToCache(lat, lng, address, { lat, lng });
+          
+          console.log('📍 [PINS] New pin ready for property creation at exact location');
+        } else {
+          console.log('📍 [PINS] No address found for pin location');
+          setAddress('Location not found');
+          
+          // Still create a property with coordinates but no address
+          const newProperty: Property = {
+            id: null,
+            address: 'Location not found',
+            lat,
+            lng,
+            label: null,
+            notes: null,
+          };
+          
+          setSelectedProperty(newProperty);
         }
       } catch (error) {
         console.log('📍 [PINS] Address lookup failed, keeping coordinates:', error);
@@ -1959,6 +2171,13 @@ function MapPage() {
   // Handle property pin click - show selection card and prefetch in background
   const handlePropertyPinClick = useCallback(async (property: Property) => {
     console.log('📍 [PINS] Property pin clicked:', property.address);
+    
+    // Clear old property data only when switching to a different property
+    if (savedProperty && savedProperty.id && savedProperty.id !== property.id) {
+      console.log('📍 [PINS] Switching properties - clearing old data');
+      setFolders([]);
+      setPropertyFiles([]);
+    }
     
     setSelectedFolder('master'); // reset folder to root when opening a property
     setSelectedProperty(property);
@@ -2024,7 +2243,7 @@ function MapPage() {
     }
     
     // Do not open modal immediately; wait for user to confirm via selection card
-  }, [getCachedPropertyData, cachePropertyData]);
+  }, [getCachedPropertyData, cachePropertyData, savedProperty]);
 
   // Handle property selection from quick access
   const handleQuickAccessPropertySelect = useCallback(async (property: PropertyWithFileCount) => {
@@ -2333,7 +2552,12 @@ function MapPage() {
                 setFilesLoading(false);
                 setShowDetailsModal(true);
               } else {
-                // Existing property: ensure data is ready (cache or background-fetched), then open modal
+                // Existing property: clear old data first if switching properties
+                if (savedProperty && savedProperty.id !== selectedProperty.id) {
+                  setFolders([]);
+                  setPropertyFiles([]);
+                }
+                // Ensure data is ready (cache or background-fetched), then open modal
                 const cached = await getCachedPropertyData(selectedProperty.address);
                 if (cached) {
                   setFolders(cached.folders);
@@ -2444,8 +2668,9 @@ function MapPage() {
             setFoldersLoading(false);
             setFilesLoading(false);
             
-            // Update address to match the switched property
+            // Update address and coordinates to match the switched property (for image header update)
             setAddress(property.address);
+            setSnappedLatLng({ lat: property.lat, lng: property.lng });
             
             console.log('🔄 [SWITCH] Property switched to:', property.address, `(${files.length} files, ${folders.length} folders)`);
           }}

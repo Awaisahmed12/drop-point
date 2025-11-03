@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, useTransition } from 'react';
 import Image from 'next/image';
 
 import { MoveModal } from './MoveModal';
@@ -106,6 +106,21 @@ export const PropertyDetailsModal = ({
       localStorage.setItem('droppoint-view-mode', viewMode);
     }
   }, [viewMode]);
+
+  // Blanket fix: Close all menus when view mode changes
+  useEffect(() => {
+    setFileMenuId(null);
+    setFolderMenuId(null);
+  }, [viewMode]);
+
+  // Blanket fix: Close all menus when modal closes or opens
+  useEffect(() => {
+    if (!isOpen) {
+      // Close menus when modal closes
+      setFileMenuId(null);
+      setFolderMenuId(null);
+    }
+  }, [isOpen]);
 
   // Mobile file viewer state
   const [mobileFileViewer, setMobileFileViewer] = useState<{
@@ -326,18 +341,22 @@ export const PropertyDetailsModal = ({
     setMenuPosition(prev => ({...prev, [menuId]: position}));
   };
 
-  // Folder validation
+  // Folder validation - memoized to prevent recalculation on every render
   const forbiddenFolderChars = /[:;\/\\*?"<>|]/;
   const maxFolderLength = 50;
-  const folderNameError = (name: string) => {
+  const folderNameError = useCallback((name: string) => {
     if (!name) return '';
     if (name[0] === ' ') return "Folder name can't start with a space.";
     if (forbiddenFolderChars.test(name)) return "Folder names can't include : ; / \\ * ? \" < > |";
     if (name.length > maxFolderLength) return `Folder name must be less than ${maxFolderLength} characters.`;
     return '';
-  };
-  const folderNameValidationMsg = folderNameError(newFolderName);
+  }, []);
+  
+  const folderNameValidationMsg = useMemo(() => folderNameError(newFolderName), [newFolderName, folderNameError]);
   const isFolderNameValid = !!newFolderName && !folderNameValidationMsg;
+  
+  // Use transition for non-urgent state updates to improve input responsiveness
+  const [isPending, startTransition] = useTransition();
 
   // Sorting logic - Folders first, then files (standard document management practice)
   const sortedItems = useMemo(() => {
@@ -427,54 +446,89 @@ export const PropertyDetailsModal = ({
   // Handle rename
   const handleRename = async (item: PropertyFile | PropertyFolder, newName: string) => {
     try {
+      // Get the current item from the files/folders array to ensure we have the latest reference
+      // This is especially important in sorted view where items can move positions
+      let currentItem: PropertyFile | PropertyFolder | undefined;
+      if ('file_name' in item) {
+        // It's a file
+        currentItem = files.find(f => f.id === item.id);
+      } else {
+        // It's a folder
+        currentItem = folders.find(f => f.id === item.id);
+      }
+      
+      // If item not found, use the original item (fallback)
+      const itemToRename = currentItem || item;
+      
       // For files, append the original extension back to the new name
       let finalName = newName;
-      if ('file_name' in item) {
-        const [, originalExtWithDot] = splitFileNameAndExt(item.file_name);
+      if ('file_name' in itemToRename) {
+        const [, originalExtWithDot] = splitFileNameAndExt(itemToRename.file_name);
         if (originalExtWithDot && !newName.includes('.')) {
           // originalExtWithDot already contains the leading dot
           finalName = `${newName}${originalExtWithDot}`;
         }
       }
       
-      await onFileRename(item, finalName);
+      await onFileRename(itemToRename, finalName);
       setRenamingFileId(null);
       setRenamingFileName('');
     } catch (error) {
       console.error('Rename failed:', error);
+      // Keep rename state active if there's an error so user can retry
     }
   };
 
   // Enhanced click outside handler - prevents accidental clicks
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
+    const handleClick = (e: MouseEvent | TouchEvent) => {
       const target = e.target as HTMLElement;
       
       // Check if any menu is currently open
       const anyMenuOpen = fileMenuId || folderMenuId;
       
-      if (!target.closest('button[title="Folder actions"]') && !target.closest('button[title="File actions"]')) {
-        let menuClosed = false;
-        
-        if (folderMenuRef.current && !folderMenuRef.current.contains(target)) {
-          setFileMenuId(null);
-          menuClosed = true;
-        }
-        if (fileMenuRef.current && !fileMenuRef.current.contains(target)) {
-          setFileMenuId(null);
-          menuClosed = true;
-        }
-        
-        // If we just closed a menu, prevent the click from propagating to other elements
-        if (anyMenuOpen && menuClosed) {
-          e.stopPropagation();
-          e.preventDefault();
-        }
+      if (!anyMenuOpen) return;
+      
+      // Check if click is on a menu button (check for title attribute, aria-label, or three-dot button structure)
+      const buttonElement = target.closest('button');
+      const isMenuButton = target.closest('button[title="Folder actions"]') || 
+                          target.closest('button[title="File actions"]') ||
+                          target.closest('button[aria-label="Folder actions"]') ||
+                          target.closest('button[aria-label="File actions"]') ||
+                          // Check if clicking on the SVG inside a three-dot button, or if parent button has three-dot SVG
+                          (target.closest('svg') && target.closest('svg')?.parentElement?.closest('button')) ||
+                          (buttonElement && buttonElement.querySelector('svg circle'));
+      
+      // Don't close if clicking the menu button itself
+      if (isMenuButton) return;
+      
+      let menuClosed = false;
+      
+      // Close folder menu if clicking outside
+      if (folderMenuId && folderMenuRef.current && !folderMenuRef.current.contains(target)) {
+        setFolderMenuId(null);
+        menuClosed = true;
+      }
+      
+      // Close file menu if clicking outside
+      if (fileMenuId && fileMenuRef.current && !fileMenuRef.current.contains(target)) {
+        setFileMenuId(null);
+        menuClosed = true;
+      }
+      
+      // If we just closed a menu, prevent the click from propagating to other elements
+      if (anyMenuOpen && menuClosed) {
+        e.stopPropagation();
+        e.preventDefault();
       }
     };
 
     document.addEventListener('click', handleClick, true); // Use capture phase
-    return () => document.removeEventListener('click', handleClick, true);
+    document.addEventListener('touchend', handleClick, true); // Also handle touch events for mobile
+    return () => {
+      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('touchend', handleClick, true);
+    };
   }, [fileMenuId, folderMenuId]);
 
   // Enhanced mobile-first file opening function
@@ -1126,11 +1180,12 @@ export const PropertyDetailsModal = ({
               streetViewEnabled ? (
                 <div className={`relative w-full ${isMobile ? 'h-28' : 'h-32'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
                   <Image
+                    key={`property-image-${property?.id || 'new'}-${snappedLatLng?.lat}-${snappedLatLng?.lng}`}
                     src={
                       // Use Street View on mobile where aspect fits; use satellite map on desktop to avoid skinny distortion
                       isMobile
-                        ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`
-                        : `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`
+                        ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`
+                        : `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&key=${GOOGLE_MAPS_API_KEY}`
                     }
                     alt="Property preview"
                     layout="fill"
@@ -1140,7 +1195,7 @@ export const PropertyDetailsModal = ({
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       if (target && target.src.indexOf('streetview') !== -1) {
-                        target.src = `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`;
+                        target.src = `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&key=${GOOGLE_MAPS_API_KEY}`;
                       }
                     }}
                   />
@@ -1148,7 +1203,8 @@ export const PropertyDetailsModal = ({
               ) : (
                 <div className={`relative w-full ${isMobile ? 'h-28' : 'h-32'} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
                   <Image
-                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property.lat)},${(snappedLatLng?.lng ?? property.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
+                    key={`property-image-${property?.id || 'new'}-${snappedLatLng?.lat}-${snappedLatLng?.lng}`}
+                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
                     alt="Property satellite view"
                     layout="fill"
                     objectFit="cover"
@@ -1320,7 +1376,12 @@ export const PropertyDetailsModal = ({
                                           const input = e.target as HTMLInputElement;
                                           input.setSelectionRange(0, folder.name.length);
                                         }}
-                                        onChange={e => setRenamingFileName(e.target.value)}
+                                        onChange={e => {
+                                      // Use startTransition for non-urgent state updates
+                                      startTransition(() => {
+                                        setRenamingFileName(e.target.value);
+                                      });
+                                    }}
                                         onBlur={async () => {
                                           const trimmed = renamingFileName.trim();
                                           if (trimmed) {
@@ -1380,7 +1441,10 @@ export const PropertyDetailsModal = ({
                                   style={{ minWidth: 24, minHeight: 24 }}
                                   onClick={e => {
                                     e.stopPropagation();
+                                    // Close any open menus first
                                     setFileMenuId(null);
+                                    setFolderMenuId(null);
+                                    // Then open this menu if not already open
                                     const newMenuId = folderMenuId === folder.id ? null : folder.id;
                                     setFolderMenuId(newMenuId);
                                     if (newMenuId) {
@@ -1473,7 +1537,12 @@ export const PropertyDetailsModal = ({
                                           const input = e.target as HTMLInputElement;
                                           input.setSelectionRange(0, renamingFileName.length);
                                         }}
-                                        onChange={e => setRenamingFileName(e.target.value)}
+                                        onChange={e => {
+                                      // Use startTransition for non-urgent state updates
+                                      startTransition(() => {
+                                        setRenamingFileName(e.target.value);
+                                      });
+                                    }}
                                         onBlur={async () => {
                                           const trimmed = renamingFileName.trim();
                                           if (trimmed) {
@@ -1535,8 +1604,15 @@ export const PropertyDetailsModal = ({
                                   className={`${isMobile ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
                                   onClick={e => {
                                     e.stopPropagation();
+                                    // Close any open menus first
                                     setFileMenuId(null);
-                                    setFileMenuId(folderMenuId === folder.id ? null : folder.id);
+                                    setFolderMenuId(null);
+                                    // Then open this folder menu if not already open
+                                    const newMenuId = folderMenuId === folder.id ? null : folder.id;
+                                    setFolderMenuId(newMenuId);
+                                    if (newMenuId) {
+                                      calculateMenuPosition(e.currentTarget, folder.id);
+                                    }
                                   }}
                                   title="Folder actions"
                                 >
@@ -1642,7 +1718,12 @@ export const PropertyDetailsModal = ({
                                             const input = e.target as HTMLInputElement;
                                             input.setSelectionRange(0, renamingFileName.length);
                                           }}
-                                          onChange={e => setRenamingFileName(e.target.value)}
+                                          onChange={e => {
+                                      // Use startTransition for non-urgent state updates
+                                      startTransition(() => {
+                                        setRenamingFileName(e.target.value);
+                                      });
+                                    }}
                                           onBlur={async () => {
                                             const trimmed = renamingFileName.trim();
                                             if (trimmed) {
@@ -1705,7 +1786,10 @@ export const PropertyDetailsModal = ({
                                   style={{ minWidth: 24, minHeight: 24 }}
                                   onClick={e => {
                                     e.stopPropagation();
+                                    // Close any open menus first
                                     setFileMenuId(null);
+                                    setFolderMenuId(null);
+                                    // Then open this menu if not already open
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
                                     if (newMenuId) {
@@ -1843,7 +1927,12 @@ export const PropertyDetailsModal = ({
                                             const input = e.target as HTMLInputElement;
                                             input.setSelectionRange(0, renamingFileName.length);
                                           }}
-                                          onChange={e => setRenamingFileName(e.target.value)}
+                                          onChange={e => {
+                                      // Use startTransition for non-urgent state updates
+                                      startTransition(() => {
+                                        setRenamingFileName(e.target.value);
+                                      });
+                                    }}
                                           onBlur={async () => {
                                             const trimmed = renamingFileName.trim();
                                             if (trimmed) {
@@ -1910,7 +1999,10 @@ export const PropertyDetailsModal = ({
                                   onClick={e => {
                                     e.stopPropagation();
                                     console.log('🧭 [FILE-MENU] Toggle for file', file.id);
+                                    // Close any open menus first
                                     setFileMenuId(null);
+                                    setFolderMenuId(null);
+                                    // Then open this menu if not already open
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
                                     if (newMenuId) {
@@ -1949,6 +2041,45 @@ export const PropertyDetailsModal = ({
                                           <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                         Rename
+                                      </div>
+                                    </button>
+                                    {onFileMove && (
+                                      <button
+                                        className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150 border-b border-gray-100/50"
+                                        onClick={e => {
+                                          e.stopPropagation();
+                                          setMoveFileTarget(file);
+                                          setShowMoveModal(true);
+                                          setFileMenuId(null);
+                                        }}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                          </svg>
+                                          Move
+                                        </div>
+                                      </button>
+                                    )}
+                                    <button
+                                      className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-150 border-b border-gray-100/50"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
+                                          window.open(fileUrl, '_blank');
+                                        } catch (error) {
+                                          console.error('Error downloading file:', error);
+                                          alert('Unable to download file. Please try again.');
+                                        }
+                                        setFileMenuId(null);
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Download
                                       </div>
                                     </button>
                                     <button
@@ -1995,12 +2126,29 @@ export const PropertyDetailsModal = ({
                                 <HeroFolderIcon style={{ width: isMobile ? 48 : 56, height: isMobile ? 48 : 56, color: '#3b82f6' }} />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className={`absolute ${isMobile ? '-top-2 -right-2' : '-top-2 -right-2'} rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl ${
+                                  className={`absolute ${isMobile ? '-top-2 -right-2' : '-top-2 -right-2'} rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation ${
                                     isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                                   }`}
                                   onClick={e => {
                                     e.stopPropagation();
+                                    e.preventDefault(); // Prevent double-tap zoom on mobile
+                                    // Close any open menus first
                                     setFileMenuId(null);
+                                    setFolderMenuId(null);
+                                    // Then open this menu if not already open
+                                    const newMenuId = folderMenuId === folder.id ? null : folder.id;
+                                    setFolderMenuId(newMenuId);
+                                    if (newMenuId) {
+                                      calculateMenuPosition(e.currentTarget, folder.id);
+                                    }
+                                  }}
+                                  onTouchEnd={e => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    // Close any open menus first
+                                    setFileMenuId(null);
+                                    setFolderMenuId(null);
+                                    // Then open this menu if not already open
                                     const newMenuId = folderMenuId === folder.id ? null : folder.id;
                                     setFolderMenuId(newMenuId);
                                     if (newMenuId) {
@@ -2009,13 +2157,16 @@ export const PropertyDetailsModal = ({
                                   }}
                                   style={{ 
                                     zIndex: 10,
-                                    width: isMobile ? '20px' : '28px',
-                                    height: isMobile ? '20px' : '28px',
-                                    minWidth: isMobile ? '20px' : '28px',
-                                    minHeight: isMobile ? '20px' : '28px'
+                                    width: isMobile ? '28px' : '28px', // Increased from 20px for better mobile tapping
+                                    height: isMobile ? '28px' : '28px',
+                                    minWidth: isMobile ? '28px' : '28px',
+                                    minHeight: isMobile ? '28px' : '28px',
+                                    touchAction: 'manipulation', // Better touch handling
+                                    cursor: 'pointer'
                                   }}
+                                  aria-label="Folder actions"
                                 >
-                                  <svg className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} text-gray-700`} fill="currentColor" viewBox="0 0 24 24">
+                                  <svg className={`${isMobile ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-gray-700`} fill="currentColor" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -2077,7 +2228,12 @@ export const PropertyDetailsModal = ({
                                       const input = e.target as HTMLInputElement;
                                       input.setSelectionRange(0, folder.name.length);
                                     }}
-                                    onChange={e => setRenamingFileName(e.target.value)}
+                                    onChange={e => {
+                                      // Use startTransition for non-urgent state updates
+                                      startTransition(() => {
+                                        setRenamingFileName(e.target.value);
+                                      });
+                                    }}
                                     onBlur={async () => {
                                       const trimmed = renamingFileName.trim();
                                       if (trimmed) {
@@ -2118,7 +2274,14 @@ export const PropertyDetailsModal = ({
                               key={`grid-file-${file.id}`}
                               className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition cursor-pointer group relative"
                               onClick={async (e) => {
-                                if ((e.target as HTMLElement).closest('button')) {
+                                if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
+                                  return;
+                                }
+                                
+                                // If any menu is open, close it instead of opening the file
+                                if (fileMenuId || folderMenuId) {
+                                  setFileMenuId(null);
+                                  setFolderMenuId(null);
                                   return;
                                 }
                                 
@@ -2138,12 +2301,29 @@ export const PropertyDetailsModal = ({
                                 />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className={`absolute ${isMobile ? '-top-2 -right-2' : '-top-2 -right-2'} rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl ${
+                                  className={`absolute ${isMobile ? '-top-2 -right-2' : '-top-2 -right-2'} rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation ${
                                     isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                                   }`}
                                   onClick={e => {
                                     e.stopPropagation();
+                                    e.preventDefault(); // Prevent double-tap zoom on mobile
+                                    // Close any open menus first
                                     setFileMenuId(null);
+                                    setFolderMenuId(null);
+                                    // Then open this menu if not already open
+                                    const newMenuId = fileMenuId === file.id ? null : file.id;
+                                    setFileMenuId(newMenuId);
+                                    if (newMenuId) {
+                                      calculateMenuPosition(e.currentTarget, file.id);
+                                    }
+                                  }}
+                                  onTouchEnd={e => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    // Close any open menus first
+                                    setFileMenuId(null);
+                                    setFolderMenuId(null);
+                                    // Then open this menu if not already open
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
                                     if (newMenuId) {
@@ -2152,13 +2332,16 @@ export const PropertyDetailsModal = ({
                                   }}
                                   style={{ 
                                     zIndex: 10,
-                                    width: isMobile ? '20px' : '28px',
-                                    height: isMobile ? '20px' : '28px',
-                                    minWidth: isMobile ? '20px' : '28px',
-                                    minHeight: isMobile ? '20px' : '28px'
+                                    width: isMobile ? '28px' : '28px', // Increased from 20px for better mobile tapping
+                                    height: isMobile ? '28px' : '28px',
+                                    minWidth: isMobile ? '28px' : '28px',
+                                    minHeight: isMobile ? '28px' : '28px',
+                                    touchAction: 'manipulation', // Better touch handling
+                                    cursor: 'pointer'
                                   }}
+                                  aria-label="File actions"
                                 >
-                                  <svg className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} text-gray-700`} fill="currentColor" viewBox="0 0 24 24">
+                                  <svg className={`${isMobile ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-gray-700`} fill="currentColor" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -2254,7 +2437,12 @@ export const PropertyDetailsModal = ({
                                       const input = e.target as HTMLInputElement;
                                       input.setSelectionRange(0, renamingFileName.length);
                                     }}
-                                    onChange={e => setRenamingFileName(e.target.value)}
+                                    onChange={e => {
+                                      // Use startTransition for non-urgent state updates
+                                      startTransition(() => {
+                                        setRenamingFileName(e.target.value);
+                                      });
+                                    }}
                                     onBlur={async () => {
                                       const trimmed = renamingFileName.trim();
                                       if (trimmed) {
@@ -2562,8 +2750,11 @@ export const PropertyDetailsModal = ({
                 onChange={e => {
                   if (isCreatingFolder) return;
                   const val = e.target.value;
+                  // Immediate state update for input responsiveness
                   setNewFolderName(val);
-                  setFolderErrorPopup(folderNameError(val));
+                  // Validation update can be batched (memoized anyway)
+                  const error = folderNameError(val);
+                  setFolderErrorPopup(error);
                 }}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && isFolderNameValid && !isCreatingFolder) {

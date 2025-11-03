@@ -93,7 +93,7 @@ export function sanitizeFileName(name: string): string {
   
   // Clean the name part
   let cleanName = nameWithoutExt
-    // Replace common problematic characters
+    // Replace common problematic characters (but keep spaces)
     .replace(/[<>:"/\\|?*]/g, '_')
     // Replace Chinese/Unicode characters with transliteration or underscore
     .replace(/[\u4e00-\u9fff]/g, '_') // Chinese characters
@@ -104,10 +104,12 @@ export function sanitizeFileName(name: string): string {
     .replace(/[\u0600-\u06ff]/g, '_') // Arabic
     // Replace any remaining non-ASCII characters
     .replace(/[^\x00-\x7F]/g, '_')
-    // Replace multiple underscores/spaces with single underscore
-    .replace(/[_\s]+/g, '_')
-    // Remove leading/trailing underscores
-    .replace(/^_+|_+$/g, '')
+    // Collapse multiple consecutive underscores (but preserve spaces)
+    .replace(/_+/g, '_')
+    // Collapse multiple consecutive spaces to single space (but keep the space)
+    .replace(/\s+/g, ' ')
+    // Remove leading/trailing underscores and spaces
+    .replace(/^[\s_]+|[\s_]+$/g, '')
     .trim();
   
   console.log('🧹 [SANITIZE] After character replacement:', cleanName);

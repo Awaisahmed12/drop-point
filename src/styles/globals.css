@@ -411,3 +411,52 @@ textarea,
 [contenteditable="true"] {
   cursor: text !important;
 }
+
+/* ================================
+   TEXT COLOR STANDARDS
+   ================================ */
+
+/* Ensure inputs always have proper text and placeholder colors by default */
+input[type="text"]:not([class*="text-"]),
+input[type="email"]:not([class*="text-"]),
+input[type="password"]:not([class*="text-"]),
+input[type="search"]:not([class*="text-"]),
+input[type="number"]:not([class*="text-"]),
+input[type="tel"]:not([class*="text-"]),
+input[type="url"]:not([class*="text-"]),
+textarea:not([class*="text-"]) {
+  /* Default to high-contrast text if no explicit text color class */
+  color: #111827; /* gray-900 */
+}
+
+/* Ensure placeholders are always visible - WCAG AA compliant */
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280; /* gray-500 - ensures good contrast */
+  opacity: 1;
+}
+
+/* Safety net: Prevent white/light text on light backgrounds */
+input[type="text"][class*="text-white"],
+input[type="email"][class*="text-white"],
+input[type="password"][class*="text-white"],
+input[type="search"][class*="text-white"],
+input[type="number"][class*="text-white"],
+input[type="tel"][class*="text-white"],
+input[type="url"][class*="text-white"],
+textarea[class*="text-white"] {
+  color: #111827 !important; /* Force dark text for accessibility */
+}
+
+/* Prevent light placeholder colors that would be invisible */
+input[class*="placeholder:text-white"]::placeholder,
+input[class*="placeholder:text-gray-100"]::placeholder,
+input[class*="placeholder:text-gray-200"]::placeholder,
+input[class*="placeholder:text-gray-300"]::placeholder,
+textarea[class*="placeholder:text-white"]::placeholder,
+textarea[class*="placeholder:text-gray-100"]::placeholder,
+textarea[class*="placeholder:text-gray-200"]::placeholder,
+textarea[class*="placeholder:text-gray-300"]::placeholder {
+  color: #6b7280 !important; /* gray-500 - ensure visibility */
+  opacity: 1 !important;
+}

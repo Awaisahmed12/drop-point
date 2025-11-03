@@ -78,4 +78,32 @@ export const fileTypeColorMap: Record<string, string> = {
 };
 
 // Animation durations
-export const FLOAT_MESSAGE_DURATION = 2500; // 2.5 seconds 
+export const FLOAT_MESSAGE_DURATION = 2500; // 2.5 seconds
+
+// Text color standards - Ensure proper contrast for accessibility
+// These correspond to Tailwind classes but serve as documentation
+export const TEXT_COLORS = {
+  // Primary text colors (high contrast on white/light backgrounds)
+  PRIMARY: 'text-gray-900',        // Main text - highest contrast
+  SECONDARY: 'text-gray-700',     // Secondary text - good contrast
+  TERTIARY: 'text-gray-500',      // Tertiary text - medium contrast
+  MUTED: 'text-gray-400',         // Muted text - lower contrast (use sparingly)
+  
+  // Placeholder colors (must have sufficient contrast)
+  PLACEHOLDER: 'text-gray-500',   // Input placeholders - MUST be visible
+  PLACEHOLDER_LIGHT: 'text-gray-400', // Light placeholders (use with caution)
+  
+  // Interactive states
+  LINK: 'text-blue-600',
+  LINK_HOVER: 'text-blue-700',
+  ERROR: 'text-red-600',
+  SUCCESS: 'text-green-600',
+  WARNING: 'text-yellow-600',
+} as const;
+
+// Standardized input classes to prevent contrast issues
+export const INPUT_CLASSES = {
+  BASE: 'text-gray-900 placeholder:text-gray-500',
+  MOBILE: 'text-base text-gray-900 placeholder:text-gray-500',
+  DESKTOP: 'text-sm text-gray-900 placeholder:text-gray-500',
+} as const;
