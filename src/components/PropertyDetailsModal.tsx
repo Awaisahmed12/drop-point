@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback, useTransition } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 
 import { MoveModal } from './MoveModal';
@@ -9,7 +9,7 @@ import { FileMenu } from './FileMenu';
 import { FolderMenu } from './FolderMenu';
 import { RenameInput } from './RenameInput';
 import { useMobileViewport } from '../hooks/useMobileViewport';
-import { useResponsiveValue, useResponsiveClass } from '../hooks/useResponsiveValue';
+import { useResponsiveValue } from '../hooks/useResponsiveValue';
 import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
@@ -350,9 +350,9 @@ export const PropertyDetailsModal = ({
   };
 
   // Folder validation - memoized to prevent recalculation on every render
-  const forbiddenFolderChars = /[:;\/\\*?"<>|]/;
   const maxFolderLength = 50;
   const folderNameError = useCallback((name: string) => {
+    const forbiddenFolderChars = /[:;\/\\*?"<>|]/;
     if (!name) return '';
     if (name[0] === ' ') return "Folder name can't start with a space.";
     if (forbiddenFolderChars.test(name)) return "Folder names can't include : ; / \\ * ? \" < > |";
@@ -363,8 +363,6 @@ export const PropertyDetailsModal = ({
   const folderNameValidationMsg = useMemo(() => folderNameError(newFolderName), [newFolderName, folderNameError]);
   const isFolderNameValid = !!newFolderName && !folderNameValidationMsg;
   
-  // Use transition for non-urgent state updates to improve input responsiveness
-  const [isPending, startTransition] = useTransition();
   
   // Responsive values
   const titleSize = useResponsiveValue('text-base', 'text-xl');

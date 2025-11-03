@@ -8,7 +8,7 @@ interface FolderMenuProps {
   onRename: (folder: PropertyFolder) => void;
   onDelete: (folder: PropertyFolder) => void;
   menuPosition: { top?: number; bottom?: number; left?: number; right?: number };
-  menuRef: React.RefObject<HTMLDivElement>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export const FolderMenu: React.FC<FolderMenuProps> = ({

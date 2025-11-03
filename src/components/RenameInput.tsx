@@ -29,7 +29,7 @@ export const RenameInput: React.FC<RenameInputProps> = ({
   className = '',
   showButtons = true,
 }) => {
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (variant === 'simple' || variant === 'grid') {

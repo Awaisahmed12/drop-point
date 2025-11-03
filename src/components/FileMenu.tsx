@@ -10,7 +10,7 @@ interface FileMenuProps {
   onMove?: (file: PropertyFile) => void;
   onDelete: (file: PropertyFile) => void;
   menuPosition: { top?: number; bottom?: number; left?: number; right?: number };
-  menuRef: React.RefObject<HTMLDivElement>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export const FileMenu: React.FC<FileMenuProps> = ({

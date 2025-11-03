@@ -552,7 +552,7 @@ function MapPage() {
   }, [mapType, map]);
 
   // Update fetchAddress to use cache
-  const fetchAddress = async (lat: number, lng: number) => {
+  const fetchAddress = useCallback(async (lat: number, lng: number) => {
     // Check cache first
     const cached = getAddressFromCache(lat, lng);
     if (cached) {
@@ -603,7 +603,7 @@ function MapPage() {
       saveAddressToCache(lat, lng, errorAddress, null);
     }
     setAddressLoading(false);
-  };
+  }, []); // Empty dependency array - state setters are stable, cache functions are pure utilities
 
   async function fetchPredictions(input: string): Promise<Prediction[]> {
     try {
