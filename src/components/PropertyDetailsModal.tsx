@@ -7,6 +7,7 @@ import { FileThumbnail } from './FileThumbnail';
 import { PropertySwitcher } from './PropertySwitcher';
 import { FileMenu } from './FileMenu';
 import { FolderMenu } from './FolderMenu';
+import { RenameInput } from './RenameInput';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
@@ -1368,65 +1369,32 @@ export const PropertyDetailsModal = ({
                                 <HeroFolderIcon style={{ width: 28, height: 28, color: '#fbbf24' }} />
                                 <div className="ml-3 flex-1 min-w-0">
                                   {renamingFileId === folder.id ? (
-                                    <div className="w-full bg-blue-50 border-2 border-blue-400 rounded-lg p-2">
-                                      <input
-                                        className="w-full font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        value={renamingFileName}
-                                        autoFocus
-                                        onClick={e => e.stopPropagation()}
-                                        onFocus={e => {
-                                          const input = e.target as HTMLInputElement;
-                                          input.setSelectionRange(0, folder.name.length);
-                                        }}
-                                        onChange={e => {
-                                      // Use startTransition for non-urgent state updates
-                                      startTransition(() => {
-                                        setRenamingFileName(e.target.value);
-                                      });
-                                    }}
-                                        onBlur={async () => {
-                                          const trimmed = renamingFileName.trim();
-                                          if (trimmed) {
-                                            await handleRename(folder, trimmed);
-                                          } else {
-                                            setRenamingFileId(null);
-                                            setRenamingFileName('');
-                                          }
-                                        }}
-                                        onKeyDown={e => {
-                                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                          if (e.key === 'Escape') {
-                                            setRenamingFileId(null);
-                                            setRenamingFileName('');
-                                          }
-                                        }}
-                                        placeholder="Folder name"
-                                      />
-                                      <div className="flex justify-end gap-1 mt-2">
-                                        <button
-                                          className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 transition-colors"
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            setRenamingFileId(null);
-                                            setRenamingFileName('');
-                                          }}
-                                        >
-                                          Cancel
-                                        </button>
-                                        <button
-                                          className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
-                                          onClick={async e => {
-                                            e.stopPropagation();
-                                            const trimmed = renamingFileName.trim();
-                                            if (trimmed) {
-                                              await handleRename(folder, trimmed);
-                                            }
-                                          }}
-                                        >
-                                          Save
-                                        </button>
-                                      </div>
-                                    </div>
+                                    <RenameInput
+                                      value={renamingFileName}
+                                      onChange={setRenamingFileName}
+                                      onBlur={async () => {
+                                        const trimmed = renamingFileName.trim();
+                                        if (trimmed) {
+                                          await handleRename(folder, trimmed);
+                                        } else {
+                                          setRenamingFileId(null);
+                                          setRenamingFileName('');
+                                        }
+                                      }}
+                                      onCancel={() => {
+                                        setRenamingFileId(null);
+                                        setRenamingFileName('');
+                                      }}
+                                      onSave={async () => {
+                                        const trimmed = renamingFileName.trim();
+                                        if (trimmed) {
+                                          await handleRename(folder, trimmed);
+                                        }
+                                      }}
+                                      placeholder="Folder name"
+                                      variant="simple"
+                                      className="w-full"
+                                    />
                                   ) : (
                                     <div className="text-gray-900 font-medium truncate">
                                       {folder.name}
@@ -1495,66 +1463,33 @@ export const PropertyDetailsModal = ({
                                 <HeroFolderIcon style={{ width: 32, height: 32, color: '#fbbf24' }} />
                                 <div className={`${isMobile ? 'ml-3' : 'ml-3'} flex-1 min-w-0`}>
                                   {renamingFileId === folder.id ? (
-                                    <div className="w-full bg-blue-50 border-2 border-blue-400 rounded-lg p-3">
-                                      <input
-                                        className={`w-full font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg px-4 py-3 ${isMobile ? 'text-base' : 'text-base'} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                                        value={renamingFileName}
-                                        autoFocus
-                                        onClick={e => e.stopPropagation()}
-                                        onFocus={e => {
-                                          const input = e.target as HTMLInputElement;
-                                          input.setSelectionRange(0, renamingFileName.length);
-                                        }}
-                                        onChange={e => {
-                                      // Use startTransition for non-urgent state updates
-                                      startTransition(() => {
-                                        setRenamingFileName(e.target.value);
-                                      });
-                                    }}
-                                        onBlur={async () => {
-                                          const trimmed = renamingFileName.trim();
-                                          if (trimmed) {
-                                            await handleRename(folder, trimmed);
-                                          } else {
-                                            setRenamingFileId(null);
-                                            setRenamingFileName('');
-                                          }
-                                        }}
-                                        onKeyDown={e => {
-                                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                          if (e.key === 'Escape') {
-                                            setRenamingFileId(null);
-                                            setRenamingFileName('');
-                                          }
-                                        }}
-                                        placeholder="Folder name"
-                                        style={{ fontSize: isMobile ? '16px' : 'inherit' }} // Prevent zoom on iOS
-                                      />
-                                      <div className="flex justify-end gap-2 mt-3">
-                                        <button
-                                          className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            setRenamingFileId(null);
-                                            setRenamingFileName('');
-                                          }}
-                                        >
-                                          Cancel
-                                        </button>
-                                        <button
-                                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                                          onClick={async e => {
-                                            e.stopPropagation();
-                                            const trimmed = renamingFileName.trim();
-                                            if (trimmed) {
-                                              await handleRename(folder, trimmed);
-                                            }
-                                          }}
-                                        >
-                                          Save
-                                        </button>
-                                      </div>
-                                    </div>
+                                    <RenameInput
+                                      value={renamingFileName}
+                                      onChange={setRenamingFileName}
+                                      onBlur={async () => {
+                                        const trimmed = renamingFileName.trim();
+                                        if (trimmed) {
+                                          await handleRename(folder, trimmed);
+                                        } else {
+                                          setRenamingFileId(null);
+                                          setRenamingFileName('');
+                                        }
+                                      }}
+                                      onCancel={() => {
+                                        setRenamingFileId(null);
+                                        setRenamingFileName('');
+                                      }}
+                                      onSave={async () => {
+                                        const trimmed = renamingFileName.trim();
+                                        if (trimmed) {
+                                          await handleRename(folder, trimmed);
+                                        }
+                                      }}
+                                      placeholder="Folder name"
+                                      variant="full"
+                                      isMobile={isMobile}
+                                      className="w-full"
+                                    />
                                   ) : (
                                     <>
                                       <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-base' : 'text-base'}`}>
@@ -1641,68 +1576,32 @@ export const PropertyDetailsModal = ({
                                 />
                                 <div className="ml-3 flex-1 min-w-0 text-gray-900 font-medium truncate">
                                   {renamingFileId === file.id ? (
-                                    <div className="w-full bg-blue-50 border-2 border-blue-400 rounded-lg p-2">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <input
-                                          className="flex-1 font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                          value={renamingFileName}
-                                          autoFocus
-                                          onClick={e => e.stopPropagation()}
-                                          onFocus={e => {
-                                            const input = e.target as HTMLInputElement;
-                                            input.setSelectionRange(0, renamingFileName.length);
-                                          }}
-                                          onChange={e => {
-                                      // Use startTransition for non-urgent state updates
-                                      startTransition(() => {
-                                        setRenamingFileName(e.target.value);
-                                      });
-                                    }}
-                                          onBlur={async () => {
-                                            const trimmed = renamingFileName.trim();
-                                            if (trimmed) {
-                                              await handleRename(file, trimmed);
-                                            } else {
-                                              setRenamingFileId(null);
-                                              setRenamingFileName('');
-                                            }
-                                          }}
-                                          onKeyDown={e => {
-                                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                            if (e.key === 'Escape') {
-                                              setRenamingFileId(null);
-                                              setRenamingFileName('');
-                                            }
-                                          }}
-                                          placeholder="File name"
-                                        />
-                                        <span className="text-gray-500 text-sm font-medium">.{ext}</span>
-                                      </div>
-                                      <div className="flex justify-end gap-1">
-                                        <button
-                                          className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 transition-colors"
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            setRenamingFileId(null);
-                                            setRenamingFileName('');
-                                          }}
-                                        >
-                                          Cancel
-                                        </button>
-                                        <button
-                                          className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
-                                          onClick={async e => {
-                                            e.stopPropagation();
-                                            const trimmed = renamingFileName.trim();
-                                            if (trimmed) {
-                                              await handleRename(file, trimmed);
-                                            }
-                                          }}
-                                        >
-                                          Save
-                                        </button>
-                                      </div>
-                                    </div>
+                                    <RenameInput
+                                      value={renamingFileName}
+                                      onChange={setRenamingFileName}
+                                      onBlur={async () => {
+                                        const trimmed = renamingFileName.trim();
+                                        if (trimmed) {
+                                          await handleRename(file, trimmed);
+                                        } else {
+                                          setRenamingFileId(null);
+                                          setRenamingFileName('');
+                                        }
+                                      }}
+                                      onCancel={() => {
+                                        setRenamingFileId(null);
+                                        setRenamingFileName('');
+                                      }}
+                                      onSave={async () => {
+                                        const trimmed = renamingFileName.trim();
+                                        if (trimmed) {
+                                          await handleRename(file, trimmed);
+                                        }
+                                      }}
+                                      extension={ext}
+                                      placeholder="File name"
+                                      variant="simple"
+                                    />
                                   ) : (
                                     <span className="text-gray-900 font-medium truncate">
                                       {getFileNameWithoutExtension(file.file_name)}
@@ -1786,69 +1685,33 @@ export const PropertyDetailsModal = ({
                                 />
                                 <div className={`${isMobile ? 'ml-3' : 'ml-3'} flex-1 min-w-0`}>
                                   {renamingFileId === file.id ? (
-                                    <div className="w-full bg-blue-50 border-2 border-blue-400 rounded-lg p-3">
-                                      <div className="flex items-center gap-2 mb-3">
-                                        <input
-                                          className={`flex-1 font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg px-4 py-3 ${isMobile ? 'text-base' : 'text-base'} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                                          value={renamingFileName}
-                                          autoFocus
-                                          onClick={e => e.stopPropagation()}
-                                          onFocus={e => {
-                                            const input = e.target as HTMLInputElement;
-                                            input.setSelectionRange(0, renamingFileName.length);
-                                          }}
-                                          onChange={e => {
-                                      // Use startTransition for non-urgent state updates
-                                      startTransition(() => {
-                                        setRenamingFileName(e.target.value);
-                                      });
-                                    }}
-                                          onBlur={async () => {
-                                            const trimmed = renamingFileName.trim();
-                                            if (trimmed) {
-                                              await handleRename(file, trimmed);
-                                            } else {
-                                              setRenamingFileId(null);
-                                              setRenamingFileName('');
-                                            }
-                                          }}
-                                          onKeyDown={e => {
-                                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                            if (e.key === 'Escape') {
-                                              setRenamingFileId(null);
-                                              setRenamingFileName('');
-                                            }
-                                          }}
-                                          placeholder="File name"
-                                          style={{ fontSize: isMobile ? '16px' : 'inherit' }} // Prevent zoom on iOS
-                                        />
-                                        <span className={`text-gray-500 ${isMobile ? 'text-base font-medium' : 'text-base font-medium'}`}>.{ext}</span>
-                                      </div>
-                                      <div className="flex justify-end gap-2">
-                                        <button
-                                          className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            setRenamingFileId(null);
-                                            setRenamingFileName('');
-                                          }}
-                                        >
-                                          Cancel
-                                        </button>
-                                        <button
-                                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                                          onClick={async e => {
-                                            e.stopPropagation();
-                                            const trimmed = renamingFileName.trim();
-                                            if (trimmed) {
-                                              await handleRename(file, trimmed);
-                                            }
-                                          }}
-                                        >
-                                          Save
-                                        </button>
-                                      </div>
-                                    </div>
+                                    <RenameInput
+                                      value={renamingFileName}
+                                      onChange={setRenamingFileName}
+                                      onBlur={async () => {
+                                        const trimmed = renamingFileName.trim();
+                                        if (trimmed) {
+                                          await handleRename(file, trimmed);
+                                        } else {
+                                          setRenamingFileId(null);
+                                          setRenamingFileName('');
+                                        }
+                                      }}
+                                      onCancel={() => {
+                                        setRenamingFileId(null);
+                                        setRenamingFileName('');
+                                      }}
+                                      onSave={async () => {
+                                        const trimmed = renamingFileName.trim();
+                                        if (trimmed) {
+                                          await handleRename(file, trimmed);
+                                        }
+                                      }}
+                                      extension={ext}
+                                      placeholder="File name"
+                                      variant="full"
+                                      isMobile={isMobile}
+                                    />
                                   ) : (
                                     <>
                                       <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-base' : 'text-base'}`}>
@@ -1986,21 +1849,9 @@ export const PropertyDetailsModal = ({
                               </div>
                               <div className="mt-2 text-center w-full">
                                 {renamingFileId === folder.id ? (
-                                  <input
-                                    className="w-full text-center bg-white border-2 border-blue-400 rounded-lg px-2 py-1 text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  <RenameInput
                                     value={renamingFileName}
-                                    autoFocus
-                                    onClick={e => e.stopPropagation()}
-                                    onFocus={e => {
-                                      const input = e.target as HTMLInputElement;
-                                      input.setSelectionRange(0, folder.name.length);
-                                    }}
-                                    onChange={e => {
-                                      // Use startTransition for non-urgent state updates
-                                      startTransition(() => {
-                                        setRenamingFileName(e.target.value);
-                                      });
-                                    }}
+                                    onChange={setRenamingFileName}
                                     onBlur={async () => {
                                       const trimmed = renamingFileName.trim();
                                       if (trimmed) {
@@ -2010,15 +1861,13 @@ export const PropertyDetailsModal = ({
                                         setRenamingFileName('');
                                       }
                                     }}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                      if (e.key === 'Escape') {
-                                        setRenamingFileId(null);
-                                        setRenamingFileName('');
-                                      }
+                                    onCancel={() => {
+                                      setRenamingFileId(null);
+                                      setRenamingFileName('');
                                     }}
                                     placeholder="Folder name"
-                                    style={{ fontSize: isMobile ? '16px' : 'inherit' }} // Prevent zoom on iOS
+                                    variant="grid"
+                                    isMobile={isMobile}
                                   />
                                 ) : (
                                   <>
@@ -2131,21 +1980,9 @@ export const PropertyDetailsModal = ({
                               </div>
                               <div className="mt-2 text-center w-full">
                                 {renamingFileId === file.id ? (
-                                  <input
-                                    className="w-full text-center bg-white border-2 border-blue-400 rounded-lg px-2 py-1 text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  <RenameInput
                                     value={renamingFileName}
-                                    autoFocus
-                                    onClick={e => e.stopPropagation()}
-                                    onFocus={e => {
-                                      const input = e.target as HTMLInputElement;
-                                      input.setSelectionRange(0, renamingFileName.length);
-                                    }}
-                                    onChange={e => {
-                                      // Use startTransition for non-urgent state updates
-                                      startTransition(() => {
-                                        setRenamingFileName(e.target.value);
-                                      });
-                                    }}
+                                    onChange={setRenamingFileName}
                                     onBlur={async () => {
                                       const trimmed = renamingFileName.trim();
                                       if (trimmed) {
@@ -2155,15 +1992,14 @@ export const PropertyDetailsModal = ({
                                         setRenamingFileName('');
                                       }
                                     }}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                                      if (e.key === 'Escape') {
-                                        setRenamingFileId(null);
-                                        setRenamingFileName('');
-                                      }
+                                    onCancel={() => {
+                                      setRenamingFileId(null);
+                                      setRenamingFileName('');
                                     }}
+                                    extension={ext}
                                     placeholder="File name"
-                                    style={{ fontSize: isMobile ? '16px' : 'inherit' }} // Prevent zoom on iOS
+                                    variant="grid"
+                                    isMobile={isMobile}
                                   />
                                 ) : (
                                   <>
