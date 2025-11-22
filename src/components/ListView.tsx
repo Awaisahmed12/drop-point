@@ -187,14 +187,17 @@ export const ListView = ({
 
   const content = (
     <>
-        {/* Header - matches PropertyDetailsModal style */}
-        <div className="modal-header-refined flex items-center justify-between px-5 py-4 rounded-t-3xl flex-shrink-0">
+        {/* Header - matches PropertyDetailsModal style with blue accents */}
+        <div className="modal-header-refined flex items-center justify-between px-5 py-4 rounded-t-3xl flex-shrink-0 bg-gradient-to-r from-blue-50/50 to-white border-b border-blue-100/60">
           <div className="flex flex-col min-w-0 flex-1 mr-4">
-            <h1 className={`property-title ${isMobile ? 'text-lg' : 'text-xl'} font-semibold leading-tight mb-1`} 
-                style={{ letterSpacing: '-0.02em' }}>
-              Properties
-            </h1>
-            <p className={`property-location ${isMobile ? 'text-sm' : 'text-base'} font-medium leading-snug text-gray-500`} 
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
+              <h1 className={`property-title ${isMobile ? 'text-lg' : 'text-xl'} font-semibold leading-tight text-gray-900`} 
+                  style={{ letterSpacing: '-0.02em' }}>
+                Properties
+              </h1>
+            </div>
+            <p className={`property-location ${isMobile ? 'text-sm' : 'text-base'} font-medium leading-snug text-gray-600 ml-3`} 
                style={{ letterSpacing: '-0.005em' }}>
               {searchQuery ? (
                 `${sortedProperties.length} of ${properties.length} properties`
@@ -207,34 +210,34 @@ export const ListView = ({
           {/* Page variant has no close button; show a subtle back link on mobile */}
           {variant === 'modal' ? (
             <button
-              className={`close-button ${isMobile ? 'p-2.5' : 'p-2.5'} rounded-full cursor-pointer flex-shrink-0 hover:bg-gray-100 transition-colors`}
+              className={`close-button ${isMobile ? 'p-2.5' : 'p-2.5'} rounded-full cursor-pointer flex-shrink-0 hover:bg-blue-50 transition-colors`}
               onClick={onClose}
               title="Close"
             >
-              <XMarkIcon className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} />
+              <XMarkIcon className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500 hover:text-blue-600 transition-colors`} />
             </button>
           ) : (
             <div className="flex-shrink-0">
-              <Link href="/map" className="hidden sm:inline-flex px-3 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50">
+              <Link href="/map" className="hidden sm:inline-flex px-4 py-2 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-700 font-medium hover:bg-blue-100 hover:border-blue-300 transition-all duration-200">
                 Back to Map
               </Link>
             </div>
           )}
         </div>
 
-        {/* Search Bar - integrated into modal */}
-        <div className={`${isMobile ? 'px-6 py-4' : 'px-5 py-4'} border-b border-gray-100 flex-shrink-0`}>
+        {/* Search Bar - integrated into modal with blue accents */}
+        <div className={`${isMobile ? 'px-6 py-4' : 'px-5 py-4'} border-b border-blue-100/60 flex-shrink-0 bg-gradient-to-b from-blue-50/40 to-white`}>
           <div className="relative">
             <div className="absolute left-3 top-1/2 -translate-y-1/2">
-              <MagnifyingGlassIcon className="w-5 h-5 text-gray-400" />
+              <MagnifyingGlassIcon className="w-5 h-5 text-blue-500" />
             </div>
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-                              placeholder="Search by custom name or address..."
-              className={`w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-gray-900 placeholder-gray-400 ${
+              placeholder="Search by custom name or address..."
+              className={`w-full pl-10 pr-4 py-3 bg-white border-2 border-blue-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all duration-200 text-gray-900 placeholder-gray-400 shadow-sm hover:shadow-md hover:border-blue-200 ${
                 isMobile ? 'text-base' : 'text-sm'
               }`}
               style={{ fontSize: isMobile ? '16px' : undefined }}
@@ -242,9 +245,9 @@ export const ListView = ({
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-blue-50 transition-colors duration-200"
               >
-                <XMarkIcon className="w-4 h-4 text-gray-400" />
+                <XMarkIcon className="w-4 h-4 text-blue-500" />
               </button>
             )}
           </div>
@@ -289,11 +292,11 @@ export const ListView = ({
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No properties yet</h3>
                 <p className="text-gray-500 mb-6">Start by selecting a property on the map and uploading some files.</p>
                 {variant === 'page' ? (
-                  <Link href="/map" className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors">Back to Map</Link>
+                  <Link href="/map" className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98]">Back to Map</Link>
                 ) : (
                   <button
                     onClick={onClose}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                    className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98]"
                   >
                     Back to Map
                   </button>
@@ -313,239 +316,238 @@ export const ListView = ({
             </div>
           ) : (
             // Properties List - styled like PropertyDetailsModal file list
-            <div className={`${isMobile ? 'px-6 py-3' : 'px-4 py-2'}`}>
+            <div className={`${isMobile ? 'px-4 py-3' : 'px-5 py-3'}`}>
               {sortedProperties.map((property) => {
                 const { streetAddress, locationInfo } = parseAddress(property.address);
                 
                 return (
-                                     <div
-                     key={property.id}
-                     onClick={() => {
-                       // Don't allow property selection when renaming
-                       if (renamingPropertyId === property.id) return;
-                       onPropertySelect(property);
-                       if (variant === 'modal') onClose();
-                     }}
-                     className={`flex items-center justify-between ${isMobile ? 'px-4 py-4' : 'px-3 py-3'} rounded-lg transition border border-gray-100 mb-2 ${
-                       renamingPropertyId === property.id 
-                         ? 'cursor-default bg-gray-50' 
-                         : 'cursor-pointer hover:bg-gray-100 group'
-                     }`}
-                     style={{ minHeight: isMobile ? '72px' : '56px' }}
-                   >
-                                         <div className="flex items-center min-w-0 flex-1">
-                       {/* Street View thumbnail */}
-                      <div className={`${isMobile ? 'w-16 h-16' : 'w-14 h-14'} rounded-lg overflow-hidden bg-gray-200 mr-4 flex-shrink-0 border border-gray-100`}>
+                  <div
+                    key={property.id}
+                    onClick={() => {
+                      // Don't allow property selection when renaming
+                      if (renamingPropertyId === property.id) return;
+                      onPropertySelect(property);
+                      if (variant === 'modal') onClose();
+                    }}
+                    className={`flex items-center justify-between ${isMobile ? 'px-4 py-4' : 'px-4 py-3.5'} rounded-xl transition-all duration-200 border border-gray-200/60 mb-3 shadow-sm ${
+                      renamingPropertyId === property.id 
+                        ? 'cursor-default bg-blue-50/30 border-gray-200' 
+                        : 'cursor-pointer hover:bg-blue-50/30 hover:shadow-md hover:border-blue-200/60 group active:scale-[0.998]'
+                    }`}
+                    style={{ minHeight: isMobile ? '80px' : '64px' }}
+                  >
+                    <div className="flex items-center min-w-0 flex-1">
+                      {/* Street View thumbnail - refined styling with blue accent */}
+                      <div className={`${isMobile ? 'w-20 h-20' : 'w-16 h-16'} rounded-xl overflow-hidden bg-gray-100 mr-4 flex-shrink-0 border-2 border-blue-100 shadow-sm group-hover:border-blue-400 group-hover:shadow-md transition-all duration-200 ring-2 ring-transparent group-hover:ring-blue-100`}>
                         <Image
-                          src={`https://maps.googleapis.com/maps/api/streetview?size=${isMobile ? '160x160' : '140x140'}&location=${property.lat},${property.lng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`}
+                          src={`https://maps.googleapis.com/maps/api/streetview?size=${isMobile ? '200x200' : '160x160'}&location=${property.lat},${property.lng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`}
                           alt="Street View preview"
-                          width={isMobile ? 160 : 140}
-                          height={isMobile ? 160 : 140}
+                          width={isMobile ? 200 : 160}
+                          height={isMobile ? 200 : 160}
                           className="w-full h-full object-cover"
                           unoptimized
                           onError={(e) => {
                             const t = e.currentTarget as HTMLImageElement;
                             if (t.dataset.fallback !== '1') {
                               t.dataset.fallback = '1';
-                              t.src = `https://maps.googleapis.com/maps/api/staticmap?center=${property.lat},${property.lng}&zoom=17&size=${isMobile ? '160x160' : '140x140'}&maptype=roadmap&markers=color:blue%7C${property.lat},${property.lng}&key=${GOOGLE_MAPS_API_KEY}`;
+                              t.src = `https://maps.googleapis.com/maps/api/staticmap?center=${property.lat},${property.lng}&zoom=17&size=${isMobile ? '200x200' : '160x160'}&maptype=roadmap&markers=color:blue%7C${property.lat},${property.lng}&key=${GOOGLE_MAPS_API_KEY}`;
                             }
                           }}
                         />
                       </div>
                       
-                                                                  {/* Normal Property Display */}
-                     <div className="flex-1 min-w-0">
-                       {/* Custom Name or Street Address - matches PropertyDetailsModal styling */}
-                       <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-lg' : 'text-base'} group-hover:text-blue-600 transition-colors`}>
-                         {property.label || streetAddress || property.address}
-                       </div>
-                       
-                       {/* Show real address below custom name, or just location info if no custom name */}
-                       {property.label && (
-                         <div className={`${isMobile ? 'text-sm mt-1' : 'text-xs mt-0.5'} text-gray-500 italic`}>
-                           {streetAddress}
-                         </div>
-                       )}
-                       
-                       {/* Location Info and File Count */}
-                       <div className={`${isMobile ? 'text-sm mt-1' : 'text-xs mt-0.5'} text-gray-500`}>
-                         {isMobile ? (
-                           // Mobile: Stack location and file count vertically for better readability
-                           <div className="space-y-1">
-                             {locationInfo && (
-                               <div className="truncate">{locationInfo}</div>
-                             )}
-                             <div className="text-gray-600 font-medium">
-                               {property.file_count} file{property.file_count === 1 ? '' : 's'}
-                             </div>
-                           </div>
-                         ) : (
-                           // Desktop: Keep inline with dots
-                           <div className="flex items-center gap-2">
-                             {locationInfo && (
-                               <>
-                                 <span className="truncate">{locationInfo}</span>
-                                 <span>•</span>
-                               </>
-                             )}
-                             <span>{property.file_count} file{property.file_count === 1 ? '' : 's'}</span>
-                             {property.last_accessed && (
-                               <>
-                                 <span>•</span>
-                                 <span>Last accessed {new Date(property.last_accessed).toLocaleDateString()}</span>
-                               </>
-                             )}
-                           </div>
-                         )}
-                       </div>
-                     </div>
-                     </div>
-                     
+                      {/* Normal Property Display */}
+                      <div className="flex-1 min-w-0">
+                        {/* Custom Name or Street Address - matches PropertyDetailsModal styling */}
+                        <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-lg' : 'text-base'} group-hover:text-blue-600 transition-colors duration-200`} style={{ letterSpacing: '-0.01em' }}>
+                          {property.label || streetAddress || property.address}
+                        </div>
+                        
+                        {/* Show real address below custom name, or just location info if no custom name */}
+                        {property.label && (
+                          <div className={`${isMobile ? 'text-sm mt-1' : 'text-xs mt-0.5'} text-gray-500 italic truncate`}>
+                            {streetAddress}
+                          </div>
+                        )}
+                        
+                        {/* Location Info and File Count */}
+                        <div className={`${isMobile ? 'text-sm mt-1.5' : 'text-xs mt-1'} text-gray-500`}>
+                          {isMobile ? (
+                            // Mobile: Stack location and file count vertically for better readability
+                            <div className="space-y-0.5">
+                              {locationInfo && (
+                                <div className="truncate">{locationInfo}</div>
+                              )}
+                              <div className="text-gray-600 font-medium">
+                                {property.file_count} file{property.file_count === 1 ? '' : 's'}
+                              </div>
+                            </div>
+                          ) : (
+                            // Desktop: Keep inline with dots
+                            <div className="flex items-center gap-2">
+                              {locationInfo && (
+                                <>
+                                  <span className="truncate">{locationInfo}</span>
+                                  <span className="text-gray-400">•</span>
+                                </>
+                              )}
+                              <span className="text-gray-600 font-medium">{property.file_count} file{property.file_count === 1 ? '' : 's'}</span>
+                              {property.last_accessed && (
+                                <>
+                                  <span className="text-gray-400">•</span>
+                                  <span>Last accessed {new Date(property.last_accessed).toLocaleDateString()}</span>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
 
-                     
-                                          {/* Three-dot menu - matches PropertyDetailsModal style */}
-                     <div className="ml-4 flex-shrink-0 relative">
-                       <button
-                         className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200 transition-colors"
-                         style={{ minWidth: 24, minHeight: 24 }}
-                                                   onClick={e => {
-                            e.stopPropagation();
-                            setPropertyMenuId(null);
-                            const newMenuId = propertyMenuId === property.id ? null : property.id;
-                            setPropertyMenuId(newMenuId);
-                            if (newMenuId && property.id) {
-                              calculateMenuPosition(e.currentTarget, property.id);
-                            }
+                    {/* Three-dot menu - matches PropertyDetailsModal style with blue accent */}
+                    <div className="ml-4 flex-shrink-0 relative">
+                      <button
+                        className="p-2 rounded-lg hover:bg-blue-50 group-hover:bg-blue-50 transition-all duration-200 active:scale-95"
+                        style={{ minWidth: 32, minHeight: 32 }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          setPropertyMenuId(null);
+                          const newMenuId = propertyMenuId === property.id ? null : property.id;
+                          setPropertyMenuId(newMenuId);
+                          if (newMenuId && property.id) {
+                            calculateMenuPosition(e.currentTarget, property.id);
+                          }
+                        }}
+                        title="Property actions"
+                      >
+                        <svg className="w-5 h-5 text-gray-500 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                        </svg>
+                      </button>
+                       
+                      {/* Property Actions Menu */}
+                      {propertyMenuId === property.id && (
+                        <div 
+                          ref={propertyMenuRef} 
+                          className="fixed w-48 bg-white/98 backdrop-blur-xl border border-gray-200/60 rounded-xl shadow-2xl overflow-hidden"
+                          style={{
+                            zIndex: 999999,
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                            ...(property.id ? menuPosition[property.id] : {})
                           }}
-                         title="Property actions"
-                       >
-                         <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                           <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
-                         </svg>
-                       </button>
-                       
-                       {/* Property Actions Menu */}
-                       {propertyMenuId === property.id && (
-                         <div 
-                           ref={propertyMenuRef} 
-                           className="fixed w-44 bg-white/95 backdrop-blur-xl border border-gray-200/50 rounded-xl shadow-2xl overflow-hidden"
-                           style={{
-                             zIndex: 999999,
-                             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
-                             ...(property.id ? menuPosition[property.id] : {})
-                           }}
-                         >
-                                                       <button
-                              className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
-                              onClick={e => {
-                                e.stopPropagation();
-                                onPropertySelect(property);
-                                if (variant === 'modal') onClose();
-                                setPropertyMenuId(null);
-                              }}
-                            >
-                              <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                                View Property
-                              </div>
-                            </button>
-                                                         <button
-                               className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-all duration-150"
-                               onClick={e => {
-                                 e.stopPropagation();
-                                 setRenamingPropertyId(property.id);
-                                 setRenamingPropertyName(property.label || '');
-                                 setPropertyMenuId(null);
-                               }}
-                             >
-                              <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                                Rename
-                              </div>
-                            </button>
+                        >
+                          <button
+                            className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 border-b border-gray-100/60 first:rounded-t-xl"
+                            onClick={e => {
+                              e.stopPropagation();
+                              onPropertySelect(property);
+                              if (variant === 'modal') onClose();
+                              setPropertyMenuId(null);
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                              View Property
+                            </div>
+                          </button>
+                          <button
+                            className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-all duration-200 border-b border-gray-100/60"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setRenamingPropertyId(property.id);
+                              setRenamingPropertyName(property.label || '');
+                              setPropertyMenuId(null);
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Rename
+                            </div>
+                          </button>
 
-                           <button
-                             className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150"
-                             onClick={e => {
-                               e.stopPropagation();
-                               // Copy address to clipboard
-                               navigator.clipboard.writeText(property.address);
-                               setPropertyMenuId(null);
-                             }}
-                           >
-                             <div className="flex items-center gap-2">
-                               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H8zM16 8h2a2 2 0 012 2v8a2 2 0 01-2 2h-2M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H8z" />
-                               </svg>
-                               Copy Address
-                             </div>
-                           </button>
-                         </div>
-                       )}
+                          <button
+                            className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-200 last:rounded-b-xl"
+                            onClick={e => {
+                              e.stopPropagation();
+                              // Copy address to clipboard
+                              navigator.clipboard.writeText(property.address);
+                              setPropertyMenuId(null);
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H8zM16 8h2a2 2 0 012 2v8a2 2 0 01-2 2h-2M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H8z" />
+                              </svg>
+                              Copy Address
+                            </div>
+                          </button>
+                        </div>
+                      )}
                      </div>
                      
-                     {/* Rename Popup - appears when renaming this property */}
-                     {renamingPropertyId === property.id && (
-                       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                         <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 border border-gray-200">
-                           <div className="text-center mb-6">
-                             <h3 className="text-lg font-semibold text-gray-900 mb-2">Rename Property</h3>
-                             <p className="text-sm text-gray-500">Enter a new name for this property</p>
-                           </div>
-                           
-                           <div className="space-y-4">
-                             <input
-                               type="text"
-                               value={renamingPropertyName}
-                               onChange={(e) => setRenamingPropertyName(e.target.value)}
-                               onKeyDown={(e) => {
-                                 if (e.key === 'Enter' && !isSaving) {
-                                   handleRename(property, renamingPropertyName);
-                                 } else if (e.key === 'Escape') {
-                                   setRenamingPropertyId(null);
-                                   setRenamingPropertyName('');
-                                 }
-                               }}
-                               className="w-full px-4 py-3 text-lg font-medium text-gray-900 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                               placeholder="Enter property name"
-                               autoFocus
-                               disabled={isSaving}
-                             />
-                             
-                             <div className="flex gap-3">
-                               <button
-                                 className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                 onClick={() => {
-                                   setRenamingPropertyId(null);
-                                   setRenamingPropertyName('');
-                                 }}
-                                 disabled={isSaving}
-                               >
-                                 Cancel
-                               </button>
-                               <button
-                                 className="flex-1 px-4 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                 onClick={() => handleRename(property, renamingPropertyName)}
-                                 disabled={isSaving}
-                               >
-                                 {isSaving ? 'Saving...' : 'Save'}
-                               </button>
-                             </div>
-                           </div>
-                           
-                           <div className="mt-4 text-center">
-                             <p className="text-xs text-gray-400">
-                               Press Enter to save, Escape to cancel
-                             </p>
-                           </div>
-                         </div>
-                       </div>
-                     )}
+                    {/* Rename Popup - appears when renaming this property */}
+                    {renamingPropertyId === property.id && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md">
+                        <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 border border-gray-200/60">
+                          <div className="text-center mb-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Rename Property</h3>
+                            <p className="text-sm text-gray-500">Enter a new name for this property</p>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <input
+                              type="text"
+                              value={renamingPropertyName}
+                              onChange={(e) => setRenamingPropertyName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !isSaving) {
+                                  handleRename(property, renamingPropertyName);
+                                } else if (e.key === 'Escape') {
+                                  setRenamingPropertyId(null);
+                                  setRenamingPropertyName('');
+                                }
+                              }}
+                              className="w-full px-4 py-3 text-lg font-medium text-gray-900 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                              placeholder="Enter property name"
+                              autoFocus
+                              disabled={isSaving}
+                            />
+                            
+                            <div className="flex gap-3">
+                              <button
+                                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+                                onClick={() => {
+                                  setRenamingPropertyId(null);
+                                  setRenamingPropertyName('');
+                                }}
+                                disabled={isSaving}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                className="flex-1 px-4 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] shadow-sm hover:shadow-md"
+                                onClick={() => handleRename(property, renamingPropertyName)}
+                                disabled={isSaving}
+                              >
+                                {isSaving ? 'Saving...' : 'Save'}
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-4 text-center">
+                            <p className="text-xs text-gray-400">
+                              Press Enter to save, Escape to cancel
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
