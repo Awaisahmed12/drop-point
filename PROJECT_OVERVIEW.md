@@ -14,7 +14,7 @@ DropPoint transforms how real estate professionals organize and access property 
 
 ## Current Status: MVP Phase
 
-### ✅ **Completed Core Features**
+### **Completed Core Features**
 - **Authentication System**: Supabase auth with modern UI
 - **Interactive Map**: LandGlide-style crosshair, satellite/roadmap toggle, POI-free experience
 - **Property Management**: Save from map, duplicate prevention, coordinate snapping
@@ -22,7 +22,7 @@ DropPoint transforms how real estate professionals organize and access property 
 - **Mobile Optimization**: Perfect viewport handling, touch-friendly interface, in-app file viewer
 - **Modern UI**: Glassmorphic design, responsive layout, smooth animations
 
-### 🚧 **Next MVP Features**
+### **Next MVP Features**
 - [ ] **Sharing System**: Public links and email-based sharing
 - [ ] **Property Tagging**: Multiple map/list views with user-defined tags
 - [ ] **Export Functionality**: Download all documents and property data

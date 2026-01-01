@@ -74,22 +74,22 @@ export function getUniqueFileName(baseName: string, folderId: string | null, pro
  * Sanitizes a filename by removing/replacing invalid characters and making it URL-safe
  */
 export function sanitizeFileName(name: string): string {
-  console.log('🧹 [SANITIZE] Starting sanitization for:', name);
+  console.log('[SANITIZE] Starting sanitization for:', name);
   
   if (!name) {
-    console.log('🧹 [SANITIZE] Empty name, returning default:', 'unnamed_file');
+    console.log('[SANITIZE] Empty name, returning default:', 'unnamed_file');
     return 'unnamed_file';
   }
   
   // First, normalize Unicode characters
   const normalized = name.normalize('NFD');
-  console.log('🧹 [SANITIZE] After normalization:', normalized);
+  console.log('[SANITIZE] After normalization:', normalized);
   
   // Split into name and extension
   const lastDot = normalized.lastIndexOf('.');
   const nameWithoutExt = lastDot === -1 ? normalized : normalized.substring(0, lastDot);
   const ext = lastDot === -1 ? '' : normalized.substring(lastDot);
-  console.log('🧹 [SANITIZE] Split - name:', nameWithoutExt, 'ext:', ext);
+  console.log('[SANITIZE] Split - name:', nameWithoutExt, 'ext:', ext);
   
   // Clean the name part
   let cleanName = nameWithoutExt
@@ -112,12 +112,12 @@ export function sanitizeFileName(name: string): string {
     .replace(/^[\s_]+|[\s_]+$/g, '')
     .trim();
   
-  console.log('🧹 [SANITIZE] After character replacement:', cleanName);
+  console.log('[SANITIZE] After character replacement:', cleanName);
   
   // If name is empty after cleaning, use a default
   if (!cleanName) {
     cleanName = 'file';
-    console.log('🧹 [SANITIZE] Name was empty after cleaning, using default:', cleanName);
+    console.log('[SANITIZE] Name was empty after cleaning, using default:', cleanName);
   }
   
   // Clean the extension
@@ -125,7 +125,7 @@ export function sanitizeFileName(name: string): string {
     .replace(/[^\w.-]/g, '')
     .toLowerCase();
   
-  console.log('🧹 [SANITIZE] Cleaned extension:', cleanExt);
+  console.log('[SANITIZE] Cleaned extension:', cleanExt);
   
   // Combine and limit length
   const result = (cleanName + cleanExt).substring(0, 200);
@@ -133,7 +133,7 @@ export function sanitizeFileName(name: string): string {
   // Ensure it doesn't start with a dot
   const finalResult = result.startsWith('.') ? 'file' + result : result;
   
-  console.log('🧹 [SANITIZE] Final result:', finalResult);
+  console.log('[SANITIZE] Final result:', finalResult);
   return finalResult;
 }
 

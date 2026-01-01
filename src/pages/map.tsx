@@ -286,7 +286,7 @@ function MapPage() {
             zoom: currentZoom
           };
           sessionStorage.setItem('droppoint-map-position', JSON.stringify(position));
-          console.log('🗺️ [MAP] Saved map position:', position);
+          console.log('[MAP] Saved map position:', position);
         }
       }
     };
@@ -326,7 +326,7 @@ function MapPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          console.log('🚀 [PRELOAD] Starting background property preload...');
+          console.log('[PRELOAD] Starting background property preload...');
           
           // Preload properties with file counts
           const { data: propertiesData } = await supabase
@@ -353,11 +353,11 @@ function MapPage() {
               timestamp: Date.now()
             }));
 
-            console.log('🚀 [PRELOAD] Properties cached:', propertiesWithCount.length);
+            console.log('[PRELOAD] Properties cached:', propertiesWithCount.length);
           }
         }
       } catch (error) {
-        console.error('🚀 [PRELOAD] Error preloading properties:', error);
+        console.error('[PRELOAD] Error preloading properties:', error);
       }
     };
 
@@ -378,7 +378,7 @@ function MapPage() {
           if (position.zoom) {
             setZoom(position.zoom);
           }
-          console.log('🗺️ [MAP] Restored map position:', position);
+          console.log('[MAP] Restored map position:', position);
         } catch (error) {
           console.error('Error parsing saved map position:', error);
         }
@@ -658,7 +658,7 @@ function MapPage() {
     const isUserProperty = prediction.types?.includes('user_property') || prediction.user_property;
     
     if (isUserProperty) {
-      console.log('🏠 User property selected:', prediction.description);
+      console.log('User property selected:', prediction.description);
       
       // Handle synthetic user property predictions (place_id starts with 'user_property_')
       if (prediction.place_id.startsWith('user_property_')) {
@@ -972,104 +972,104 @@ function MapPage() {
     const originalName = 'file_name' in item ? item.file_name : item.name;
     const trimmedNewName = newName.trim();
     
-    console.log('✏️ [RENAME] Starting rename operation');
-    console.log('✏️ [RENAME] Item type:', 'file_name' in item ? 'file' : 'folder');
-    console.log('✏️ [RENAME] Original name:', originalName);
-    console.log('✏️ [RENAME] New name (trimmed):', trimmedNewName);
+    console.log('[RENAME] Starting rename operation');
+    console.log('[RENAME] Item type:', 'file_name' in item ? 'file' : 'folder');
+    console.log('[RENAME] Original name:', originalName);
+    console.log('[RENAME] New name (trimmed):', trimmedNewName);
     
     if (!trimmedNewName || trimmedNewName === originalName) {
-      console.log('✏️ [RENAME] No change needed, cancelling rename');
+      console.log('[RENAME] No change needed, cancelling rename');
       setRenamingFileId(null);
       return;
     }
   
     // Type guard
     const isFile = 'file_name' in item;
-    console.log('✏️ [RENAME] Is file:', isFile);
+    console.log('[RENAME] Is file:', isFile);
   
     try {
       if (isFile) {
         const file = item as PropertyFile;
-        console.log('✏️ [RENAME] Processing file rename - File ID:', file.id, 'Property ID:', file.property_id);
+        console.log('[RENAME] Processing file rename - File ID:', file.id, 'Property ID:', file.property_id);
         
         // Sanitize the new filename for storage
         const sanitizedNewName = sanitizeFileName(trimmedNewName);
-        console.log('✏️ [RENAME] Sanitized new name:', sanitizedNewName);
+        console.log('[RENAME] Sanitized new name:', sanitizedNewName);
         
         if (!sanitizedNewName) {
-          console.log('✏️ [RENAME] Sanitization resulted in empty name, throwing error');
+          console.log('[RENAME] Sanitization resulted in empty name, throwing error');
           throw new Error('Invalid file name after sanitization.');
         }
         
         // File-specific logic
         const existingFile = propertyFiles.find(f => f.folder_id === file.folder_id && f.file_name.toLowerCase() === sanitizedNewName.toLowerCase() && f.id !== file.id);
         if (existingFile) {
-          console.log('✏️ [RENAME] File with this name already exists:', existingFile.file_name);
+          console.log('[RENAME] File with this name already exists:', existingFile.file_name);
           throw new Error('A file with this name already exists in this folder.');
         }
 
         const oldPath = file.file_url;
         const newPath = `${file.property_id}/${sanitizedNewName}`;
-        console.log('✏️ [RENAME] Storage paths - Old:', oldPath, 'New:', newPath);
+        console.log('[RENAME] Storage paths - Old:', oldPath, 'New:', newPath);
         
-        console.log('✏️ [RENAME] Moving file in storage...');
+        console.log('[RENAME] Moving file in storage...');
         const { error: moveError } = await supabase.storage.from('property-files').move(oldPath, newPath);
         if (moveError) {
-          console.log('✏️ [RENAME] Storage move error:', moveError);
+          console.log('[RENAME] Storage move error:', moveError);
           throw new Error(`Storage error: ${moveError.message}`);
         }
-        console.log('✏️ [RENAME] Storage move successful');
+        console.log('[RENAME] Storage move successful');
 
-        console.log('✏️ [RENAME] Updating database record...');
+        console.log('[RENAME] Updating database record...');
         const { error: dbError } = await supabase.from('property_files').update({
           file_name: sanitizedNewName,
           file_url: newPath,
         }).eq('id', file.id);
         
         if (dbError) {
-          console.log('✏️ [RENAME] Database update error:', dbError);
+          console.log('[RENAME] Database update error:', dbError);
           throw dbError;
         }
-        console.log('✏️ [RENAME] Database update successful');
+        console.log('[RENAME] Database update successful');
 
-        console.log('✏️ [RENAME] Updating local state...');
+        console.log('[RENAME] Updating local state...');
         setPropertyFiles(files => files.map(f => f.id === file.id ? { ...f, file_name: sanitizedNewName, file_url: newPath } : f));
         
       } else {
         const folder = item as PropertyFolder;
-        console.log('✏️ [RENAME] Processing folder rename - Folder ID:', folder.id);
+        console.log('[RENAME] Processing folder rename - Folder ID:', folder.id);
         
         // For folders, we can be less restrictive with sanitization
         const sanitizedNewName = trimmedNewName.replace(/[<>:"/\\|?*]/g, '_').substring(0, 50);
-        console.log('✏️ [RENAME] Sanitized folder name:', sanitizedNewName);
+        console.log('[RENAME] Sanitized folder name:', sanitizedNewName);
         
         // Folder-specific logic
         const existingFolder = folders.find(f => f.parent_id === folder.parent_id && f.name.toLowerCase() === sanitizedNewName.toLowerCase() && f.id !== folder.id);
         if (existingFolder) {
-          console.log('✏️ [RENAME] Folder with this name already exists:', existingFolder.name);
+          console.log('[RENAME] Folder with this name already exists:', existingFolder.name);
           throw new Error('A folder with this name already exists here.');
         }
         
-        console.log('✏️ [RENAME] Updating folder in database...');
+        console.log('[RENAME] Updating folder in database...');
         const { error } = await supabase.from('property_folders').update({ name: sanitizedNewName }).eq('id', folder.id);
         if (error) {
-          console.log('✏️ [RENAME] Folder database update error:', error);
+          console.log('[RENAME] Folder database update error:', error);
           throw error;
         }
-        console.log('✏️ [RENAME] Folder database update successful');
+        console.log('[RENAME] Folder database update successful');
 
-        console.log('✏️ [RENAME] Updating folder local state...');
+        console.log('[RENAME] Updating folder local state...');
         setFolders(folders => folders.map(f => f.id === folder.id ? { ...f, name: sanitizedNewName } : f));
       }
       
-      console.log('✏️ [RENAME] Rename operation completed successfully');
+      console.log('[RENAME] Rename operation completed successfully');
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Rename failed';
-      console.log('✏️ [RENAME] Rename operation failed:', errorMessage);
+      console.log('[RENAME] Rename operation failed:', errorMessage);
       alert(`Rename failed: ${errorMessage}`);
     } finally {
-      console.log('✏️ [RENAME] Clearing rename state');
+      console.log('[RENAME] Clearing rename state');
       setRenamingFileId(null);
     }
   }
@@ -1453,7 +1453,7 @@ function MapPage() {
         return;
       }
     } catch (err) {
-      console.error('⚠️ [USAGE] Failed to check usage. Blocking upload for safety.', err);
+      console.error('[USAGE] Failed to check usage. Blocking upload for safety.', err);
       alert('Unable to verify your storage usage right now. Please try again shortly.');
       setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
       return;
@@ -1881,10 +1881,10 @@ function MapPage() {
             : 'Browser';
           
           debugInfo = `Diagnostics show this is a SYSTEM-LEVEL issue, not an app issue:\n\n` +
-            `✅ Browser permissions: GRANTED\n` +
-            `✅ macOS Location Services: Enabled (confirmed)\n` +
-            `❌ GPS location: Unavailable\n` +
-            `❌ IP/WiFi location: Unavailable\n\n` +
+            `Browser permissions: GRANTED\n` +
+            `macOS Location Services: Enabled (confirmed)\n` +
+            `GPS location: Unavailable\n` +
+            `IP/WiFi location: Unavailable\n\n` +
             `Troubleshooting Steps:\n\n` +
             `1. Try Safari - Open this site in Safari to test if it's a Chrome-specific issue\n` +
             `2. Restart Chrome - Close all Chrome windows and reopen\n` +
@@ -2247,7 +2247,7 @@ function MapPage() {
 
   // Handle property selection from quick access
   const handleQuickAccessPropertySelect = useCallback(async (property: PropertyWithFileCount) => {
-    console.log('🚀 [QUICK_ACCESS] Property selected:', property.address);
+    console.log('[QUICK_ACCESS] Property selected:', property.address);
     
     // Convert PropertyWithFileCount to Property
     const propertyObj: Property = {
@@ -2328,9 +2328,9 @@ function MapPage() {
           mapContainerStyle={containerStyle}
           center={mapCenter}
           onLoad={(mapInstance) => {
-            console.log('🗺️ [MAP] Map loaded successfully');
-            console.log('🗺️ [MAP] Initial center:', mapCenter);
-            console.log('🗺️ [MAP] Initial zoom:', zoom);
+            console.log('[MAP] Map loaded successfully');
+            console.log('[MAP] Initial center:', mapCenter);
+            console.log('[MAP] Initial zoom:', zoom);
             setMap(mapInstance);
             // Set initial zoom once; let gestures control subsequent zoom levels
             if (typeof zoom === 'number') {
@@ -2529,7 +2529,7 @@ function MapPage() {
                 // Add to userProperties list
                 setUserProperties(prev => [...prev, savedProperty]);
                 
-                console.log('🏠 [PROPERTY] Property saved successfully:', savedProperty);
+                console.log('[PROPERTY] Property saved successfully:', savedProperty);
               } catch (error) {
                 console.error('Error saving property:', error);
               }
@@ -2592,7 +2592,7 @@ function MapPage() {
           onFileDelete={handleDeleteFile}
           onFileRename={handleRename}
           onFileMove={async (file: PropertyFile, targetFolderId: string | null) => {
-            console.log('📦 [MOVE] onMove invoked:', { fileId: file.id, fromFolder: file.folder_id, toFolder: targetFolderId });
+            console.log('[MOVE] onMove invoked:', { fileId: file.id, fromFolder: file.folder_id, toFolder: targetFolderId });
             const movingToDifferentFolder = file.folder_id !== targetFolderId;
             let newName = file.file_name;
             if (movingToDifferentFolder) {
@@ -2606,16 +2606,16 @@ function MapPage() {
             if (newName !== file.file_name) {
               const oldPath = `${file.property_id}/${file.file_name}`;
               const newPath = `${file.property_id}/${newName}`;
-              console.log('📦 [MOVE] Renaming in storage:', { oldPath, newPath });
+              console.log('[MOVE] Renaming in storage:', { oldPath, newPath });
               const { error: copyError } = await supabase.storage.from('property-files').copy(oldPath, newPath);
               if (copyError) {
-                console.error('📦 [MOVE] Storage copy error:', copyError);
+                console.error('[MOVE] Storage copy error:', copyError);
                 alert('Failed to move file in storage.');
                 return;
               }
               const { error: removeError } = await supabase.storage.from('property-files').remove([oldPath]);
               if (removeError) {
-                console.warn('📦 [MOVE] Storage remove warning:', removeError);
+                console.warn('[MOVE] Storage remove warning:', removeError);
               }
               const { error: dbError } = await supabase.from('property_files').update({
                 folder_id: targetFolderId,
@@ -2623,7 +2623,7 @@ function MapPage() {
                 file_url: newPath,
               }).eq('id', file.id);
               if (dbError) {
-                console.error('📦 [MOVE] DB update error:', dbError);
+                console.error('[MOVE] DB update error:', dbError);
                 alert('Failed to update file metadata.');
                 return;
               }
@@ -2632,14 +2632,14 @@ function MapPage() {
             } else if (movingToDifferentFolder) {
               const { error: dbError } = await supabase.from('property_files').update({ folder_id: targetFolderId }).eq('id', file.id);
               if (dbError) {
-                console.error('📦 [MOVE] DB move error:', dbError);
+                console.error('[MOVE] DB move error:', dbError);
                 alert('Failed to move file.');
                 return;
               }
               // Optimistic UI update
               setPropertyFiles(prev => prev.map(f => f.id === file.id ? { ...f, folder_id: targetFolderId } : f));
             } else {
-              console.log('📦 [MOVE] No-op (same folder)');
+              console.log('[MOVE] No-op (same folder)');
             }
 
             // Refresh from server for consistency
@@ -2649,7 +2649,7 @@ function MapPage() {
               .eq('property_id', file.property_id)
               .order('uploaded_at', { ascending: false });
             if (result.error) {
-              console.warn('📦 [MOVE] Refresh error:', result.error);
+              console.warn('[MOVE] Refresh error:', result.error);
             }
             if (result.data) setPropertyFiles(result.data);
           }}

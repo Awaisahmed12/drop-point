@@ -52,7 +52,7 @@ export const usePropertySwitcher = ({
       const cached = propertyCache[cacheKey];
       
       if (cached && (Date.now() - cached.lastFetched) < cacheTimeout) {
-        console.log('🚀 [SWITCH] Using cached data for instant property switch:', property.address);
+        console.log('[SWITCH] Using cached data for instant property switch:', property.address);
         
         // Use cached data immediately
         if (onPropertyDataLoad) {
@@ -64,13 +64,13 @@ export const usePropertySwitcher = ({
           .from('properties')
           .update({ updated_at: new Date().toISOString() })
           .eq('id', property.id)
-          .then(() => console.log('🚀 [SWITCH] Background last_accessed update completed'));
+          .then(() => console.log('[SWITCH] Background last_accessed update completed'));
         
         return;
       }
 
       // No cache - fetch fresh data
-      console.log('🚀 [SWITCH] Cache miss - fetching fresh data for:', property.address);
+      console.log('[SWITCH] Cache miss - fetching fresh data for:', property.address);
 
       // Fetch folders and files for the property
       const [folderResult, filesResult] = await Promise.all([
@@ -107,7 +107,7 @@ export const usePropertySwitcher = ({
         onPropertyDataLoad(property, filesResult.data || [], folderResult.data || []);
       }
 
-      console.log('🚀 [SWITCH] Fresh data loaded for:', property.address);
+      console.log('[SWITCH] Fresh data loaded for:', property.address);
 
     } catch (error) {
       console.error('Error switching to property:', error);

@@ -2,7 +2,7 @@
 
 This document explains how to set up and use the admin configuration system for DropPoint.
 
-## 🚀 Quick Setup
+## Quick Setup
 
 ### 1. Database Setup
 
@@ -37,7 +37,7 @@ WHERE user_id = (
 4. You'll see an "Admin Tools" section with a link to Configuration Management
 5. Click "Configuration Management" to access `/admin/config`
 
-## 🎛️ Configuration Management
+## Configuration Management
 
 ### Current Configurations
 
@@ -103,13 +103,13 @@ import { useConfig } from '../contexts/ConfigContext';
 const { yourConfigValue } = useConfig();
 ```
 
-## 🔐 Security
+## Security
 
 - Only users with `user_type = 'Admin'` can access the admin configuration page
 - Row Level Security (RLS) policies protect the `admin_configurations` table
 - All configuration changes are logged with user IDs and timestamps
 
-## 🏗️ Architecture
+## Architecture
 
 ### Components
 
@@ -126,14 +126,14 @@ const { yourConfigValue } = useConfig();
 
 ### Features
 
-- ✅ Real-time configuration updates
-- ✅ Automatic fallback to default values
-- ✅ Admin permission checking
-- ✅ Configuration change logging
-- ✅ Type-safe configuration access
-- ✅ Mobile-responsive admin interface
+- Real-time configuration updates
+- Automatic fallback to default values
+- Admin permission checking
+- Configuration change logging
+- Type-safe configuration access
+- Mobile-responsive admin interface
 
-## 🎯 Usage Examples
+## Usage Examples
 
 ### In Components
 
@@ -197,7 +197,7 @@ function AdminComponent() {
 3. Check for typos in configuration keys
 4. Ensure the configuration is marked as active (`is_active = true`)
 
-## 📝 Future Enhancements
+## Future Enhancements
 
 - Configuration categories and grouping
 - Configuration change history and rollback

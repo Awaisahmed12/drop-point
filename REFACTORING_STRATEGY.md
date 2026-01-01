@@ -190,14 +190,14 @@ to import and use this utility. Keep behavior exactly the same."
 
 ## Red Flags to Avoid
 
-❌ **Don't do:**
+**Don't do:**
 - Refactor multiple files simultaneously
 - Change behavior while refactoring
 - Remove code before replacing all uses
 - Refactor without testing each step
 - Combine refactoring with new features
 
-✅ **Do:**
+**Do:**
 - One change at a time
 - Test after each change
 - Keep commits small and focused
@@ -264,12 +264,12 @@ Use this template:
 ## Success Metrics
 
 After refactoring, you should have:
-- ✅ Fewer lines of duplicated code
-- ✅ More reusable components
-- ✅ Clearer separation of concerns
-- ✅ Easier to maintain and extend
-- ✅ All existing functionality still works
-- ✅ No increase in bugs
+- Fewer lines of duplicated code
+- More reusable components
+- Clearer separation of concerns
+- Easier to maintain and extend
+- All existing functionality still works
+- No increase in bugs
 
 ---
 

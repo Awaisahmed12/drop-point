@@ -242,7 +242,7 @@ export const PropertyInfoCard = ({
           className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer"
           disabled={addressLoading || !address || address === 'No address found' || address === 'Error fetching address'}
           onClick={() => {
-            console.log('🏠 [PROPERTY] Select button clicked for address:', address);
+            console.log('[PROPERTY] Select button clicked for address:', address);
             onSelect();
           }}
         >
