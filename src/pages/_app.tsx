@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import Router from "next/router";
 import { CookieConsentBanner } from "../components/CookieConsentBanner";
 import { ConfigProvider } from "../contexts/ConfigContext";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
@@ -73,16 +74,18 @@ export default function App({ Component, pageProps }: AppProps) {
   }, []);
 
   return (
-    <ConfigProvider>
-      <Head>
-        {/* Mobile viewport optimization */}
-        <meta 
-          name="viewport" 
-          content="width=device-width, initial-scale=1, shrink-to-fit=no, user-scalable=no, viewport-fit=cover" 
-        />
-      </Head>
-      <Component {...pageProps} />
-      <CookieConsentBanner />
-    </ConfigProvider>
+    <ErrorBoundary>
+      <ConfigProvider>
+        <Head>
+          {/* Mobile viewport optimization */}
+          <meta 
+            name="viewport" 
+            content="width=device-width, initial-scale=1, shrink-to-fit=no, user-scalable=no, viewport-fit=cover" 
+          />
+        </Head>
+        <Component {...pageProps} />
+        <CookieConsentBanner />
+      </ConfigProvider>
+    </ErrorBoundary>
   );
 }

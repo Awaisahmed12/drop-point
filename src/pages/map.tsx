@@ -16,6 +16,7 @@ import { PropertyInfoCard } from '../components/PropertyInfoCard';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { CurrentLocationIndicator } from '../components/CurrentLocationIndicator';
 import { withAuth } from '../components/withAuth';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 import { 
   containerStyle, 
@@ -213,7 +214,6 @@ function MapPage() {
       }
     }));
     
-    console.log('📁 [CACHE] Property data cached for:', address, `(${files.length} files, ${folders.length} folders)`);
   }, []);
 
   // Function to get cached property data
@@ -241,7 +241,6 @@ function MapPage() {
 
   // Load user properties as pins
   const loadUserProperties = useCallback(async () => {
-    console.log('📍 [PINS] Loading user properties as pins...');
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -253,13 +252,12 @@ function MapPage() {
         .order('updated_at', { ascending: false });
 
       if (error) {
-        console.error('📍 [PINS] Error loading properties:', error);
+        console.error('[PINS] Error loading properties:', error);
         return;
       }
 
       if (properties) {
         setUserProperties(properties);
-        console.log('📍 [PINS] Loaded', properties.length, 'property pins');
       }
     } catch (error) {
       console.error('📍 [PINS] Error loading user properties:', error);
@@ -286,7 +284,6 @@ function MapPage() {
             zoom: currentZoom
           };
           sessionStorage.setItem('droppoint-map-position', JSON.stringify(position));
-          console.log('[MAP] Saved map position:', position);
         }
       }
     };
@@ -326,8 +323,6 @@ function MapPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          console.log('[PRELOAD] Starting background property preload...');
-          
           // Preload properties with file counts
           const { data: propertiesData } = await supabase
             .from('properties')
@@ -352,8 +347,6 @@ function MapPage() {
               properties: propertiesWithCount,
               timestamp: Date.now()
             }));
-
-            console.log('[PRELOAD] Properties cached:', propertiesWithCount.length);
           }
         }
       } catch (error) {
@@ -378,7 +371,6 @@ function MapPage() {
           if (position.zoom) {
             setZoom(position.zoom);
           }
-          console.log('[MAP] Restored map position:', position);
         } catch (error) {
           console.error('Error parsing saved map position:', error);
         }
@@ -658,7 +650,6 @@ function MapPage() {
     const isUserProperty = prediction.types?.includes('user_property') || prediction.user_property;
     
     if (isUserProperty) {
-      console.log('User property selected:', prediction.description);
       
       // Handle synthetic user property predictions (place_id starts with 'user_property_')
       if (prediction.place_id.startsWith('user_property_')) {
@@ -916,7 +907,6 @@ function MapPage() {
       // Check cache first
       const cached = await getCachedPropertyData(savedProperty.address);
       if (cached) {
-        console.log('Using cached property data');
         setFolders(cached.folders);
         setPropertyFiles(cached.files);
         setFoldersLoading(false);
@@ -924,7 +914,6 @@ function MapPage() {
         return;
       }
 
-      console.log('Cache miss - fetching property data');
       
       // If not cached, fetch as normal
       const [folderResult, filesResult] = await Promise.all([
@@ -972,104 +961,73 @@ function MapPage() {
     const originalName = 'file_name' in item ? item.file_name : item.name;
     const trimmedNewName = newName.trim();
     
-    console.log('[RENAME] Starting rename operation');
-    console.log('[RENAME] Item type:', 'file_name' in item ? 'file' : 'folder');
-    console.log('[RENAME] Original name:', originalName);
-    console.log('[RENAME] New name (trimmed):', trimmedNewName);
-    
     if (!trimmedNewName || trimmedNewName === originalName) {
-      console.log('[RENAME] No change needed, cancelling rename');
       setRenamingFileId(null);
       return;
     }
   
     // Type guard
     const isFile = 'file_name' in item;
-    console.log('[RENAME] Is file:', isFile);
-  
     try {
       if (isFile) {
         const file = item as PropertyFile;
-        console.log('[RENAME] Processing file rename - File ID:', file.id, 'Property ID:', file.property_id);
         
         // Sanitize the new filename for storage
         const sanitizedNewName = sanitizeFileName(trimmedNewName);
-        console.log('[RENAME] Sanitized new name:', sanitizedNewName);
         
         if (!sanitizedNewName) {
-          console.log('[RENAME] Sanitization resulted in empty name, throwing error');
           throw new Error('Invalid file name after sanitization.');
         }
         
         // File-specific logic
         const existingFile = propertyFiles.find(f => f.folder_id === file.folder_id && f.file_name.toLowerCase() === sanitizedNewName.toLowerCase() && f.id !== file.id);
         if (existingFile) {
-          console.log('[RENAME] File with this name already exists:', existingFile.file_name);
           throw new Error('A file with this name already exists in this folder.');
         }
 
         const oldPath = file.file_url;
         const newPath = `${file.property_id}/${sanitizedNewName}`;
-        console.log('[RENAME] Storage paths - Old:', oldPath, 'New:', newPath);
         
-        console.log('[RENAME] Moving file in storage...');
         const { error: moveError } = await supabase.storage.from('property-files').move(oldPath, newPath);
         if (moveError) {
-          console.log('[RENAME] Storage move error:', moveError);
           throw new Error(`Storage error: ${moveError.message}`);
         }
-        console.log('[RENAME] Storage move successful');
 
-        console.log('[RENAME] Updating database record...');
         const { error: dbError } = await supabase.from('property_files').update({
           file_name: sanitizedNewName,
           file_url: newPath,
         }).eq('id', file.id);
         
         if (dbError) {
-          console.log('[RENAME] Database update error:', dbError);
           throw dbError;
         }
-        console.log('[RENAME] Database update successful');
-
-        console.log('[RENAME] Updating local state...');
         setPropertyFiles(files => files.map(f => f.id === file.id ? { ...f, file_name: sanitizedNewName, file_url: newPath } : f));
         
       } else {
         const folder = item as PropertyFolder;
-        console.log('[RENAME] Processing folder rename - Folder ID:', folder.id);
         
         // For folders, we can be less restrictive with sanitization
         const sanitizedNewName = trimmedNewName.replace(/[<>:"/\\|?*]/g, '_').substring(0, 50);
-        console.log('[RENAME] Sanitized folder name:', sanitizedNewName);
         
         // Folder-specific logic
         const existingFolder = folders.find(f => f.parent_id === folder.parent_id && f.name.toLowerCase() === sanitizedNewName.toLowerCase() && f.id !== folder.id);
         if (existingFolder) {
-          console.log('[RENAME] Folder with this name already exists:', existingFolder.name);
           throw new Error('A folder with this name already exists here.');
         }
         
-        console.log('[RENAME] Updating folder in database...');
         const { error } = await supabase.from('property_folders').update({ name: sanitizedNewName }).eq('id', folder.id);
         if (error) {
-          console.log('[RENAME] Folder database update error:', error);
           throw error;
         }
-        console.log('[RENAME] Folder database update successful');
 
-        console.log('[RENAME] Updating folder local state...');
         setFolders(folders => folders.map(f => f.id === folder.id ? { ...f, name: sanitizedNewName } : f));
       }
       
-      console.log('[RENAME] Rename operation completed successfully');
-      
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Rename failed';
-      console.log('[RENAME] Rename operation failed:', errorMessage);
+      console.error('[RENAME] Rename operation failed:', errorMessage);
       alert(`Rename failed: ${errorMessage}`);
     } finally {
-      console.log('[RENAME] Clearing rename state');
       setRenamingFileId(null);
     }
   }
@@ -1260,15 +1218,12 @@ function MapPage() {
 
   // File upload handling
   async function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    console.log('📁 [UPLOAD] File input changed');
     const files = e.target.files;
     if (!files || files.length === 0) {
-      console.log('📁 [UPLOAD] No files selected');
       return;
     }
     
     if (!savedProperty) {
-      console.log('📁 [UPLOAD] No property selected, aborting upload');
       alert('Please select a property first before uploading files.');
       return;
     }
@@ -1277,7 +1232,6 @@ function MapPage() {
     
     // If property doesn't have an ID yet, save it to the database first
     if (!propertyId) {
-      console.log('📁 [UPLOAD] Property not saved yet, auto-saving to database...');
       
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -1317,7 +1271,6 @@ function MapPage() {
         // Update the saved property with the new ID
         propertyId = newProperty.id;
         setSavedProperty(newProperty);
-        console.log('📁 [UPLOAD] Property auto-saved with ID:', propertyId);
         
         // Refresh user properties to show the new property as a permanent pin
         await loadUserProperties();
@@ -1335,11 +1288,9 @@ function MapPage() {
           .single();
           
         if (verifyError || !verifyProperty) {
-          console.error('📁 [UPLOAD] Property verification failed:', verifyError);
+          console.error('[UPLOAD] Property verification failed:', verifyError);
           throw new Error('Property was not properly saved. Please try again.');
         }
-        
-        console.log('📁 [UPLOAD] Property verified, proceeding with uploads');
         
       } catch (error) {
         console.error('📁 [UPLOAD] Error auto-saving property:', error);
@@ -1349,24 +1300,18 @@ function MapPage() {
     }
 
     const folderIdForUpload = selectedFolder === 'master' ? null : selectedFolder;
-    console.log('📁 [UPLOAD] Property ID:', propertyId, 'Folder ID:', folderIdForUpload);
     
     const filesArray = Array.from(files);
-    console.log('📁 [UPLOAD] Files to upload:', filesArray.map(f => f.name));
 
     // Create pending uploads for each file
     const newPendingUploads: PendingUpload[] = filesArray.map(file => {
-      console.log('📁 [UPLOAD] Processing file:', file.name, 'Size:', file.size, 'Type:', file.type);
-      
       // Generate unique file name for this folder
       const existingFiles = propertyFiles.filter(f => 
         folderIdForUpload ? f.folder_id === folderIdForUpload : !f.folder_id
       );
       const existingNames = existingFiles.map(f => f.file_name);
-      console.log('📁 [UPLOAD] Existing files in folder:', existingNames);
       
       const baseName = sanitizeFileName(file.name); // Sanitize the original filename first
-      console.log('📁 [UPLOAD] Base name after sanitization:', baseName);
       let uniqueName = baseName;
       let counter = 1;
       while (existingNames.includes(uniqueName)) {
@@ -1375,9 +1320,7 @@ function MapPage() {
           : [baseName, ''];
         uniqueName = `${name} (${counter})${ext}`;
         counter++;
-        console.log('📁 [UPLOAD] Name conflict, trying:', uniqueName);
       }
-      console.log('📁 [UPLOAD] Final unique name:', uniqueName);
 
       const uploadId = Math.random().toString(36).substring(2, 15);
       
@@ -1385,13 +1328,11 @@ function MapPage() {
       const abortController = new AbortController();
       
       const cancel = () => {
-        console.log('📁 [UPLOAD] Cancelling upload for:', uniqueName);
         abortController.abort();
         setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
       };
 
       const retry = () => {
-        console.log('📁 [UPLOAD] Retrying upload for:', uniqueName);
         // Reset and restart upload
         setPendingUploads(prev => prev.map(p => 
           p.id === uploadId ? { ...p, status: 'uploading', progress: 0, error: undefined } : p
@@ -1414,7 +1355,6 @@ function MapPage() {
       };
     });
 
-    console.log('📁 [UPLOAD] Created pending uploads:', newPendingUploads.map(p => ({ id: p.id, name: p.name })));
     setPendingUploads(prev => [...prev, ...newPendingUploads]);
 
     // Start uploads for each file
@@ -1435,11 +1375,8 @@ function MapPage() {
   ) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.log('📁 [UPLOAD] User not found');
       throw new Error('User not authenticated');
     }
-
-    console.log('📁 [UPLOAD] Starting upload process for:', uniqueName);
     
     // Enforce free-tier quota before uploading
     try {
@@ -1472,11 +1409,8 @@ function MapPage() {
         });
 
       if (uploadError) {
-        console.log('📁 [UPLOAD] Storage upload error:', uploadError);
         throw uploadError;
       }
-
-      console.log('📁 [UPLOAD] Storage upload successful:', uploadData.path);
 
       // Update progress to 90% after storage upload
       setPendingUploads(prev => prev.map(p => 
@@ -1496,8 +1430,6 @@ function MapPage() {
         modified_at: new Date(file.lastModified).toISOString(),
       };
 
-      console.log('📁 [UPLOAD] Inserting DB record:', dbRecord);
-
       // Single database insert with retry logic
       let dbError = null;
       let retryCount = 0;
@@ -1513,21 +1445,15 @@ function MapPage() {
         dbError = error;
         retryCount++;
         
-        console.log(`📁 [UPLOAD] Database insert attempt ${retryCount} failed:`, error);
-        
         if (retryCount < maxRetries) {
           const waitTime = 500 * retryCount; // Faster retry: 500ms, 1s
-          console.log(`📁 [UPLOAD] Retrying in ${waitTime}ms...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
 
       if (dbError) {
-        console.log('📁 [UPLOAD] Database insert failed after all retries:', dbError);
         throw dbError;
       }
-
-      console.log('📁 [UPLOAD] Database insert successful for:', uniqueName);
       
       // Mark as successful
       setPendingUploads(prev => prev.map(p => 
@@ -1559,10 +1485,8 @@ function MapPage() {
         }
       }
 
-      console.log('📁 [UPLOAD] Upload completed successfully for:', uniqueName);
-
     } catch (error) {
-      console.log('📁 [UPLOAD] Upload failed for:', uniqueName, error);
+      console.error('[UPLOAD] Upload failed:', error);
       
       // Mark as failed
       setPendingUploads(prev => prev.map(p => 
@@ -1617,19 +1541,6 @@ function MapPage() {
 
   // File/folder sorting and filtering moved to PropertyDetailsModal
 
-  // Debug effect for renamingFileId changes
-  useEffect(() => {
-    console.log('renamingFileId changed:', renamingFileId);
-  }, [renamingFileId]);
-
-  // Debug effect for menu state changes
-  useEffect(() => {
-    console.log('folderMenuId changed:', folderMenuId);
-  }, [folderMenuId]);
-
-  useEffect(() => {
-    console.log('fileMenuId changed:', fileMenuId);
-  }, [fileMenuId]);
 
   // Utility function moved to utils/fileManagement.ts
 
@@ -1656,26 +1567,20 @@ function MapPage() {
 
   // Current location handler
   const handleCurrentLocationClick = useCallback(() => {
-    console.log('🌍 [GEOLOCATION] Current location button clicked');
-    
     // Clear any selected property/address when focusing on current location
     setSelectedProperty(null);
     setAddress('');
     setAddressLoading(false);
     
     if (!navigator.geolocation) {
-      console.log('🌍 [GEOLOCATION] Geolocation not supported');
       alert('Geolocation is not supported by this browser.');
       return;
     }
 
     // Helper function to handle successful position retrieval
     const handlePositionSuccess = async (position: GeolocationPosition) => {
-      console.log('🌍 [GEOLOCATION] Success:', position.coords);
       const { latitude, longitude } = position.coords;
       const newCenter = { lat: latitude, lng: longitude };
-      
-      console.log('🌍 [GEOLOCATION] New center:', newCenter);
       
       // Keep it simple: always perform a visible action.
       const mediumZoom = CURRENT_LOCATION_ZOOM;
@@ -1715,13 +1620,10 @@ function MapPage() {
       setMapCenter(newCenter);
       setZoom(targetZoom);
       if (map) {
-        console.log('🌍 [GEOLOCATION] Updating map position...');
         if (!isClose || forcePan) map.panTo(newCenter);
         // Track programmatic zoom change
         programmaticZoomChangesRef.current += 1;
         map.setZoom(targetZoom);
-      } else {
-        console.log('🌍 [GEOLOCATION] Warning: Map not ready yet');
       }
 
       // Clear search input
@@ -1730,7 +1632,6 @@ function MapPage() {
       // Check cache first
       const cached = getAddressFromCache(latitude, longitude);
       if (cached) {
-        console.log('🌍 [GEOLOCATION] Using cached address:', cached.address);
         setAddress(cached.address);
         setSnappedLatLng(cached.snappedLatLng);
         setAddressLoading(false);
@@ -1771,23 +1672,17 @@ function MapPage() {
         }
       } else {
         // Fetch address for current location
-        console.log('🌍 [GEOLOCATION] Fetching address for coordinates...');
         fetchAddress(latitude, longitude);
       }
       
       setCurrentLocationLoading(false);
-      console.log('🌍 [GEOLOCATION] Location update complete');
     };
 
     // Helper function to handle errors with fallback
     const handlePositionError = (error: GeolocationPositionError, isFallback: boolean = false) => {
-      console.log('🌍 [GEOLOCATION] Error:', error);
-      console.log('🌍 [GEOLOCATION] Error details:', {
+      console.error('[GEOLOCATION] Error:', {
         code: error.code,
         message: error.message,
-        PERMISSION_DENIED: error.PERMISSION_DENIED,
-        POSITION_UNAVAILABLE: error.POSITION_UNAVAILABLE,
-        TIMEOUT: error.TIMEOUT,
         isFallback
       });
 
@@ -1808,19 +1703,12 @@ function MapPage() {
            window.location.hostname === '127.0.0.1' || 
            window.location.hostname === '');
         
-        console.log('🌍 [GEOLOCATION] High accuracy failed, trying fallback with lower accuracy...');
-        console.log('🌍 [GEOLOCATION] Fallback options: enableHighAccuracy=false, timeout=' + 
-          (isLocalhost ? '30000' : '25000') + 'ms, maximumAge=15min');
-        
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            console.log('🌍 [GEOLOCATION] Fallback succeeded!', position.coords);
             handlePositionSuccess(position);
           },
           (fallbackError) => {
-            console.error('🌍 [GEOLOCATION] Fallback ALSO failed - This indicates a system-level issue!');
-            console.log('🌍 [GEOLOCATION] Fallback error:', fallbackError);
-            console.log('🌍 [GEOLOCATION] Fallback error details:', {
+            console.error('[GEOLOCATION] Fallback ALSO failed - This indicates a system-level issue!', {
               code: fallbackError.code,
               message: fallbackError.message,
               PERMISSION_DENIED: fallbackError.PERMISSION_DENIED,
@@ -1860,13 +1748,7 @@ function MapPage() {
         timestamp: new Date().toISOString()
       };
       
-      console.error('🌍 [GEOLOCATION] DIAGNOSTICS - Both attempts failed:', diagnostics);
-      console.error('🌍 [GEOLOCATION] This likely indicates a SYSTEM-LEVEL issue, not our code.');
-      console.error('🌍 [GEOLOCATION] Common causes:');
-      console.error('  1. macOS System Preferences > Security & Privacy > Location Services disabled');
-      console.error('  2. Browser location services blocked at system level');
-      console.error('  3. VPN or network configuration blocking location');
-      console.error('  4. Browser not allowed to use location services');
+      console.error('[GEOLOCATION] DIAGNOSTICS - Both attempts failed:', diagnostics);
       
       let errorMessage = 'Unable to retrieve your location.';
       let debugInfo = '';
@@ -1907,15 +1789,10 @@ function MapPage() {
           debugInfo = 'An unexpected geolocation error occurred.';
       }
       
-      console.log('🌍 [GEOLOCATION] Debug info:', debugInfo);
       alert(`${errorMessage}\n\n${debugInfo}`);
     };
 
     setCurrentLocationLoading(true);
-    
-    console.log('🌍 [GEOLOCATION] Starting location request...');
-    console.log('🌍 [GEOLOCATION] To test geolocation directly in console, run:');
-    console.log('🌍 [GEOLOCATION] navigator.geolocation.getCurrentPosition(pos => console.log("SUCCESS:", pos.coords), err => console.error("ERROR:", err), {enableHighAccuracy: false, timeout: 10000, maximumAge: 86400000})');
     
     // Try a different approach: use watchPosition with a timeout instead of getCurrentPosition
     // watchPosition sometimes works better in certain browsers/situations
@@ -1935,8 +1812,6 @@ function MapPage() {
     };
     
     const attemptWatch = (useHighAccuracy: boolean) => {
-      console.log(`🌍 [GEOLOCATION] Attempting watchPosition (highAccuracy: ${useHighAccuracy})`);
-      
       const options: PositionOptions = {
         enableHighAccuracy: useHighAccuracy,
         timeout: 30000, // 30 second timeout
@@ -1947,7 +1822,6 @@ function MapPage() {
         (position) => {
           if (!positionReceived) {
             positionReceived = true;
-            console.log('🌍 [GEOLOCATION] watchPosition succeeded!', position.coords);
             cleanup();
             handlePositionSuccess(position);
           }
@@ -1955,7 +1829,7 @@ function MapPage() {
         (error) => {
           if (positionReceived) return; // Already handled
           
-          console.error(`🌍 [GEOLOCATION] watchPosition error (highAccuracy: ${useHighAccuracy}):`, error);
+          console.error(`[GEOLOCATION] watchPosition error (highAccuracy: ${useHighAccuracy}):`, error);
           
           if (error.code === error.PERMISSION_DENIED) {
             cleanup();
@@ -1966,14 +1840,12 @@ function MapPage() {
           // If this was low accuracy attempt, try high accuracy
           if (!useHighAccuracy && (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT)) {
             cleanup();
-            console.log('🌍 [GEOLOCATION] Low accuracy watch failed, trying high accuracy watch...');
             attemptWatch(true);
             return;
           }
           
           // If high accuracy also failed or other error, fall back to getCurrentPosition
           cleanup();
-          console.log('🌍 [GEOLOCATION] watchPosition failed, trying getCurrentPosition as fallback...');
           
           // Final fallback: try getCurrentPosition with simplest options
           const simpleOptions: PositionOptions = {
@@ -1984,11 +1856,10 @@ function MapPage() {
           
           navigator.geolocation.getCurrentPosition(
             (position) => {
-              console.log('🌍 [GEOLOCATION] getCurrentPosition fallback succeeded!', position.coords);
               handlePositionSuccess(position);
             },
             (error) => {
-              console.error('🌍 [GEOLOCATION] All methods failed:', error);
+              console.error('[GEOLOCATION] All methods failed:', error);
               handlePositionError(error, true);
             },
             simpleOptions
@@ -2000,7 +1871,6 @@ function MapPage() {
       // Set a timeout to cancel watch if it takes too long
       timeoutId = setTimeout(() => {
         if (!positionReceived && watchId !== null) {
-          console.warn('🌍 [GEOLOCATION] WatchPosition timeout, cleaning up...');
           cleanup();
           if (!useHighAccuracy) {
             attemptWatch(true);
@@ -2008,11 +1878,10 @@ function MapPage() {
             // Try getCurrentPosition as final fallback
             navigator.geolocation.getCurrentPosition(
               (position) => {
-                console.log('🌍 [GEOLOCATION] Final getCurrentPosition fallback succeeded!', position.coords);
                 handlePositionSuccess(position);
               },
               (error) => {
-                console.error('🌍 [GEOLOCATION] All location methods exhausted:', error);
+                console.error('[GEOLOCATION] All location methods exhausted:', error);
                 handlePositionError(error, true);
               },
               { enableHighAccuracy: false, timeout: 15000, maximumAge: 86400000 }
@@ -2069,14 +1938,11 @@ function MapPage() {
     
     // Don't drop pins if search is focused or if search elements are visible
     if (showDropdown || document.activeElement?.tagName === 'INPUT') {
-      console.log('📍 [PINS] Search focused - ignoring map click');
       return;
     }
     
     const lat = event.latLng.lat();
     const lng = event.latLng.lng();
-    
-    console.log('📍 [PINS] Map clicked at:', { lat, lng });
     
     // Check if this might be a double-click by tracking recent clicks
     const currentTime = Date.now();
@@ -2085,7 +1951,6 @@ function MapPage() {
     
     // If clicks are happening rapidly (within 300ms), it's likely a double-click for zoom
     if (timeSinceLastClick < 300) {
-      console.log('📍 [PINS] Double-click detected - allowing zoom behavior only');
       return; // Don't drop pins during double-clicking
     }
     
@@ -2093,7 +1958,6 @@ function MapPage() {
     setTimeout(async () => {
       // Check if another click happened shortly after (indicating double-click)
       if (Date.now() - lastClickTimeRef.current < 250) {
-        console.log('📍 [PINS] Part of double-click sequence - skipping pin drop');
         return;
       }
       
@@ -2102,8 +1966,6 @@ function MapPage() {
       if (selectedProperty && !selectedProperty.id) {
         setSelectedProperty(null);
       }
-
-      console.log('📍 [PINS] New pin created at exact coordinates');
       
       // Get a human-readable address for the pin location
       setAddressLoading(true);
@@ -2118,9 +1980,6 @@ function MapPage() {
         
         if (data.results && data.results[0]) {
           const address = data.results[0].formatted_address;
-          
-          console.log('📍 [PINS] New pin address:', address);
-          console.log('📍 [PINS] Pin location (exact click):', { lat, lng });
           
           // Create new property for pin using EXACT clicked coordinates
           // Users can drop pins wherever they want, not snapped to geocoding API location
@@ -2141,10 +2000,7 @@ function MapPage() {
           
           // Cache the address with exact coordinates
           saveAddressToCache(lat, lng, address, { lat, lng });
-          
-          console.log('📍 [PINS] New pin ready for property creation at exact location');
         } else {
-          console.log('📍 [PINS] No address found for pin location');
           setAddress('Location not found');
           
           // Still create a property with coordinates but no address
@@ -2160,7 +2016,7 @@ function MapPage() {
           setSelectedProperty(newProperty);
         }
       } catch (error) {
-        console.log('📍 [PINS] Address lookup failed, keeping coordinates:', error);
+        console.error('[PINS] Address lookup failed:', error);
         // Keep the original property with coordinates - no error handling needed
       } finally {
         setAddressLoading(false);
@@ -2170,11 +2026,8 @@ function MapPage() {
 
   // Handle property pin click - show selection card and prefetch in background
   const handlePropertyPinClick = useCallback(async (property: Property) => {
-    console.log('📍 [PINS] Property pin clicked:', property.address);
-    
     // Clear old property data only when switching to a different property
     if (savedProperty && savedProperty.id && savedProperty.id !== property.id) {
-      console.log('📍 [PINS] Switching properties - clearing old data');
       setFolders([]);
       setPropertyFiles([]);
     }
@@ -2188,13 +2041,11 @@ function MapPage() {
     // Check cache first for instant loading
     const cached = await getCachedPropertyData(property.address);
     if (cached) {
-      console.log('📍 [PINS] Using cached data for property');
       setFolders(cached.folders);
       setPropertyFiles(cached.files);
       setFoldersLoading(false);
       setFilesLoading(false);
     } else {
-      console.log('📍 [PINS] Loading fresh data for property');
       setFoldersLoading(true);
       setFilesLoading(true);
       
@@ -2247,7 +2098,6 @@ function MapPage() {
 
   // Handle property selection from quick access
   const handleQuickAccessPropertySelect = useCallback(async (property: PropertyWithFileCount) => {
-    console.log('[QUICK_ACCESS] Property selected:', property.address);
     
     // Convert PropertyWithFileCount to Property
     const propertyObj: Property = {
@@ -2328,9 +2178,6 @@ function MapPage() {
           mapContainerStyle={containerStyle}
           center={mapCenter}
           onLoad={(mapInstance) => {
-            console.log('[MAP] Map loaded successfully');
-            console.log('[MAP] Initial center:', mapCenter);
-            console.log('[MAP] Initial zoom:', zoom);
             setMap(mapInstance);
             // Set initial zoom once; let gestures control subsequent zoom levels
             if (typeof zoom === 'number') {
@@ -2350,7 +2197,6 @@ function MapPage() {
           }}
           onClick={handleMapClick}
           onDblClick={() => {
-            console.log('📍 [PINS] Double-click detected - allowing Google Maps zoom');
             // Google Maps will handle the zoom automatically
             // Just update our click tracking to prevent pin drops
             lastClickTimeRef.current = Date.now();
@@ -2529,7 +2375,6 @@ function MapPage() {
                 // Add to userProperties list
                 setUserProperties(prev => [...prev, savedProperty]);
                 
-                console.log('[PROPERTY] Property saved successfully:', savedProperty);
               } catch (error) {
                 console.error('Error saving property:', error);
               }
@@ -2575,11 +2420,27 @@ function MapPage() {
             }}
           />
         )}
-        <PropertyDetailsModal
-          isOpen={showDetailsModal}
-          property={savedProperty}
-          snappedLatLng={snappedLatLng}
-          onClose={handleDetailsModalClose}
+        <ErrorBoundary
+          fallback={
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="bg-white rounded-xl p-6 max-w-md mx-4">
+                <h2 className="text-xl font-semibold mb-2">Error Loading Property</h2>
+                <p className="text-gray-600 mb-4">There was an error loading the property details. Please try again.</p>
+                <button
+                  onClick={handleDetailsModalClose}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <PropertyDetailsModal
+            isOpen={showDetailsModal}
+            property={savedProperty}
+            snappedLatLng={snappedLatLng}
+            onClose={handleDetailsModalClose}
           folders={folders}
           files={propertyFiles}
           foldersLoading={foldersLoading}
@@ -2592,7 +2453,6 @@ function MapPage() {
           onFileDelete={handleDeleteFile}
           onFileRename={handleRename}
           onFileMove={async (file: PropertyFile, targetFolderId: string | null) => {
-            console.log('[MOVE] onMove invoked:', { fileId: file.id, fromFolder: file.folder_id, toFolder: targetFolderId });
             const movingToDifferentFolder = file.folder_id !== targetFolderId;
             let newName = file.file_name;
             if (movingToDifferentFolder) {
@@ -2606,7 +2466,6 @@ function MapPage() {
             if (newName !== file.file_name) {
               const oldPath = `${file.property_id}/${file.file_name}`;
               const newPath = `${file.property_id}/${newName}`;
-              console.log('[MOVE] Renaming in storage:', { oldPath, newPath });
               const { error: copyError } = await supabase.storage.from('property-files').copy(oldPath, newPath);
               if (copyError) {
                 console.error('[MOVE] Storage copy error:', copyError);
@@ -2639,7 +2498,6 @@ function MapPage() {
               // Optimistic UI update
               setPropertyFiles(prev => prev.map(f => f.id === file.id ? { ...f, folder_id: targetFolderId } : f));
             } else {
-              console.log('[MOVE] No-op (same folder)');
             }
 
             // Refresh from server for consistency
@@ -2672,7 +2530,6 @@ function MapPage() {
             setAddress(property.address);
             setSnappedLatLng({ lat: property.lat, lng: property.lng });
             
-            console.log('🔄 [SWITCH] Property switched to:', property.address, `(${files.length} files, ${folders.length} folders)`);
           }}
           onMapMove={(lat, lng) => {
             // Update map center when switching properties
@@ -2682,6 +2539,7 @@ function MapPage() {
             }
           }}
         />
+        </ErrorBoundary>
 
     </div>
   );
