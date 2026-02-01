@@ -27,36 +27,44 @@ export const MapControls = ({
   propertyCardHeight = 0,
   selectedProperty = null, // Add selectedProperty parameter
 }: MapControlsProps) => {
+  const desktopMapButtonBase = 'px-3 py-1 rounded font-semibold text-sm cursor-pointer';
+  const desktopMapButtonActive = 'bg-blue-600 text-white';
+  const desktopMapButtonInactive = 'bg-white text-gray-800 border border-gray-300';
+  const desktopActionButtonBase = 'px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm';
+  const floatingButtonShadow = { boxShadow: '0 2px 8px rgba(0,0,0,0.15)' };
+  const mobileFabBase = 'w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl cursor-pointer';
+  const mobileActionButtonBase = 'relative w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl active:scale-[0.98] cursor-pointer';
+
   // Desktop map type controls (left side) - now with 3 options
   const desktopMapControls = (
     <div className="hidden sm:flex absolute top-6 left-6 z-30">
       <div className="flex gap-2 bg-white rounded-lg shadow-lg p-2">
         <button
-          className={`px-3 py-1 rounded font-semibold text-sm ${
+          className={`${desktopMapButtonBase} ${
             mapType === 'roadmap' 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-white text-gray-800 border border-gray-300'
-          } cursor-pointer`}
+              ? desktopMapButtonActive 
+              : desktopMapButtonInactive
+          }`}
           onClick={() => onMapTypeChange('roadmap')}
         >
           Map
         </button>
         <button
-          className={`px-3 py-1 rounded font-semibold text-sm ${
+          className={`${desktopMapButtonBase} ${
             mapType === 'hybrid' 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-white text-gray-800 border border-gray-300'
-          } cursor-pointer`}
+              ? desktopMapButtonActive 
+              : desktopMapButtonInactive
+          }`}
           onClick={() => onMapTypeChange('hybrid')}
         >
           Hybrid
         </button>
         <button
-          className={`px-3 py-1 rounded font-semibold text-sm ${
+          className={`${desktopMapButtonBase} ${
             mapType === 'satellite' 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-white text-gray-800 border border-gray-300'
-          } cursor-pointer`}
+              ? desktopMapButtonActive 
+              : desktopMapButtonInactive
+          }`}
           onClick={() => onMapTypeChange('satellite')}
         >
           Satellite
@@ -69,7 +77,7 @@ export const MapControls = ({
   const desktopCurrentLocationButton = onCurrentLocationClick && (
     <div className="hidden sm:flex absolute top-6 right-6 z-30 gap-2">
       <Link
-        className="px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm"
+        className={desktopActionButtonBase}
         href="/account"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -81,9 +89,9 @@ export const MapControls = ({
       </Link>
       {/* List View Button */}
       <Link
-        className="px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm"
+        className={desktopActionButtonBase}
         href="/list"
-        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+        style={floatingButtonShadow}
       >
         <svg 
           width="16" 
@@ -107,11 +115,9 @@ export const MapControls = ({
       
       {/* Current Location Button */}
       <button
-        className={`px-4 py-3 rounded-lg shadow-lg border bg-white text-gray-700 border-gray-300 flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-xl cursor-pointer font-semibold text-sm`}
+        className={desktopActionButtonBase}
         onClick={onCurrentLocationClick}
-        style={{ 
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-        }}
+        style={floatingButtonShadow}
       >
         {/* Always show static crosshairs/target icon - handles both recenter and deep zoom */}
         <svg 
@@ -145,7 +151,7 @@ export const MapControls = ({
   const mobileControls = shouldShowMobileControls && (
     <div className="absolute right-4 top-24 z-30 sm:hidden flex flex-col gap-2">
       <button
-        className="w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl cursor-pointer"
+        className={mobileFabBase}
         onClick={() => {
           if (mapType === 'roadmap') {
             onMapTypeChange('hybrid');
@@ -155,7 +161,7 @@ export const MapControls = ({
             onMapTypeChange('roadmap');
           }
         }}
-        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+        style={floatingButtonShadow}
         aria-label="Toggle map type"
       >
         {mapType === 'roadmap' ? (
@@ -211,11 +217,9 @@ export const MapControls = ({
           }}>
       {/* Current Location Button */}
       <button
-        className={`relative w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl active:scale-[0.98] cursor-pointer`}
+        className={mobileActionButtonBase}
         onClick={onCurrentLocationClick}
-        style={{ 
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-        }}
+        style={floatingButtonShadow}
       >
          {/* Current location GPS pin icon */}
          <svg 
@@ -240,11 +244,9 @@ export const MapControls = ({
       {/* Zoom In Button */}
       {onZoomIn && (
         <button
-          className={`relative w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl active:scale-[0.98] cursor-pointer`}
+          className={mobileActionButtonBase}
           onClick={onZoomIn}
-          style={{ 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-          }}
+          style={floatingButtonShadow}
           aria-label="Zoom in"
         >
           {/* Plus icon */}
@@ -267,11 +269,9 @@ export const MapControls = ({
       {/* Zoom Out Button */}
       {onZoomOut && (
         <button
-          className={`relative w-11 h-11 rounded-full shadow-lg border-2 bg-white text-gray-700 border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-xl active:scale-[0.98] cursor-pointer`}
+          className={mobileActionButtonBase}
           onClick={onZoomOut}
-          style={{ 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-          }}
+          style={floatingButtonShadow}
           aria-label="Zoom out"
         >
           {/* Minus icon */}

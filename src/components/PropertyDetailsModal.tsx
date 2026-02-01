@@ -1387,7 +1387,7 @@ export const PropertyDetailsModal = ({
                                 // If any menu is open, close it instead of navigating to folder
                                 if (fileMenuId || folderMenuId) {
                                   setFileMenuId(null);
-                                  setFileMenuId(null);
+                                  setFolderMenuId(null);
                                   return;
                                 }
                                 
@@ -1481,7 +1481,7 @@ export const PropertyDetailsModal = ({
                                 // If any menu is open, close it instead of navigating to folder
                                 if (fileMenuId || folderMenuId) {
                                   setFileMenuId(null);
-                                  setFileMenuId(null);
+                                  setFolderMenuId(null);
                                   return;
                                 }
                                 
@@ -1492,7 +1492,7 @@ export const PropertyDetailsModal = ({
                             >
                               <div className="flex items-center min-w-0 flex-1">
                                 <HeroFolderIcon style={{ width: 32, height: 32, color: '#fbbf24' }} />
-                                <div className={`${isMobile ? 'ml-3' : 'ml-3'} flex-1 min-w-0`}>
+                                <div className="ml-3 flex-1 min-w-0">
                                   {renamingFileId === folder.id ? (
                                     <RenameInput
                                       value={renamingFileName}
@@ -1523,10 +1523,10 @@ export const PropertyDetailsModal = ({
                                     />
                                   ) : (
                                     <>
-                                      <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-base' : 'text-base'}`}>
+                                      <div className="text-gray-900 font-semibold truncate text-base">
                                         {folder.name}
                                       </div>
-                                      <div className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500 mt-0.5 flex items-center gap-2`}>
+                                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
                                         <span>{formatDate(folder.created_at)}</span>
                                       </div>
                                     </>
@@ -1535,7 +1535,7 @@ export const PropertyDetailsModal = ({
                               </div>
                               <div className="relative">
                                 <button
-                                  className={`${isMobile ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
+                                  className="p-2 rounded hover:bg-gray-200 ml-2 flex-shrink-0"
                                   onClick={e => {
                                     e.stopPropagation();
                                     // Close any open menus first
@@ -1550,7 +1550,7 @@ export const PropertyDetailsModal = ({
                                   }}
                                   title="Folder actions"
                                 >
-                                  <svg className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -1588,7 +1588,7 @@ export const PropertyDetailsModal = ({
                                 // If any menu is open, close it instead of opening the file
                                 if (fileMenuId || folderMenuId) {
                                   setFileMenuId(null);
-                                  setFileMenuId(null);
+                                  setFolderMenuId(null);
                                   return;
                                 }
                                 
@@ -1712,9 +1712,9 @@ export const PropertyDetailsModal = ({
                               <div className="flex items-center min-w-0 flex-1">
                                 <FileIcon
                                   type={file.file_name.split('.').pop() || 'file'}
-                                  size={isMobile ? 32 : 32}
+                                  size={32}
                                 />
-                                <div className={`${isMobile ? 'ml-3' : 'ml-3'} flex-1 min-w-0`}>
+                                <div className="ml-3 flex-1 min-w-0">
                                   {renamingFileId === file.id ? (
                                     <RenameInput
                                       value={renamingFileName}
@@ -1744,10 +1744,10 @@ export const PropertyDetailsModal = ({
                                     />
                                   ) : (
                                     <>
-                                      <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-base' : 'text-base'}`}>
+                                      <div className="text-gray-900 font-semibold truncate text-base">
                                         {getFileNameWithoutExtension(file.file_name)}
                                       </div>
-                                      <div className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500 mt-0.5 flex items-center gap-2`}>
+                                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
                                         <span>{formatDate(file.modified_at || file.uploaded_at)}</span>
                                         <span>•</span>
                                         <span>{formatFileSize(file.file_size)}</span>
@@ -1758,7 +1758,7 @@ export const PropertyDetailsModal = ({
                               </div>
                               <div className="relative">
                                 <button
-                                  className={`${isMobile ? 'p-2' : 'p-2'} rounded hover:bg-gray-200 ml-2 flex-shrink-0`}
+                                  className="p-2 rounded hover:bg-gray-200 ml-2 flex-shrink-0"
                                   onClick={e => {
                                     e.stopPropagation();
                                     // Close any open menus first
@@ -1773,7 +1773,7 @@ export const PropertyDetailsModal = ({
                                   }}
                                   title="File actions"
                                 >
-                                  <svg className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -1904,7 +1904,7 @@ export const PropertyDetailsModal = ({
                                     <div className={`font-medium text-gray-900 truncate ${isMobile ? 'text-xs' : 'text-sm'} leading-tight`}>
                                       {folder.name}
                                     </div>
-                                    <div className={`text-gray-500 mt-0.5 ${isMobile ? 'text-xs' : 'text-xs'}`}>
+                                    <div className="text-xs text-gray-500 mt-0.5">
                                       {formatDate(folder.created_at)}
                                     </div>
                                   </>
@@ -1948,7 +1948,7 @@ export const PropertyDetailsModal = ({
                                 />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className={`absolute ${isMobile ? '-top-2 -right-2' : '-top-2 -right-2'} rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation ${
+                                  className={`absolute -top-2 -right-2 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation ${
                                     isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                                   }`}
                                   onClick={e => {
@@ -2037,7 +2037,7 @@ export const PropertyDetailsModal = ({
                                     <div className={`font-medium text-gray-900 truncate ${isMobile ? 'text-xs' : 'text-sm'} leading-tight`}>
                                       {getFileNameWithoutExtension(file.file_name)}
                                     </div>
-                                    <div className={`text-gray-500 mt-0.5 ${isMobile ? 'text-xs' : 'text-xs'} space-y-0.5`}>
+                                    <div className="text-xs text-gray-500 mt-0.5 space-y-0.5">
                                       <div>{formatFileSize(file.file_size)}</div>
                                       <div>{formatDate(file.modified_at || file.uploaded_at)}</div>
                                     </div>
