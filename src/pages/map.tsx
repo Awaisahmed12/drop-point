@@ -3,6 +3,13 @@ import Head from 'next/head';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
 import { useMobileViewport } from '../hooks/useMobileViewport';
+import { useMapState } from '../hooks/useMapState';
+import { usePropertyState } from '../hooks/usePropertyState';
+import { usePropertyData } from '../hooks/usePropertyData';
+import { useSearchState } from '../hooks/useSearchState';
+import { useModalState } from '../hooks/useModalState';
+import { useUploadState } from '../hooks/useUploadState';
+import { useMenuState } from '../hooks/useMenuState';
 import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload, PropertyWithFileCount } from '../../types';
 import { supabase } from '../utils/supabaseClient';
 import { useRouter } from 'next/router';
@@ -17,6 +24,7 @@ import { MobileBottomNav } from '../components/MobileBottomNav';
 import { CurrentLocationIndicator } from '../components/CurrentLocationIndicator';
 import { withAuth } from '../components/withAuth';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { propertyService, fileService, folderService } from '../services';
 
 import { 
   containerStyle, 
@@ -79,55 +87,59 @@ function MapPage() {
   });
   const router = useRouter();
   const { getMobileStyles, mobileClasses } = useMobileViewport();
+  
+  // Extract state management into custom hooks
+  const mapState = useMapState();
+  const propertyState = usePropertyState();
+  const propertyData = usePropertyData();
+  const searchState = useSearchState();
+  const modalState = useModalState();
+  const uploadState = useUploadState();
+  const menuState = useMenuState();
+
+  // Destructure for easier access
+  const {
+    mapCenter, setMapCenter, map, setMap, zoom, setZoom, mapType, setMapType,
+    mapFirstIdle, setMapFirstIdle, initialCenterResolved, setInitialCenterResolved,
+    saveMapPositionThrottled
+  } = mapState;
+
+  const {
+    userProperties, setUserProperties, selectedProperty, setSelectedProperty,
+    savedProperty, setSavedProperty, propertiesLoaded, setPropertiesLoaded,
+    loadUserProperties
+  } = propertyState;
+
+  const {
+    propertyFiles, setPropertyFiles, folders, setFolders,
+    selectedFolder, setSelectedFolder, foldersLoading, setFoldersLoading,
+    filesLoading, setFilesLoading, propertyCache, setPropertyCache,
+    isPropertyDataCached, cachePropertyData, getCachedPropertyData
+  } = propertyData;
+
+  const {
+    inputValue, setInputValue, predictions, setPredictions,
+    showDropdown, setShowDropdown
+  } = searchState;
+
+  const {
+    showDetailsModal, setShowDetailsModal, address, setAddress,
+    addressLoading, setAddressLoading, snappedLatLng, setSnappedLatLng
+  } = modalState;
+
+  const {
+    pendingUploads, setPendingUploads, renamingFileId, setRenamingFileId
+  } = uploadState;
+
+  const {
+    folderMenuId, setFolderMenuId, fileMenuId, setFileMenuId,
+    folderMenuRef, fileMenuRef
+  } = menuState;
+
+  // Local state and refs
   const [loading, setLoading] = useState(true);
-  const [mapCenter, setMapCenter] = useState(US_CENTER);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
-  const [mapType, setMapType] = useState<string>(DEFAULT_MAP_TYPE);
-  // Smooth initial render flags
-  const [propertiesLoaded, setPropertiesLoaded] = useState(false);
-  // kept for readability in flow but not used directly anymore
-  // const [initialLocateDone, setInitialLocateDone] = useState(false);
-  const [mapFirstIdle, setMapFirstIdle] = useState(false);
-  const [initialCenterResolved, setInitialCenterResolved] = useState(false);
-  
-  // Pin system state
-  const [userProperties, setUserProperties] = useState<Property[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  
-  const [address, setAddress] = useState<string>('');
-  const [addressLoading, setAddressLoading] = useState(false);
   const justSelectedRef = useRef(false);
   const lastClickTimeRef = useRef(0);
-
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [savedProperty, setSavedProperty] = useState<Property | null>(null);
-
-  // Add state for uploaded files
-  const [propertyFiles, setPropertyFiles] = useState<PropertyFile[]>([]);
-
-  // Will be used for property save-on-upload logic
-  const [snappedLatLng, setSnappedLatLng] = useState<{lat: number, lng: number} | null>(null);
-
-  // Custom autocomplete state (used by internal search handling)
-  const [inputValue, setInputValue] = useState('');
-  const [predictions, setPredictions] = useState<Prediction[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-
-  // Replace folders state with backend-driven state
-  const [folders, setFolders] = useState<PropertyFolder[]>([]);
-
-  // Add state for folders and folder selection (move above all usages)
-  const [selectedFolder, setSelectedFolder] = useState('master');
-
-  // Folder validation moved to PropertyDetailsModal
-
-  // Add state for pending uploads
-  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
-
-  // Add ref for menu click outside
-  const folderMenuRef = useRef<HTMLDivElement | null>(null);
-  const fileMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Track staged zoom behavior for current location (first -> deep)
   const currentLocationZoomStageRef = useRef<'none' | 'first' | 'deep'>('none');
@@ -135,99 +147,6 @@ function MapPage() {
   const programmaticZoomChangesRef = useRef(0);
   // Track stage internally only for logic decisions; store in ref to avoid unused state
   const currentLocationStageRef = useRef<'none' | 'first' | 'deep'>('none');
-  // Throttle map position saves
-  const lastSaveTimeRef = useRef(0);
-  const saveMapPositionThrottled = useCallback(() => {
-    const now = Date.now();
-    if (now - lastSaveTimeRef.current > 1000) { // Throttle to once per second
-      lastSaveTimeRef.current = now;
-      if (map && typeof window !== 'undefined') {
-        const center = map.getCenter();
-        const currentZoom = map.getZoom();
-        if (center && currentZoom) {
-          const position = {
-            lat: center.lat(),
-            lng: center.lng(),
-            zoom: currentZoom
-          };
-          sessionStorage.setItem('droppoint-map-position', JSON.stringify(position));
-        }
-      }
-    }
-  }, [map]);
-
-  // (Removed) Live user location dot tracking
-
-  // Add state for renaming files
-  const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
-
-  // Sorting moved to PropertyDetailsModal
-
-  // Add loading states
-  const [foldersLoading, setFoldersLoading] = useState(true);
-  const [filesLoading, setFilesLoading] = useState(true);
-
-  // Add these near the top of the MapPage component, with other state declarations
-  // Cache for property data
-  const [propertyCache, setPropertyCache] = useState<Record<string, {
-    files: PropertyFile[];
-    folders: PropertyFolder[];
-    lastFetched: number;
-  }>>({});
-
-  // Expose cache globally for property switcher
-  useEffect(() => {
-    (globalThis as GlobalCache).__droppoint_property_cache = propertyCache;
-  }, [propertyCache]);
-
-  // Cache timeout in milliseconds (5 minutes)
-  const CACHE_TIMEOUT = 5 * 60 * 1000;
-
-  // Address caching moved to utils/propertyCache.ts
-
-  // Cache functions moved to utils/propertyCache.ts
-
-
-
-  // Function to check if property data is cached and valid
-  const isPropertyDataCached = useCallback(async (address: string): Promise<boolean> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
-
-    const cacheKey = `${user.id}-${address}`;
-    const cached = propertyCache[cacheKey];
-    return cached && (Date.now() - cached.lastFetched) < CACHE_TIMEOUT;
-  }, [propertyCache, CACHE_TIMEOUT]);
-
-  // Function to cache property data
-  const cachePropertyData = useCallback(async (address: string, files: PropertyFile[], folders: PropertyFolder[]) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const cacheKey = `${user.id}-${address}`;
-    setPropertyCache(prev => ({
-      ...prev,
-      [cacheKey]: {
-        files,
-        folders,
-        lastFetched: Date.now()
-      }
-    }));
-    
-  }, []);
-
-  // Function to get cached property data
-  const getCachedPropertyData = useCallback(async (address: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-
-    const cacheKey = `${user.id}-${address}`;
-    const cached = propertyCache[cacheKey];
-    if (cached && (Date.now() - cached.lastFetched) < CACHE_TIMEOUT) {
-      return cached;
-    }
-    return null;
-  }, [propertyCache, CACHE_TIMEOUT]);
 
   // Optimistic auth guard: render immediately; redirect only if unauthenticated when check resolves
   useEffect(() => {
@@ -238,33 +157,6 @@ function MapPage() {
       }
     });
   }, [router]);
-
-  // Load user properties as pins
-  const loadUserProperties = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    try {
-      const { data: properties, error } = await supabase
-        .from('properties')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false });
-
-      if (error) {
-        console.error('[PINS] Error loading properties:', error);
-        return;
-      }
-
-      if (properties) {
-        setUserProperties(properties);
-      }
-    } catch (error) {
-      console.error('📍 [PINS] Error loading user properties:', error);
-    } finally {
-      setPropertiesLoaded(true);
-    }
-  }, []);
 
   // Load user properties on mount
   useEffect(() => {
@@ -985,23 +877,9 @@ function MapPage() {
           throw new Error('A file with this name already exists in this folder.');
         }
 
-        const oldPath = file.file_url;
-        const newPath = `${file.property_id}/${sanitizedNewName}`;
-        
-        const { error: moveError } = await supabase.storage.from('property-files').move(oldPath, newPath);
-        if (moveError) {
-          throw new Error(`Storage error: ${moveError.message}`);
-        }
-
-        const { error: dbError } = await supabase.from('property_files').update({
-          file_name: sanitizedNewName,
-          file_url: newPath,
-        }).eq('id', file.id);
-        
-        if (dbError) {
-          throw dbError;
-        }
-        setPropertyFiles(files => files.map(f => f.id === file.id ? { ...f, file_name: sanitizedNewName, file_url: newPath } : f));
+        // Use service to rename file
+        const updatedFile = await fileService.renameFile(file, sanitizedNewName);
+        setPropertyFiles(files => files.map(f => f.id === file.id ? updatedFile : f));
         
       } else {
         const folder = item as PropertyFolder;
@@ -1015,12 +893,9 @@ function MapPage() {
           throw new Error('A folder with this name already exists here.');
         }
         
-        const { error } = await supabase.from('property_folders').update({ name: sanitizedNewName }).eq('id', folder.id);
-        if (error) {
-          throw error;
-        }
-
-        setFolders(folders => folders.map(f => f.id === folder.id ? { ...f, name: sanitizedNewName } : f));
+        // Use service to rename folder
+        const updatedFolder = await folderService.renameFolder(folder, sanitizedNewName);
+        setFolders(folders => folders.map(f => f.id === folder.id ? updatedFolder : f));
       }
       
     } catch (error: unknown) {
@@ -1040,24 +915,10 @@ function MapPage() {
 
     if (isConfirmed) {
         try {
-            // 1. Delete from storage
-            const { error: storageError } = await supabase.storage
-                .from('property-files')
-                .remove([`${file.property_id}/${file.file_name}`]);
+            // Use service to delete file
+            await fileService.deleteFile(file);
 
-            if (storageError) {
-                console.warn('Storage deletion warning (may be harmless if file was already gone):', storageError.message);
-            }
-
-            // 2. Delete from database
-            const { error: dbError } = await supabase
-                .from('property_files')
-                .delete()
-                .eq('id', file.id);
-
-            if (dbError) throw dbError;
-
-            // 3. Update local state
+            // Update local state
             setPropertyFiles(prevFiles => prevFiles.filter(f => f.id !== file.id));
 
         } catch (error: unknown) {
@@ -1088,13 +949,8 @@ function MapPage() {
 
     if (isConfirmed) {
         try {
-            // Soft delete from the database
-            const { error } = await supabase
-                .from('property_folders')
-                .update({ deleted_at: new Date().toISOString() })
-                .eq('id', folder.id);
-
-            if (error) throw error;
+            // Use service to delete folder
+            await folderService.deleteFolder(folder.id);
 
             // Update local state
             setFolders(prevFolders => prevFolders.filter(f => f.id !== folder.id));
@@ -1240,33 +1096,14 @@ function MapPage() {
           return;
         }
 
-        // Save the property to the database
-        const { data: newProperty, error: saveError } = await supabase
-          .from('properties')
-          .insert([{
-            user_id: user.id,
-            address: savedProperty.address,
-            lat: savedProperty.lat,
-            lng: savedProperty.lng,
-            label: savedProperty.label,
-            notes: savedProperty.notes,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }])
-          .select()
-          .single();
-
-        if (saveError) {
-          console.error('📁 [UPLOAD] Error saving property:', saveError);
-          alert('Failed to save property. Please try again.');
-          return;
-        }
-
-        if (!newProperty) {
-          console.error('📁 [UPLOAD] No property returned after save');
-          alert('Failed to save property. Please try again.');
-          return;
-        }
+        // Save the property to the database using service
+        const newProperty = await propertyService.createProperty({
+          address: savedProperty.address,
+          lat: savedProperty.lat,
+          lng: savedProperty.lng,
+          label: savedProperty.label,
+          notes: savedProperty.notes
+        });
 
         // Update the saved property with the new ID
         propertyId = newProperty.id;
@@ -1280,15 +1117,8 @@ function MapPage() {
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Verify the property was actually saved and is accessible
-        const { data: verifyProperty, error: verifyError } = await supabase
-          .from('properties')
-          .select('id')
-          .eq('id', propertyId)
-          .eq('user_id', user.id)
-          .single();
-          
-        if (verifyError || !verifyProperty) {
-          console.error('[UPLOAD] Property verification failed:', verifyError);
+        const verified = await propertyService.verifyProperty(propertyId);
+        if (!verified) {
           throw new Error('Property was not properly saved. Please try again.');
         }
         
@@ -1400,59 +1230,43 @@ function MapPage() {
     const filePath = `${propertyId}/${uniqueName}`;
     
     try {
-      // Upload to storage with progress tracking
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('property-files')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
+      // Upload file using service
+      await fileService.uploadFile(file, propertyId, uniqueName, folderIdForUpload);
 
       // Update progress to 90% after storage upload
       setPendingUploads(prev => prev.map(p => 
         p.id === uploadId ? { ...p, progress: 90 } : p
       ));
 
-      // Insert database record with optimized payload
-      const dbRecord = {
-        property_id: propertyId,
-        file_name: uniqueName,
-        file_url: filePath,
-        uploaded_at: new Date().toISOString(),
-        user_id: user.id,
-        file_type: file.type,
-        file_size: file.size,
-        folder_id: folderIdForUpload,
-        modified_at: new Date(file.lastModified).toISOString(),
-      };
-
-      // Single database insert with retry logic
-      let dbError = null;
+      // Create database record using service (with retry logic built-in)
       let retryCount = 0;
-      const maxRetries = 2; // Reduced from 3 for faster failure
-      
+      const maxRetries = 2;
+      let lastError = null;
+
       while (retryCount < maxRetries) {
-        const { error } = await supabase.from('property_files').insert([dbRecord]);
-        
-        if (!error) {
-          break;
-        }
-        
-        dbError = error;
-        retryCount++;
-        
-        if (retryCount < maxRetries) {
-          const waitTime = 500 * retryCount; // Faster retry: 500ms, 1s
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+        try {
+          await fileService.createFileRecord(
+            propertyId,
+            uniqueName,
+            filePath,
+            file.type,
+            file.size,
+            folderIdForUpload,
+            new Date(file.lastModified).toISOString()
+          );
+          break; // Success
+        } catch (error) {
+          lastError = error;
+          retryCount++;
+          if (retryCount < maxRetries) {
+            const waitTime = 500 * retryCount;
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
         }
       }
 
-      if (dbError) {
-        throw dbError;
+      if (retryCount >= maxRetries && lastError) {
+        throw lastError;
       }
       
       // Mark as successful
@@ -1460,29 +1274,22 @@ function MapPage() {
         p.id === uploadId ? { ...p, status: 'success', progress: 100 } : p
       ));
 
-      // Optimized file list refresh - only refresh files, not both files and folders
-      const result = await supabase
-        .from('property_files')
-        .select('*')
-        .eq('property_id', propertyId)
-        .order('uploaded_at', { ascending: false });
-
-      if (result.data) {
-        setPropertyFiles(result.data);
-        
-        // Update cache immediately for instant access
-        const currentAddress = address || '';
-        if (currentAddress) {
-          const cacheKey = `${user.id}-${currentAddress}`;
-          setPropertyCache(prev => ({
-            ...prev,
-            [cacheKey]: {
-              files: result.data,
-              folders: prev[cacheKey]?.folders || [],
-              lastFetched: Date.now()
-            }
-          }));
-        }
+      // Refresh file list using service
+      const files = await fileService.getPropertyFiles(propertyId);
+      setPropertyFiles(files);
+      
+      // Update cache immediately for instant access
+      const currentAddress = address || '';
+      if (currentAddress) {
+        const cacheKey = `${user.id}-${currentAddress}`;
+        setPropertyCache(prev => ({
+          ...prev,
+          [cacheKey]: {
+            files,
+            folders: prev[cacheKey]?.folders || [],
+            lastFetched: Date.now()
+          }
+        }));
       }
 
     } catch (error) {
@@ -1533,9 +1340,7 @@ function MapPage() {
     };
   }, []);
 
-  // Add state for action menus
-  const [folderMenuId, setFolderMenuId] = useState<string | null>(null);
-  const [fileMenuId, setFileMenuId] = useState<string | null>(null);
+  // Menu state is now managed by useMenuState hook
 
   // Utility function moved to utils/fileManagement.ts
 
@@ -2453,63 +2258,36 @@ function MapPage() {
           onFileDelete={handleDeleteFile}
           onFileRename={handleRename}
           onFileMove={async (file: PropertyFile, targetFolderId: string | null) => {
-            const movingToDifferentFolder = file.folder_id !== targetFolderId;
-            let newName = file.file_name;
-            if (movingToDifferentFolder) {
-              newName = sanitizeFileName(getUniqueFileName(file.file_name, targetFolderId, propertyFiles));
-            }
-            if (!newName) {
-              alert('Invalid file name. Please rename your file and try again.');
-              return;
-            }
+            try {
+              const movingToDifferentFolder = file.folder_id !== targetFolderId;
+              let newFileName: string | undefined = undefined;
+              
+              if (movingToDifferentFolder) {
+                // Generate unique name if needed
+                newFileName = sanitizeFileName(getUniqueFileName(file.file_name, targetFolderId, propertyFiles));
+                if (!newFileName) {
+                  alert('Invalid file name. Please rename your file and try again.');
+                  return;
+                }
+                // Only use new name if it's different
+                if (newFileName === file.file_name) {
+                  newFileName = undefined;
+                }
+              }
 
-            if (newName !== file.file_name) {
-              const oldPath = `${file.property_id}/${file.file_name}`;
-              const newPath = `${file.property_id}/${newName}`;
-              const { error: copyError } = await supabase.storage.from('property-files').copy(oldPath, newPath);
-              if (copyError) {
-                console.error('[MOVE] Storage copy error:', copyError);
-                alert('Failed to move file in storage.');
-                return;
-              }
-              const { error: removeError } = await supabase.storage.from('property-files').remove([oldPath]);
-              if (removeError) {
-                console.warn('[MOVE] Storage remove warning:', removeError);
-              }
-              const { error: dbError } = await supabase.from('property_files').update({
-                folder_id: targetFolderId,
-                file_name: newName,
-                file_url: newPath,
-              }).eq('id', file.id);
-              if (dbError) {
-                console.error('[MOVE] DB update error:', dbError);
-                alert('Failed to update file metadata.');
-                return;
-              }
+              // Use service to move file
+              const updatedFile = await fileService.moveFile(file, targetFolderId, newFileName);
+              
               // Optimistic UI update
-              setPropertyFiles(prev => prev.map(f => f.id === file.id ? { ...f, folder_id: targetFolderId, file_name: newName, file_url: newPath } : f));
-            } else if (movingToDifferentFolder) {
-              const { error: dbError } = await supabase.from('property_files').update({ folder_id: targetFolderId }).eq('id', file.id);
-              if (dbError) {
-                console.error('[MOVE] DB move error:', dbError);
-                alert('Failed to move file.');
-                return;
-              }
-              // Optimistic UI update
-              setPropertyFiles(prev => prev.map(f => f.id === file.id ? { ...f, folder_id: targetFolderId } : f));
-            } else {
-            }
+              setPropertyFiles(prev => prev.map(f => f.id === file.id ? updatedFile : f));
 
-            // Refresh from server for consistency
-            const result = await supabase
-              .from('property_files')
-              .select('*')
-              .eq('property_id', file.property_id)
-              .order('uploaded_at', { ascending: false });
-            if (result.error) {
-              console.warn('[MOVE] Refresh error:', result.error);
+              // Refresh from server for consistency
+              const files = await fileService.getPropertyFiles(file.property_id);
+              setPropertyFiles(files);
+            } catch (error) {
+              console.error('[MOVE] Error moving file:', error);
+              alert(`Failed to move file: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
-            if (result.data) setPropertyFiles(result.data);
           }}
           onFolderCreate={handleCreateFolderByName}
           onFolderDelete={handleDeleteFolder}
