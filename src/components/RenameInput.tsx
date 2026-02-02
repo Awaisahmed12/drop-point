@@ -9,7 +9,6 @@ interface RenameInputProps {
   placeholder?: string;
   extension?: string;
   variant?: 'simple' | 'full' | 'grid';
-  isMobile?: boolean;
   autoFocus?: boolean;
   className?: string;
   showButtons?: boolean;
@@ -24,7 +23,6 @@ export const RenameInput: React.FC<RenameInputProps> = ({
   placeholder = 'Name',
   extension,
   variant = 'simple',
-  isMobile = false,
   autoFocus = true,
   className = '',
   showButtons = true,
@@ -65,9 +63,9 @@ export const RenameInput: React.FC<RenameInputProps> = ({
   };
 
   const inputClassName = variant === 'full' 
-    ? `flex-1 font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg px-4 py-3 ${isMobile ? 'text-base' : 'text-base'} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`
+    ? 'flex-1 font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
     : variant === 'grid'
-    ? `w-full text-center bg-white border-2 border-blue-400 rounded-lg px-2 py-1 text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${className}`
+    ? `w-full text-center bg-white border-2 border-blue-400 rounded-lg px-2 py-1 text-[16px] sm:text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${className}`
     : `flex-1 font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${className}`;
 
   if (variant === 'grid') {
@@ -86,7 +84,6 @@ export const RenameInput: React.FC<RenameInputProps> = ({
         }}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        style={{ fontSize: isMobile ? '16px' : 'inherit' }}
       />
     );
   }
@@ -109,7 +106,7 @@ export const RenameInput: React.FC<RenameInputProps> = ({
             }}
             placeholder={placeholder}
             autoFocus={autoFocus}
-            style={{ fontSize: isMobile ? '16px' : 'inherit', maxWidth: '100%' }}
+            style={{ maxWidth: '100%' }}
           />
         </div>
         <div className="flex justify-end gap-3">

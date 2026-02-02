@@ -4,7 +4,6 @@ import { Property } from '../../types';
 interface MapControlsProps {
   mapType: string;
   onMapTypeChange: (type: 'roadmap' | 'satellite' | 'hybrid') => void;
-  isMobile?: boolean;
   showDropdown?: boolean;
   onCurrentLocationClick?: () => void;
   showPropertyInfoCard?: boolean;

@@ -94,6 +94,11 @@ export const PropertyDetailsModal = ({
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchQuery, setSearchQuery] = useState('');
   const [switchingProperty, setSwitchingProperty] = useState(false);
+
+  const closeMenus = useCallback(() => {
+    setFileMenuId(null);
+    setFolderMenuId(null);
+  }, []);
   
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
@@ -109,22 +114,20 @@ export const PropertyDetailsModal = ({
     if (typeof window !== 'undefined') {
       localStorage.setItem('droppoint-view-mode', viewMode);
     }
-  }, [viewMode]);
+  }, [viewMode, closeMenus]);
 
   // Blanket fix: Close all menus when view mode changes
   useEffect(() => {
-    setFileMenuId(null);
-    setFolderMenuId(null);
+    closeMenus();
   }, [viewMode]);
 
   // Blanket fix: Close all menus when modal closes or opens
   useEffect(() => {
     if (!isOpen) {
       // Close menus when modal closes
-      setFileMenuId(null);
-      setFolderMenuId(null);
+      closeMenus();
     }
-  }, [isOpen]);
+  }, [isOpen, closeMenus]);
 
   // Mobile file viewer state
   const [mobileFileViewer, setMobileFileViewer] = useState<{
@@ -374,7 +377,10 @@ export const PropertyDetailsModal = ({
   const searchIconPos = useResponsiveValue('top-4 w-5 h-5', 'top-2.5 w-4 h-4');
   const tableHeaderPadding = useResponsiveValue('py-3', 'py-2');
   const listItemPadding = useResponsiveValue('px-4 py-2.5', 'px-3 py-3');
-  const listItemMinHeight = useResponsiveValue('56px', '56px');
+  const listIconSize = useResponsiveValue(32, 28);
+  const listRenameVariant = useResponsiveValue<'full' | 'simple'>('full', 'simple');
+  const gridIconSize = useResponsiveValue(48, 56);
+  const gridMenuButtonSize = '28px';
 
   // Sorting logic - Folders first, then files (standard document management practice)
   const sortedItems = useMemo(() => {
@@ -1101,11 +1107,10 @@ export const PropertyDetailsModal = ({
         }
       }}
     >
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative overflow-hidden"
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[calc(100vw-20px)] sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative overflow-hidden"
            style={{ 
              borderRadius: '1.5rem', 
              ...getModalDimensions(),
-             maxWidth: isMobile ? 'calc(100vw - 20px)' : undefined,
            }}>
         
         {/* Header */}
@@ -1195,7 +1200,7 @@ export const PropertyDetailsModal = ({
               }}
               title="Close"
             >
-              <svg className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -1298,12 +1303,11 @@ export const PropertyDetailsModal = ({
               )}
               
               {/* Search Bar - Always visible with enhanced mobile positioning */}
-              <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-3' : 'py-4'} bg-white`} style={{
+              <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-3' : 'py-4'} bg-white min-h-[72px] sm:min-h-0`} style={{
                 // Ensure search bar is always above mobile browser chrome
                 position: 'sticky',
                 top: breadcrumbPath.length > 0 ? '0' : '0',
                 zIndex: 60, // Higher z-index to ensure it stays above everything
-                minHeight: isMobile ? '72px' : 'auto', // Minimum height for mobile touch
               }}>
                 <div className="relative">
                   <input
@@ -1311,12 +1315,7 @@ export const PropertyDetailsModal = ({
                     placeholder="Search files and folders..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className={`w-full ${searchPadding} bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-10 ${searchQuery ? 'pr-10' : ''} text-black placeholder-gray-400`}
-                    style={{
-                      // Prevent zoom on iOS
-                      fontSize: isMobile ? '16px' : undefined,
-                      minHeight: isMobile ? '48px' : 'auto',
-                    }}
+                    className={`w-full ${searchPadding} min-h-[48px] sm:min-h-0 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-10 ${searchQuery ? 'pr-10' : ''} text-black placeholder-gray-400`}
                   />
                   <svg className={`absolute left-3 ${searchIconPos} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <circle cx="11" cy="11" r="8" />
@@ -1379,119 +1378,27 @@ export const PropertyDetailsModal = ({
                         const folder = item;
                         return (
                           <div key={`folder-${folder.id}`}>
-                            {/* Desktop Folder Layout */}
                             <div
-                              className="hidden sm:grid grid-cols-12 gap-4 items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
-                              style={{ cursor: 'pointer', minHeight: 40 }}
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[56px] sm:min-h-[40px] hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
+                              style={{ cursor: 'pointer' }}
                               onClick={() => {
-                                // If any menu is open, close it instead of navigating to folder
                                 if (fileMenuId || folderMenuId) {
-                                  setFileMenuId(null);
-                                  setFolderMenuId(null);
+                                  closeMenus();
                                   return;
                                 }
-                                
-                                // Clear search when entering a folder
-                                setSearchQuery('');
-                                onFolderChange(folder.id);
-                              }}
-                            >
-                              <div className="col-span-7 flex items-center min-w-0">
-                                <HeroFolderIcon style={{ width: 28, height: 28, color: '#fbbf24' }} />
-                                <div className="ml-3 flex-1 min-w-0">
-                                  {renamingFileId === folder.id ? (
-                                    <RenameInput
-                                      value={renamingFileName}
-                                      onChange={setRenamingFileName}
-                                      onBlur={async () => {
-                                        const trimmed = renamingFileName.trim();
-                                        if (trimmed) {
-                                          await handleRename(folder, trimmed);
-                                        } else {
-                                          setRenamingFileId(null);
-                                          setRenamingFileName('');
-                                        }
-                                      }}
-                                      onCancel={() => {
-                                        setRenamingFileId(null);
-                                        setRenamingFileName('');
-                                      }}
-                                      onSave={async () => {
-                                        const trimmed = renamingFileName.trim();
-                                        if (trimmed) {
-                                          await handleRename(folder, trimmed);
-                                        }
-                                      }}
-                                      placeholder="Folder name"
-                                      variant="simple"
-                                      className="w-full"
-                                    />
-                                  ) : (
-                                    <div className="text-gray-900 font-medium truncate">
-                                      {folder.name}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="col-span-3 text-xs text-gray-500">
-                                {formatDate(folder.created_at)}
-                              </div>
-                              <div className="col-span-2 flex items-center justify-end relative">
-                                <button
-                                  className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
-                                  style={{ minWidth: 24, minHeight: 24 }}
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    // Close any open menus first
-                                    setFileMenuId(null);
-                                    setFolderMenuId(null);
-                                    // Then open this menu if not already open
-                                    const newMenuId = folderMenuId === folder.id ? null : folder.id;
-                                    setFolderMenuId(newMenuId);
-                                    if (newMenuId) {
-                                      calculateMenuPosition(e.currentTarget, folder.id);
-                                    }
-                                  }}
-                                  title="Folder actions"
-                                >
-                                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                    <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
-                                  </svg>
-                                </button>
-                                <FolderMenu
-                                  folder={folder}
-                                  isOpen={folderMenuId === folder.id}
-                                  onClose={() => setFolderMenuId(null)}
-                                  onRename={(folder) => {
-                                    setRenamingFileId(folder.id);
-                                    setRenamingFileName(folder.name);
-                                  }}
-                                  onDelete={onFolderDelete}
-                                  menuPosition={menuPosition[folder.id] || {}}
-                                  menuRef={folderMenuRef}
-                                />
-                              </div>
-                            </div>
 
-                            {/* Mobile Folder Layout */}
-                            <div
-                              className={`sm:hidden flex items-center justify-between ${listItemPadding} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
-                              style={{ cursor: 'pointer', minHeight: listItemMinHeight }}
-                              onClick={() => {
-                                // If any menu is open, close it instead of navigating to folder
-                                if (fileMenuId || folderMenuId) {
-                                  setFileMenuId(null);
-                                  setFolderMenuId(null);
-                                  return;
-                                }
-                                
-                                // Clear search when entering a folder
                                 setSearchQuery('');
                                 onFolderChange(folder.id);
                               }}
                             >
-                              <div className="flex items-center min-w-0 flex-1">
-                                <HeroFolderIcon style={{ width: 32, height: 32, color: '#fbbf24' }} />
+                              <div className="flex items-center min-w-0 flex-1 sm:col-span-7">
+                                <HeroFolderIcon
+                                  style={{
+                                    width: listIconSize,
+                                    height: listIconSize,
+                                    color: '#fbbf24'
+                                  }}
+                                />
                                 <div className="ml-3 flex-1 min-w-0">
                                   {renamingFileId === folder.id ? (
                                     <RenameInput
@@ -1517,31 +1424,31 @@ export const PropertyDetailsModal = ({
                                         }
                                       }}
                                       placeholder="Folder name"
-                                      variant="full"
-                                      isMobile={isMobile}
+                                      variant={listRenameVariant}
                                       className="w-full"
                                     />
                                   ) : (
                                     <>
-                                      <div className="text-gray-900 font-semibold truncate text-base">
+                                      <div className="text-gray-900 font-medium truncate">
                                         {folder.name}
                                       </div>
-                                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+                                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 sm:hidden">
                                         <span>{formatDate(folder.created_at)}</span>
                                       </div>
                                     </>
                                   )}
                                 </div>
                               </div>
-                              <div className="relative">
+                              <div className="hidden sm:block sm:col-span-3 text-xs text-gray-500">
+                                {formatDate(folder.created_at)}
+                              </div>
+                              <div className="relative flex items-center justify-end sm:col-span-2">
                                 <button
-                                  className="p-2 rounded hover:bg-gray-200 ml-2 flex-shrink-0"
+                                  className="p-2 sm:p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex-shrink-0"
+                                  style={{ minWidth: 24, minHeight: 24 }}
                                   onClick={e => {
                                     e.stopPropagation();
-                                    // Close any open menus first
-                                    setFileMenuId(null);
-                                    setFolderMenuId(null);
-                                    // Then open this folder menu if not already open
+                                    closeMenus();
                                     const newMenuId = folderMenuId === folder.id ? null : folder.id;
                                     setFolderMenuId(newMenuId);
                                     if (newMenuId) {
@@ -1550,7 +1457,7 @@ export const PropertyDetailsModal = ({
                                   }}
                                   title="Folder actions"
                                 >
-                                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <svg className="w-5 h-5 sm:w-4 sm:h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -1576,131 +1483,19 @@ export const PropertyDetailsModal = ({
                         const [, ext] = splitFileNameAndExt(file.file_name);
                         return (
                           <div key={`file-${file.id}`}>
-                            {/* Desktop File Layout */}
                             <div
-                              className="hidden sm:grid grid-cols-12 gap-4 items-center px-3 py-2 hover:bg-gray-100 rounded-lg transition group border border-gray-100 mb-1"
-                              style={{ cursor: 'pointer', minHeight: 40 }}
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[56px] sm:min-h-[40px] hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
+                              style={{ cursor: 'pointer' }}
                               onClick={async (e) => {
                                 if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
                                   return;
                                 }
-                                
-                                // If any menu is open, close it instead of opening the file
-                                if (fileMenuId || folderMenuId) {
-                                  setFileMenuId(null);
-                                  setFolderMenuId(null);
-                                  return;
-                                }
-                                
-                                try {
-                                  await openFileInline(file);
-                                } catch (error) {
-                                  console.error('Error opening file:', error);
-                                  alert('Unable to open file. Please try again.');
-                                }
-                              }}
-                            >
-                              <div className="col-span-7 flex items-center min-w-0">
-                                <FileIcon
-                                  type={file.file_name.split('.').pop() || 'file'}
-                                  size={28}
-                                />
-                                <div className="ml-3 flex-1 min-w-0 text-gray-900 font-medium truncate">
-                                  {renamingFileId === file.id ? (
-                                    <RenameInput
-                                      value={renamingFileName}
-                                      onChange={setRenamingFileName}
-                                      onBlur={async () => {
-                                        const trimmed = renamingFileName.trim();
-                                        if (trimmed) {
-                                          await handleRename(file, trimmed);
-                                        } else {
-                                          setRenamingFileId(null);
-                                          setRenamingFileName('');
-                                        }
-                                      }}
-                                      onCancel={() => {
-                                        setRenamingFileId(null);
-                                        setRenamingFileName('');
-                                      }}
-                                      onSave={async () => {
-                                        const trimmed = renamingFileName.trim();
-                                        if (trimmed) {
-                                          await handleRename(file, trimmed);
-                                        }
-                                      }}
-                                      extension={ext}
-                                      placeholder="File name"
-                                      variant="simple"
-                                    />
-                                  ) : (
-                                    <span className="text-gray-900 font-medium truncate">
-                                      {getFileNameWithoutExtension(file.file_name)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="col-span-3 text-xs text-gray-500">
-                                {formatDate(file.modified_at || file.uploaded_at)}
-                              </div>
-                              <div className="col-span-2 flex items-center justify-end relative">
-                                <span className="hidden sm:inline-block text-xs text-gray-500 mr-2">{formatFileSize(file.file_size)}</span>
-                                <button
-                                  className="p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200"
-                                  style={{ minWidth: 24, minHeight: 24 }}
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    // Close any open menus first
-                                    setFileMenuId(null);
-                                    setFolderMenuId(null);
-                                    // Then open this menu if not already open
-                                    const newMenuId = fileMenuId === file.id ? null : file.id;
-                                    setFileMenuId(newMenuId);
-                                    if (newMenuId) {
-                                      calculateMenuPosition(e.currentTarget, file.id);
-                                    }
-                                  }}
-                                  title="File actions"
-                                >
-                                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                    <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
-                                  </svg>
-                                </button>
-                                <FileMenu
-                                  file={file}
-                                  isOpen={fileMenuId === file.id}
-                                  onClose={() => setFileMenuId(null)}
-                                  onRename={(file) => {
-                                    setRenamingFileId(file.id);
-                                    setRenamingFileName(file.file_name);
-                                  }}
-                                  onMove={onFileMove ? (file) => {
-                                    setMoveFileTarget(file);
-                                    setShowMoveModal(true);
-                                  } : undefined}
-                                  onDelete={onFileDelete}
-                                  menuPosition={menuPosition[file.id] || {}}
-                                  menuRef={fileMenuRef}
-                                />
-                              </div>
-                            </div>
 
-                            {/* Mobile File Layout */}
-                            <div
-                              className={`sm:hidden flex items-center justify-between ${listItemPadding} hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
-                              style={{ cursor: 'pointer', minHeight: listItemMinHeight }}
-                              onClick={async (e) => {
-                                if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
-                                  return;
-                                }
-                                
-                                // If any menu is open, close it instead of opening the file
                                 if (fileMenuId || folderMenuId) {
-                                  setFileMenuId(null);
-                                  setFileMenuId(null);
+                                  closeMenus();
                                   return;
                                 }
-                                
+
                                 try {
                                   await openFileInline(file);
                                 } catch (error) {
@@ -1709,10 +1504,10 @@ export const PropertyDetailsModal = ({
                                 }
                               }}
                             >
-                              <div className="flex items-center min-w-0 flex-1">
+                              <div className="flex items-center min-w-0 flex-1 sm:col-span-7">
                                 <FileIcon
                                   type={file.file_name.split('.').pop() || 'file'}
-                                  size={32}
+                                  size={listIconSize}
                                 />
                                 <div className="ml-3 flex-1 min-w-0">
                                   {renamingFileId === file.id ? (
@@ -1738,16 +1533,16 @@ export const PropertyDetailsModal = ({
                                           await handleRename(file, trimmed);
                                         }
                                       }}
+                                      extension={listRenameVariant === 'simple' ? ext : undefined}
                                       placeholder="File name"
-                                      variant="full"
-                                      isMobile={isMobile}
+                                      variant={listRenameVariant}
                                     />
                                   ) : (
                                     <>
-                                      <div className="text-gray-900 font-semibold truncate text-base">
+                                      <span className="text-gray-900 font-medium truncate">
                                         {getFileNameWithoutExtension(file.file_name)}
-                                      </div>
-                                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+                                      </span>
+                                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 sm:hidden">
                                         <span>{formatDate(file.modified_at || file.uploaded_at)}</span>
                                         <span>•</span>
                                         <span>{formatFileSize(file.file_size)}</span>
@@ -1756,15 +1551,17 @@ export const PropertyDetailsModal = ({
                                   )}
                                 </div>
                               </div>
-                              <div className="relative">
+                              <div className="hidden sm:block sm:col-span-3 text-xs text-gray-500">
+                                {formatDate(file.modified_at || file.uploaded_at)}
+                              </div>
+                              <div className="relative flex items-center justify-end sm:col-span-2">
+                                <span className="hidden sm:inline-block text-xs text-gray-500 mr-2">{formatFileSize(file.file_size)}</span>
                                 <button
-                                  className="p-2 rounded hover:bg-gray-200 ml-2 flex-shrink-0"
+                                  className="p-2 sm:p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex-shrink-0"
+                                  style={{ minWidth: 24, minHeight: 24 }}
                                   onClick={e => {
                                     e.stopPropagation();
-                                    // Close any open menus first
-                                    setFileMenuId(null);
-                                    setFolderMenuId(null);
-                                    // Then open this menu if not already open
+                                    closeMenus();
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
                                     if (newMenuId) {
@@ -1773,7 +1570,7 @@ export const PropertyDetailsModal = ({
                                   }}
                                   title="File actions"
                                 >
-                                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <svg className="w-5 h-5 sm:w-4 sm:h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -1801,7 +1598,7 @@ export const PropertyDetailsModal = ({
                     })
                   ) : (
                     // Grid View (new iOS Files-style layout)
-                    <div className={`grid gap-3 ${isMobile ? 'grid-cols-3' : 'grid-cols-4 sm:grid-cols-5 lg:grid-cols-6'} p-2`}>
+                    <div className="grid gap-3 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 p-2">
                       {sortedItems.map(item => {
                         if (item.itemType === 'folder') {
                           // Grid Folder Item
@@ -1817,18 +1614,15 @@ export const PropertyDetailsModal = ({
                               }}
                             >
                               <div className="relative">
-                                <HeroFolderIcon style={{ width: isMobile ? 48 : 56, height: isMobile ? 48 : 56, color: '#3b82f6' }} />
+                                <HeroFolderIcon style={{ width: gridIconSize, height: gridIconSize, color: '#3b82f6' }} />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className={`absolute ${isMobile ? '-top-2 -right-2' : '-top-2 -right-2'} rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation ${
-                                    isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                                  }`}
+                                  className="absolute -top-2 -right-2 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                                   onClick={e => {
                                     e.stopPropagation();
                                     e.preventDefault(); // Prevent double-tap zoom on mobile
                                     // Close any open menus first
-                                    setFileMenuId(null);
-                                    setFolderMenuId(null);
+                                    closeMenus();
                                     // Then open this menu if not already open
                                     const newMenuId = folderMenuId === folder.id ? null : folder.id;
                                     setFolderMenuId(newMenuId);
@@ -1840,8 +1634,7 @@ export const PropertyDetailsModal = ({
                                     e.stopPropagation();
                                     e.preventDefault();
                                     // Close any open menus first
-                                    setFileMenuId(null);
-                                    setFolderMenuId(null);
+                                    closeMenus();
                                     // Then open this menu if not already open
                                     const newMenuId = folderMenuId === folder.id ? null : folder.id;
                                     setFolderMenuId(newMenuId);
@@ -1851,16 +1644,16 @@ export const PropertyDetailsModal = ({
                                   }}
                                   style={{ 
                                     zIndex: 10,
-                                    width: isMobile ? '28px' : '28px', // Increased from 20px for better mobile tapping
-                                    height: isMobile ? '28px' : '28px',
-                                    minWidth: isMobile ? '28px' : '28px',
-                                    minHeight: isMobile ? '28px' : '28px',
+                                    width: gridMenuButtonSize,
+                                    height: gridMenuButtonSize,
+                                    minWidth: gridMenuButtonSize,
+                                    minHeight: gridMenuButtonSize,
                                     touchAction: 'manipulation', // Better touch handling
                                     cursor: 'pointer'
                                   }}
                                   aria-label="Folder actions"
                                 >
-                                  <svg className={`${isMobile ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-gray-700`} fill="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -1897,11 +1690,10 @@ export const PropertyDetailsModal = ({
                                     }}
                                     placeholder="Folder name"
                                     variant="grid"
-                                    isMobile={isMobile}
                                   />
                                 ) : (
                                   <>
-                                    <div className={`font-medium text-gray-900 truncate ${isMobile ? 'text-xs' : 'text-sm'} leading-tight`}>
+                                    <div className="font-medium text-gray-900 truncate text-xs sm:text-sm leading-tight">
                                       {folder.name}
                                     </div>
                                     <div className="text-xs text-gray-500 mt-0.5">
@@ -1927,8 +1719,7 @@ export const PropertyDetailsModal = ({
                                 
                                 // If any menu is open, close it instead of opening the file
                                 if (fileMenuId || folderMenuId) {
-                                  setFileMenuId(null);
-                                  setFolderMenuId(null);
+                                  closeMenus();
                                   return;
                                 }
                                 
@@ -1944,19 +1735,16 @@ export const PropertyDetailsModal = ({
                                 <FileThumbnail
                                   fileName={file.file_name}
                                   propertyId={file.property_id}
-                                  size={isMobile ? 48 : 56}
+                                  size={gridIconSize}
                                 />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className={`absolute -top-2 -right-2 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation ${
-                                    isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                                  }`}
+                                  className="absolute -top-2 -right-2 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                                   onClick={e => {
                                     e.stopPropagation();
                                     e.preventDefault(); // Prevent double-tap zoom on mobile
                                     // Close any open menus first
-                                    setFileMenuId(null);
-                                    setFolderMenuId(null);
+                                    closeMenus();
                                     // Then open this menu if not already open
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
@@ -1968,8 +1756,7 @@ export const PropertyDetailsModal = ({
                                     e.stopPropagation();
                                     e.preventDefault();
                                     // Close any open menus first
-                                    setFileMenuId(null);
-                                    setFolderMenuId(null);
+                                    closeMenus();
                                     // Then open this menu if not already open
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
@@ -1979,16 +1766,16 @@ export const PropertyDetailsModal = ({
                                   }}
                                   style={{ 
                                     zIndex: 10,
-                                    width: isMobile ? '28px' : '28px', // Increased from 20px for better mobile tapping
-                                    height: isMobile ? '28px' : '28px',
-                                    minWidth: isMobile ? '28px' : '28px',
-                                    minHeight: isMobile ? '28px' : '28px',
+                                    width: gridMenuButtonSize,
+                                    height: gridMenuButtonSize,
+                                    minWidth: gridMenuButtonSize,
+                                    minHeight: gridMenuButtonSize,
                                     touchAction: 'manipulation', // Better touch handling
                                     cursor: 'pointer'
                                   }}
                                   aria-label="File actions"
                                 >
-                                  <svg className={`${isMobile ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-gray-700`} fill="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -2030,11 +1817,10 @@ export const PropertyDetailsModal = ({
                                     extension={ext}
                                     placeholder="File name"
                                     variant="grid"
-                                    isMobile={isMobile}
                                   />
                                 ) : (
                                   <>
-                                    <div className={`font-medium text-gray-900 truncate ${isMobile ? 'text-xs' : 'text-sm'} leading-tight`}>
+                                    <div className="font-medium text-gray-900 truncate text-xs sm:text-sm leading-tight">
                                       {getFileNameWithoutExtension(file.file_name)}
                                     </div>
                                     <div className="text-xs text-gray-500 mt-0.5 space-y-0.5">
@@ -2070,11 +1856,7 @@ export const PropertyDetailsModal = ({
 
         {/* Upload Progress Toasts - Apple-inspired design */}
         {pendingUploads.length > 0 && (
-          <div className={`fixed z-[9999] ${
-            isMobile 
-              ? 'top-4 left-4 right-4' 
-              : 'top-4 right-4 w-96'
-          }`}>
+          <div className="fixed z-[9999] top-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96">
             {/* Summary toast for multiple uploads */}
             {pendingUploads.length > 1 && (
               <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-4 mb-3 transform transition-all duration-300 ease-out">
@@ -2281,26 +2063,24 @@ export const PropertyDetailsModal = ({
         `}</style>
 
         {/* Action Buttons */}
-        <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0" style={{
-          height: isMobile ? '56px' : '70px', // Reduced height for mobile
-          minHeight: isMobile ? '56px' : '70px',
-          paddingBottom: isMobile ? 'env(safe-area-inset-bottom, 0px)' : '0px',
+        <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0 h-14 min-h-[56px] sm:h-[70px] sm:min-h-[70px]" style={{
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           ...getMobileStyles('container')
         }}>
           <button
-            className={`w-1/2 ${isMobile ? 'py-2.5 px-4' : 'h-full'} bg-gray-100 text-blue-700 ${isMobile ? 'text-base' : 'text-lg'} font-bold flex items-center justify-center gap-2 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95`}
+            className="w-1/2 py-2.5 px-4 sm:py-0 sm:px-0 sm:h-full bg-gray-100 text-blue-700 text-base sm:text-lg font-bold flex items-center justify-center gap-2 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95"
             onClick={() => setCreatingFolder(true)}
           >
-            <svg className={`${isMobile ? 'w-5 h-5' : 'w-7 h-7'}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 sm:w-7 sm:h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             Create
           </button>
           <button
-            className={`w-1/2 ${isMobile ? 'py-2.5 px-4' : 'h-full'} bg-blue-600 text-white ${isMobile ? 'text-base' : 'text-lg'} font-bold flex items-center justify-center gap-2 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95`}
+            className="w-1/2 py-2.5 px-4 sm:py-0 sm:px-0 sm:h-full bg-blue-600 text-white text-base sm:text-lg font-bold flex items-center justify-center gap-2 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95"
             onClick={() => document.getElementById('file-upload-input')?.click()}
           >
-            <svg className={`${isMobile ? 'w-5 h-5' : 'w-7 h-7'}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 sm:w-7 sm:h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5 5V3" />
             </svg>
             Upload

@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { useUserProperties } from '../hooks/useUserProperties';
+import { useResponsiveValue } from '../hooks/useResponsiveValue';
 import type { PropertyWithFileCount } from '../../types';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import { supabase } from '../utils/supabaseClient';
@@ -30,8 +31,10 @@ export const ListView = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const propertyMenuRef = useRef<HTMLDivElement>(null);
   
-  const { isMobile, getModalDimensions, mobileClasses } = useMobileViewport();
+  const { getModalDimensions, mobileClasses } = useMobileViewport();
   const { properties, loading, error, refreshProperties } = useUserProperties();
+  const streetViewSize = useResponsiveValue('200x200', '160x160');
+  const streetViewDimension = useResponsiveValue(200, 160);
 
   // Parse address for clean display (same as PropertyDetailsModal)
   const parseAddress = (fullAddress: string) => {
@@ -72,12 +75,12 @@ export const ListView = ({
     if (!isOpen) return;
     // avoid focusing on touch devices to prevent mobile keyboard popups
     const isTouch = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window);
-    if (!isTouch && !isMobile && searchInputRef.current) {
+    if (!isTouch && searchInputRef.current) {
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 100);
     }
-  }, [isOpen, isMobile]);
+  }, [isOpen]);
 
   // Clear search when modal closes
   useEffect(() => {
@@ -192,12 +195,12 @@ export const ListView = ({
           <div className="flex flex-col min-w-0 flex-1 mr-4">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-              <h1 className={`property-title ${isMobile ? 'text-lg' : 'text-xl'} font-semibold leading-tight text-gray-900`} 
+              <h1 className="property-title text-lg sm:text-xl font-semibold leading-tight text-gray-900" 
                   style={{ letterSpacing: '-0.02em' }}>
                 Properties
               </h1>
             </div>
-            <p className={`property-location ${isMobile ? 'text-sm' : 'text-base'} font-medium leading-snug text-gray-600 ml-3`} 
+            <p className="property-location text-sm sm:text-base font-medium leading-snug text-gray-600 ml-3" 
                style={{ letterSpacing: '-0.005em' }}>
               {searchQuery ? (
                 `${sortedProperties.length} of ${properties.length} properties`
@@ -210,11 +213,11 @@ export const ListView = ({
           {/* Page variant has no close button; show a subtle back link on mobile */}
           {variant === 'modal' ? (
             <button
-              className={`close-button ${isMobile ? 'p-2.5' : 'p-2.5'} rounded-full cursor-pointer flex-shrink-0 hover:bg-blue-50 transition-colors`}
+              className="close-button p-2.5 rounded-full cursor-pointer flex-shrink-0 hover:bg-blue-50 transition-colors"
               onClick={onClose}
               title="Close"
             >
-              <XMarkIcon className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} text-gray-500 hover:text-blue-600 transition-colors`} />
+              <XMarkIcon className="w-5 h-5 text-gray-500 hover:text-blue-600 transition-colors" />
             </button>
           ) : (
             <div className="flex-shrink-0">
@@ -226,7 +229,7 @@ export const ListView = ({
         </div>
 
         {/* Search Bar - integrated into modal with blue accents */}
-        <div className={`${isMobile ? 'px-6 py-4' : 'px-5 py-4'} border-b border-blue-100/60 flex-shrink-0 bg-gradient-to-b from-blue-50/40 to-white`}>
+        <div className="px-6 py-4 sm:px-5 border-b border-blue-100/60 flex-shrink-0 bg-gradient-to-b from-blue-50/40 to-white">
           <div className="relative">
             <div className="absolute left-3 top-1/2 -translate-y-1/2">
               <MagnifyingGlassIcon className="w-5 h-5 text-blue-500" />
@@ -237,10 +240,7 @@ export const ListView = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by custom name or address..."
-              className={`w-full pl-10 pr-4 py-3 bg-white border-2 border-blue-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all duration-200 text-gray-900 placeholder-gray-400 shadow-sm hover:shadow-md hover:border-blue-200 ${
-                isMobile ? 'text-base' : 'text-sm'
-              }`}
-              style={{ fontSize: isMobile ? '16px' : undefined }}
+              className="w-full pl-10 pr-4 py-3 bg-white border-2 border-blue-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all duration-200 text-gray-900 placeholder-gray-400 shadow-sm hover:shadow-md hover:border-blue-200 text-base sm:text-sm"
             />
             {searchQuery && (
               <button
@@ -316,7 +316,7 @@ export const ListView = ({
             </div>
           ) : (
             // Properties List - styled like PropertyDetailsModal file list
-            <div className={`${isMobile ? 'px-4 py-3' : 'px-5 py-3'}`}>
+            <div className="px-4 py-3 sm:px-5">
               {sortedProperties.map((property) => {
                 const { streetAddress, locationInfo } = parseAddress(property.address);
                 
@@ -329,28 +329,27 @@ export const ListView = ({
                       onPropertySelect(property);
                       if (variant === 'modal') onClose();
                     }}
-                    className={`flex items-center justify-between ${isMobile ? 'px-4 py-4' : 'px-4 py-3.5'} rounded-xl transition-all duration-200 border border-gray-200/60 mb-3 shadow-sm ${
+                    className={`flex items-center justify-between px-4 py-4 sm:py-3.5 min-h-[80px] sm:min-h-[64px] rounded-xl transition-all duration-200 border border-gray-200/60 mb-3 shadow-sm ${
                       renamingPropertyId === property.id 
                         ? 'cursor-default bg-blue-50/30 border-gray-200' 
                         : 'cursor-pointer hover:bg-blue-50/30 hover:shadow-md hover:border-blue-200/60 group active:scale-[0.998]'
                     }`}
-                    style={{ minHeight: isMobile ? '80px' : '64px' }}
                   >
                     <div className="flex items-center min-w-0 flex-1">
                       {/* Street View thumbnail - refined styling with blue accent */}
-                      <div className={`${isMobile ? 'w-20 h-20' : 'w-16 h-16'} rounded-xl overflow-hidden bg-gray-100 mr-4 flex-shrink-0 border-2 border-blue-100 shadow-sm group-hover:border-blue-400 group-hover:shadow-md transition-all duration-200 ring-2 ring-transparent group-hover:ring-blue-100`}>
+                      <div className="w-20 h-20 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-gray-100 mr-4 flex-shrink-0 border-2 border-blue-100 shadow-sm group-hover:border-blue-400 group-hover:shadow-md transition-all duration-200 ring-2 ring-transparent group-hover:ring-blue-100">
                         <Image
-                          src={`https://maps.googleapis.com/maps/api/streetview?size=${isMobile ? '200x200' : '160x160'}&location=${property.lat},${property.lng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`}
+                          src={`https://maps.googleapis.com/maps/api/streetview?size=${streetViewSize}&location=${property.lat},${property.lng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`}
                           alt="Street View preview"
-                          width={isMobile ? 200 : 160}
-                          height={isMobile ? 200 : 160}
+                          width={streetViewDimension}
+                          height={streetViewDimension}
                           className="w-full h-full object-cover"
                           unoptimized
                           onError={(e) => {
                             const t = e.currentTarget as HTMLImageElement;
                             if (t.dataset.fallback !== '1') {
                               t.dataset.fallback = '1';
-                              t.src = `https://maps.googleapis.com/maps/api/staticmap?center=${property.lat},${property.lng}&zoom=17&size=${isMobile ? '200x200' : '160x160'}&maptype=roadmap&markers=color:blue%7C${property.lat},${property.lng}&key=${GOOGLE_MAPS_API_KEY}`;
+                              t.src = `https://maps.googleapis.com/maps/api/staticmap?center=${property.lat},${property.lng}&zoom=17&size=${streetViewSize}&maptype=roadmap&markers=color:blue%7C${property.lat},${property.lng}&key=${GOOGLE_MAPS_API_KEY}`;
                             }
                           }}
                         />
@@ -359,47 +358,42 @@ export const ListView = ({
                       {/* Normal Property Display */}
                       <div className="flex-1 min-w-0">
                         {/* Custom Name or Street Address - matches PropertyDetailsModal styling */}
-                        <div className={`text-gray-900 font-semibold truncate ${isMobile ? 'text-lg' : 'text-base'} group-hover:text-blue-600 transition-colors duration-200`} style={{ letterSpacing: '-0.01em' }}>
+                        <div className="text-gray-900 font-semibold truncate text-lg sm:text-base group-hover:text-blue-600 transition-colors duration-200" style={{ letterSpacing: '-0.01em' }}>
                           {property.label || streetAddress || property.address}
                         </div>
                         
                         {/* Show real address below custom name, or just location info if no custom name */}
                         {property.label && (
-                          <div className={`${isMobile ? 'text-sm mt-1' : 'text-xs mt-0.5'} text-gray-500 italic truncate`}>
+                          <div className="text-sm sm:text-xs mt-1 sm:mt-0.5 text-gray-500 italic truncate">
                             {streetAddress}
                           </div>
                         )}
                         
                         {/* Location Info and File Count */}
-                        <div className={`${isMobile ? 'text-sm mt-1.5' : 'text-xs mt-1'} text-gray-500`}>
-                          {isMobile ? (
-                            // Mobile: Stack location and file count vertically for better readability
-                            <div className="space-y-0.5">
-                              {locationInfo && (
-                                <div className="truncate">{locationInfo}</div>
-                              )}
-                              <div className="text-gray-600 font-medium">
-                                {property.file_count} file{property.file_count === 1 ? '' : 's'}
-                              </div>
+                        <div className="text-sm sm:text-xs mt-1.5 sm:mt-1 text-gray-500">
+                          <div className="space-y-0.5 sm:hidden">
+                            {locationInfo && (
+                              <div className="truncate">{locationInfo}</div>
+                            )}
+                            <div className="text-gray-600 font-medium">
+                              {property.file_count} file{property.file_count === 1 ? '' : 's'}
                             </div>
-                          ) : (
-                            // Desktop: Keep inline with dots
-                            <div className="flex items-center gap-2">
-                              {locationInfo && (
-                                <>
-                                  <span className="truncate">{locationInfo}</span>
-                                  <span className="text-gray-400">•</span>
-                                </>
-                              )}
-                              <span className="text-gray-600 font-medium">{property.file_count} file{property.file_count === 1 ? '' : 's'}</span>
-                              {property.last_accessed && (
-                                <>
-                                  <span className="text-gray-400">•</span>
-                                  <span>Last accessed {new Date(property.last_accessed).toLocaleDateString()}</span>
-                                </>
-                              )}
-                            </div>
-                          )}
+                          </div>
+                          <div className="hidden sm:flex items-center gap-2">
+                            {locationInfo && (
+                              <>
+                                <span className="truncate">{locationInfo}</span>
+                                <span className="text-gray-400">•</span>
+                              </>
+                            )}
+                            <span className="text-gray-600 font-medium">{property.file_count} file{property.file_count === 1 ? '' : 's'}</span>
+                            {property.last_accessed && (
+                              <>
+                                <span className="text-gray-400">•</span>
+                                <span>Last accessed {new Date(property.last_accessed).toLocaleDateString()}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -569,13 +563,10 @@ export const ListView = ({
       role="dialog"
     >
       <div 
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-md sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl flex flex-col border border-blue-100 relative overflow-hidden"
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-[calc(100vw-24px)] sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl flex flex-col border border-blue-100 relative overflow-hidden m-3 sm:m-0 max-h-[calc(100dvh-96px)] sm:max-h-none"
         style={{ 
           borderRadius: '1.5rem', 
           ...getModalDimensions(),
-          maxWidth: isMobile ? 'calc(100vw - 24px)' : undefined,
-          margin: isMobile ? '12px' : undefined,
-          maxHeight: isMobile ? 'calc(100dvh - 96px)' : undefined,
         }}
       >
         {content}

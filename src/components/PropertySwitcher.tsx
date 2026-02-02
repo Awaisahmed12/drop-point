@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useUserProperties } from '../hooks/useUserProperties';
 import type { PropertyWithFileCount } from '../../types';
-import { useMobileViewport } from '../hooks/useMobileViewport';
 
 interface PropertySwitcherProps {
   currentProperty: PropertyWithFileCount | null;
@@ -20,7 +19,6 @@ export const PropertySwitcher = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  const { isMobile } = useMobileViewport();
   const { properties, loading } = useUserProperties();
 
   // Filter properties based on search query (keep current property but we'll handle it specially)
@@ -125,15 +123,15 @@ export const PropertySwitcher = ({
           Switch
         </span>
         <ChevronDownIcon 
-          className={`${isMobile ? 'w-4 h-4' : 'w-4 h-4'} text-gray-700 transition-transform duration-200 ${
+          className={`w-4 h-4 text-gray-700 transition-transform duration-200 ${
             isOpen ? 'rotate-180' : ''
           }`} 
         />
       </button>
 
       {/* Mobile: Large Centered Dropdown */}
-      {isOpen && isMobile && (
-        <div className="fixed inset-4 z-[9999] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col" style={{ 
+      {isOpen && (
+        <div className="fixed inset-4 z-[9999] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col sm:hidden" style={{ 
           top: '10vh',
           bottom: '10vh',
           left: '5vw',
@@ -252,8 +250,8 @@ export const PropertySwitcher = ({
       )}
 
       {/* Desktop: Dropdown Menu */}
-      {isOpen && !isMobile && (
-        <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{ 
+      {isOpen && (
+        <div className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] hidden sm:block" style={{ 
           zIndex: 9999,
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
           width: 'min(50vw, 400px)',
