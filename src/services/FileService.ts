@@ -14,8 +14,9 @@ export class FileService {
     file: File,
     propertyId: string,
     fileName: string,
-    folderId: string | null = null
+    _folderId: string | null = null
   ): Promise<{ path: string }> {
+    void _folderId;
     const filePath = `${propertyId}/${fileName}`;
     
     const { data, error } = await supabase.storage
@@ -112,6 +113,30 @@ export class FileService {
       console.error('[FileService] Error deleting file from database:', dbError);
       throw dbError;
     }
+  }
+
+  /**
+   * Fetch files for a property
+   */
+  async getPropertyFiles(propertyId: string): Promise<PropertyFile[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data, error } = await supabase
+      .from('property_files')
+      .select('*')
+      .eq('property_id', propertyId)
+      .eq('user_id', user.id)
+      .order('uploaded_at', { ascending: false });
+
+    if (error) {
+      console.error('[FileService] Error fetching property files:', error);
+      throw error;
+    }
+
+    return data || [];
   }
 
   /**

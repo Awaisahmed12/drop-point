@@ -48,15 +48,6 @@ import {
 
 // Row component moved to PropertyDetailsModal
 
-// Global cache interface
-interface GlobalCache {
-  __droppoint_property_cache?: Record<string, {
-    files: PropertyFile[];
-    folders: PropertyFolder[];
-    lastFetched: number;
-  }>;
-}
-
 // Custom pin icon for properties
 const createPropertyPinIcon = (selected: boolean = false) => ({
   url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
@@ -106,14 +97,14 @@ function MapPage() {
 
   const {
     userProperties, setUserProperties, selectedProperty, setSelectedProperty,
-    savedProperty, setSavedProperty, propertiesLoaded, setPropertiesLoaded,
+    savedProperty, setSavedProperty, propertiesLoaded,
     loadUserProperties
   } = propertyState;
 
   const {
     propertyFiles, setPropertyFiles, folders, setFolders,
     selectedFolder, setSelectedFolder, foldersLoading, setFoldersLoading,
-    filesLoading, setFilesLoading, propertyCache, setPropertyCache,
+    filesLoading, setFilesLoading, setPropertyCache,
     isPropertyDataCached, cachePropertyData, getCachedPropertyData
   } = propertyData;
 
@@ -128,11 +119,11 @@ function MapPage() {
   } = modalState;
 
   const {
-    pendingUploads, setPendingUploads, renamingFileId, setRenamingFileId
+    pendingUploads, setPendingUploads, setRenamingFileId
   } = uploadState;
 
   const {
-    folderMenuId, setFolderMenuId, fileMenuId, setFileMenuId,
+    setFolderMenuId, setFileMenuId,
     folderMenuRef, fileMenuRef
   } = menuState;
 
@@ -1106,6 +1097,9 @@ function MapPage() {
         });
 
         // Update the saved property with the new ID
+        if (!newProperty.id) {
+          throw new Error('Property could not be saved. Please try again.');
+        }
         propertyId = newProperty.id;
         setSavedProperty(newProperty);
         

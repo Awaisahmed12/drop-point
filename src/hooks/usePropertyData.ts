@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { PropertyFile, PropertyFolder } from '../../types';
-import { propertyService } from '../services';
 import { supabase } from '../utils/supabaseClient';
 
 interface PropertyDataCache {

@@ -114,12 +114,12 @@ export const PropertyDetailsModal = ({
     if (typeof window !== 'undefined') {
       localStorage.setItem('droppoint-view-mode', viewMode);
     }
-  }, [viewMode, closeMenus]);
+  }, [viewMode]);
 
   // Blanket fix: Close all menus when view mode changes
   useEffect(() => {
     closeMenus();
-  }, [viewMode]);
+  }, [viewMode, closeMenus]);
 
   // Blanket fix: Close all menus when modal closes or opens
   useEffect(() => {
