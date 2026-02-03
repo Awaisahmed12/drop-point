@@ -240,7 +240,19 @@ function MapPage() {
     // Start preloading after a short delay to not block initial map load
     const timer = setTimeout(preloadUserProperties, 1000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [
+    setMapCenter,
+    setZoom,
+    setSavedProperty,
+    setPropertyFiles,
+    setFolders,
+    setSelectedFolder,
+    setFoldersLoading,
+    setFilesLoading,
+    setAddress,
+    setSnappedLatLng,
+    setShowDetailsModal
+  ]);
 
   // Restore map position and selected property from session storage
   useEffect(() => {
@@ -353,7 +365,7 @@ function MapPage() {
     } else if (!initialCenterResolved) {
       setInitialCenterResolved(true);
     }
-  }, [zoom, initialCenterResolved]);
+  }, [zoom, initialCenterResolved, setInitialCenterResolved, setMapCenter, setZoom]);
 
   // Fetch predictions as user types
   useEffect(() => {
@@ -371,7 +383,7 @@ function MapPage() {
     return () => {
       active = false;
     };
-  }, [inputValue]);
+  }, [inputValue, setPredictions]);
 
 
 
@@ -414,7 +426,7 @@ function MapPage() {
     } else {
       setMapType(DEFAULT_MAP_TYPE);
     }
-  }, []);
+  }, [setMapType]);
 
   // When mapType changes, save to localStorage and update map if loaded
   useEffect(() => {
@@ -478,7 +490,7 @@ function MapPage() {
       saveAddressToCache(lat, lng, errorAddress, null);
     }
     setAddressLoading(false);
-  }, []); // Empty dependency array - state setters are stable, cache functions are pure utilities
+  }, [setAddress, setAddressLoading, setSnappedLatLng]); // State setters are stable, cache utilities are pure
 
   async function fetchPredictions(input: string): Promise<Prediction[]> {
     try {
@@ -1059,7 +1071,7 @@ function MapPage() {
   // Note: propertyFiles are now managed by the property switcher, so we don't clear them here
   useEffect(() => {
     setPendingUploads([]);
-  }, [savedProperty?.id]);
+  }, [savedProperty?.id, setPendingUploads]);
 
   // File utility functions moved to utils/fileManagement.ts
 
@@ -1332,7 +1344,7 @@ function MapPage() {
     return () => {
       document.removeEventListener('click', handleClick);
     };
-  }, []);
+  }, [fileMenuRef, folderMenuRef, setFileMenuId, setFolderMenuId]);
 
   // Menu state is now managed by useMenuState hook
 
@@ -1692,7 +1704,23 @@ function MapPage() {
     
     // Start with low accuracy watch
     attemptWatch(false);
-  }, [map, isPropertyDataCached, cachePropertyData, zoom, mapCenter.lat, mapCenter.lng, fetchAddress]);
+  }, [
+    map,
+    isPropertyDataCached,
+    cachePropertyData,
+    zoom,
+    mapCenter.lat,
+    mapCenter.lng,
+    fetchAddress,
+    setSelectedProperty,
+    setAddress,
+    setAddressLoading,
+    setInputValue,
+    setMapCenter,
+    setSnappedLatLng,
+    setZoom,
+    setCurrentLocationLoading
+  ]);
 
   // Zoom handlers for mobile controls
   const handleZoomIn = useCallback(() => {
@@ -1702,7 +1730,7 @@ function MapPage() {
       map.setZoom(newZoom);
       setZoom(newZoom);
     }
-  }, [map, zoom]);
+  }, [map, zoom, setZoom]);
 
   const handleZoomOut = useCallback(() => {
     if (map) {
@@ -1711,7 +1739,7 @@ function MapPage() {
       map.setZoom(newZoom);
       setZoom(newZoom);
     }
-  }, [map, zoom]);
+  }, [map, zoom, setZoom]);
 
   // Support in-app focus current location requests (from bottom nav Map when already on map)
   useEffect(() => {
@@ -1729,7 +1757,7 @@ function MapPage() {
     };
     window.addEventListener('droppoint-toggle-map-type', toggleHandler);
     return () => window.removeEventListener('droppoint-toggle-map-type', toggleHandler);
-  }, []);
+  }, [setMapType]);
 
   // Handle map click to drop new pin
   const handleMapClick = useCallback(async (event: google.maps.MapMouseEvent) => {
@@ -1821,7 +1849,7 @@ function MapPage() {
         setAddressLoading(false);
       }
     }, 250); // Wait 250ms to detect double-click
-  }, [selectedProperty, showDropdown]);
+  }, [selectedProperty, showDropdown, setSelectedProperty, setAddressLoading, setAddress, setSnappedLatLng]);
 
   // Handle property pin click - show selection card and prefetch in background
   const handlePropertyPinClick = useCallback(async (property: Property) => {
@@ -1893,7 +1921,20 @@ function MapPage() {
     }
     
     // Do not open modal immediately; wait for user to confirm via selection card
-  }, [getCachedPropertyData, cachePropertyData, savedProperty]);
+  }, [
+    getCachedPropertyData,
+    cachePropertyData,
+    savedProperty,
+    setFolders,
+    setPropertyFiles,
+    setSelectedFolder,
+    setSelectedProperty,
+    setSavedProperty,
+    setAddress,
+    setSnappedLatLng,
+    setFoldersLoading,
+    setFilesLoading
+  ]);
 
   // Handle property selection from quick access
   const handleQuickAccessPropertySelect = useCallback(async (property: PropertyWithFileCount) => {
@@ -1918,7 +1959,7 @@ function MapPage() {
     
     // Handle the property selection (same as clicking a pin)
     await handlePropertyPinClick(propertyObj);
-  }, [map, handlePropertyPinClick]);
+  }, [map, handlePropertyPinClick, setMapCenter, setZoom]);
 
   // Handle map container click - close dropdown and blur inputs
   const handleMapContainerClick = useCallback(() => {
@@ -1927,7 +1968,7 @@ function MapPage() {
     if (document.activeElement?.tagName === 'INPUT') {
       (document.activeElement as HTMLElement).blur();
     }
-  }, []);
+  }, [setShowDropdown]);
 
   // Close details modal; navigate back to list if initiated from there
   const handleDetailsModalClose = useCallback(() => {
@@ -1944,7 +1985,7 @@ function MapPage() {
       setCameFromListView(false);
       router.push('/list');
     }
-  }, [cameFromListView, router]);
+  }, [cameFromListView, router, setShowDetailsModal, setCameFromListView]);
 
   if (loading) {
     return (
