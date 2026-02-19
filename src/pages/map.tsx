@@ -1219,7 +1219,6 @@ function MapPage() {
       const usedBytes = await getUserUsageBytes(user.id);
       const projected = usedBytes + file.size;
       if (projected > FREE_TIER_MAX_BYTES) {
-        console.warn('⛔ [UPLOAD] Quota exceeded. Used:', usedBytes, 'Attempting:', file.size);
         alert('Storage limit reached for the free plan (5 GB). Please delete files or upgrade to continue uploading.');
         // Remove pending upload entry if present
         setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
@@ -1519,18 +1518,7 @@ function MapPage() {
             handlePositionSuccess(position);
           },
           (fallbackError) => {
-            console.error('[GEOLOCATION] Fallback ALSO failed - This indicates a system-level issue!', {
-              code: fallbackError.code,
-              message: fallbackError.message,
-              PERMISSION_DENIED: fallbackError.PERMISSION_DENIED,
-              POSITION_UNAVAILABLE: fallbackError.POSITION_UNAVAILABLE,
-              TIMEOUT: fallbackError.TIMEOUT
-            });
-            console.error('🌍 [GEOLOCATION] Both high accuracy (GPS) AND low accuracy (IP/WiFi) failed.');
-            console.error('🌍 [GEOLOCATION] This means:');
-            console.error('  - Permissions are granted (browser level)');
-            console.error('  - But location services are unavailable (system level)');
-            console.error('  - Check macOS System Preferences > Security & Privacy > Location Services');
+            console.error('[GEOLOCATION] Fallback also failed:', fallbackError.message);
             handlePositionError(fallbackError, true);
           },
           {

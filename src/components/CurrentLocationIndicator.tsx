@@ -22,8 +22,6 @@ export const CurrentLocationIndicator = ({
     }
 
     const startWatching = (useHighAccuracy: boolean = true) => {
-      console.log(`🌍 [LOCATION_DOT] Starting location watch (high accuracy: ${useHighAccuracy})`);
-
       const watchOptions: PositionOptions = {
         enableHighAccuracy: useHighAccuracy,
         timeout: useHighAccuracy ? 10000 : 15000,
@@ -33,13 +31,6 @@ export const CurrentLocationIndicator = ({
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude, accuracy: positionAccuracy } = position.coords;
-          console.log('🌍 [LOCATION_DOT] Position update:', { 
-            lat: latitude, 
-            lng: longitude, 
-            accuracy: positionAccuracy,
-            highAccuracy: useHighAccuracy
-          });
-          
           hasPositionRef.current = true; // Mark that we've received a position
           setCurrentPosition({ lat: latitude, lng: longitude });
           setAccuracy(positionAccuracy || null);
@@ -49,7 +40,6 @@ export const CurrentLocationIndicator = ({
           const isTransientError = error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT;
           
           if (error.code === error.PERMISSION_DENIED) {
-            console.warn('🌍 [LOCATION_DOT] Location permission denied - stopping watch');
             if (watchIdRef.current !== null) {
               navigator.geolocation.clearWatch(watchIdRef.current);
               watchIdRef.current = null;
@@ -61,7 +51,6 @@ export const CurrentLocationIndicator = ({
           if (isTransientError) {
             // If we haven't received a position yet and high accuracy failed, try fallback
             if (!hasPositionRef.current && useHighAccuracy) {
-              console.warn('🌍 [LOCATION_DOT] Transient location error (will retry with lower accuracy):', error.message);
               if (watchIdRef.current !== null) {
                 navigator.geolocation.clearWatch(watchIdRef.current);
                 watchIdRef.current = null;
@@ -75,8 +64,6 @@ export const CurrentLocationIndicator = ({
             return;
           }
 
-          // For other errors, log as warning (not error) since we're keeping last known position
-          console.warn('🌍 [LOCATION_DOT] Location watch error:', error.message);
           // Don't clear position on error - keep last known position
         },
         watchOptions
@@ -93,19 +80,16 @@ export const CurrentLocationIndicator = ({
         (error) => {
           // If permission denied, don't retry
           if (error.code === error.PERMISSION_DENIED) {
-            console.log('🌍 [LOCATION_DOT] Location permission denied');
             return;
           }
 
           // If high accuracy failed with transient error, try with lower accuracy
           if (useHighAccuracy && (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT)) {
-            console.log('🌍 [LOCATION_DOT] Initial high accuracy failed, trying with lower accuracy...');
             tryGetInitialPosition(false);
             return;
           }
 
           // Other errors - start watching anyway (watchPosition handles errors gracefully)
-          console.log('🌍 [LOCATION_DOT] Initial position check failed, starting watch anyway:', error.message);
           startWatching(useHighAccuracy);
         },
         { 
@@ -121,7 +105,6 @@ export const CurrentLocationIndicator = ({
     // Cleanup function
     return () => {
       if (watchIdRef.current !== null) {
-        console.log('🌍 [LOCATION_DOT] Stopping location watch');
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
       }

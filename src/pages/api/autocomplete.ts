@@ -75,8 +75,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (input.trim()) {
       // Prepare Google Maps API request
       const mapsUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${apiKey}&types=address`;
-      console.log('[AUTOCOMPLETE] Fetching from Google Maps API...');
-      
       const mapsResponse = await fetch(mapsUrl);
 
       if (!mapsResponse.ok) {
@@ -85,8 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       mapsData = await mapsResponse.json();
-      console.log('[AUTOCOMPLETE] Google Maps API response status:', mapsData.status);
-      
+
       if (mapsData.status && mapsData.status !== 'OK' && mapsData.status !== 'ZERO_RESULTS') {
         console.error(`[AUTOCOMPLETE] Google Maps API status error: ${mapsData.status}`, mapsData.error_message);
         return res.status(500).json({ 
@@ -94,8 +91,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           message: mapsData.error_message 
         });
       }
-    } else {
-      console.log('[AUTOCOMPLETE] Empty input - returning user properties only');
     }
 
     // Create synthetic predictions for matching user properties
@@ -242,8 +237,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return 0;
     });
 
-    console.log('[AUTOCOMPLETE] Returning', sortedPredictions.length, 'predictions');
-    res.status(200).json({ 
+    res.status(200).json({
       predictions: sortedPredictions,
       status: mapsData.status 
     });
