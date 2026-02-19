@@ -7,6 +7,7 @@ import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
 import { supabase } from '../utils/supabaseClient';
 import { withAuth } from '../components/withAuth';
+import { useUserProperties } from '../hooks/useUserProperties';
 import { fileService, folderService } from '../services';
 import { useToast } from '../contexts/ToastContext';
 import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
@@ -25,6 +26,7 @@ function ListPage() {
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const { showToast } = useToast();
   const setRenamingFileId = useRef<((id: string | null) => void) | null>(null);
+  const { properties: allProperties } = useUserProperties();
 
   const openProperty = useCallback(async (p: { id: string | null; address: string; lat: number; lng: number; label?: string | null; notes?: string | null; }) => {
     const prop: Property = {
@@ -310,7 +312,11 @@ function ListPage() {
       <Head>
         <title>Properties - DropPoint</title>
       </Head>
-      <WebSidebar />
+      <WebSidebar
+        properties={allProperties}
+        selectedPropertyId={savedProperty?.id}
+        onPropertySelect={(property) => openProperty(property)}
+      />
       <div className="flex-1 overflow-auto pt-4 pb-20">
         <ListView
           isOpen={true}

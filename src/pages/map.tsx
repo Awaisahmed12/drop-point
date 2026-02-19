@@ -1927,6 +1927,82 @@ function MapPage() {
     setFilesLoading
   ]);
 
+  // Handle sidebar property click — skip PropertyInfoCard floater, open modal directly
+  const handleSidebarPropertySelect = useCallback(async (property: Property) => {
+    // Clear old data only when switching to a different property
+    if (savedProperty && savedProperty.id && savedProperty.id !== property.id) {
+      setFolders([]);
+      setPropertyFiles([]);
+    }
+
+    setSelectedFolder('master');
+    setSavedProperty(property);
+    setAddress(property.address);
+    setSnappedLatLng({ lat: property.lat, lng: property.lng });
+
+    // Pan map to property
+    if (map) {
+      map.panTo({ lat: property.lat, lng: property.lng });
+      map.setZoom(SEARCH_ZOOM);
+    }
+    setMapCenter({ lat: property.lat, lng: property.lng });
+    setZoom(SEARCH_ZOOM);
+
+    // Open modal immediately — no confirmation card needed
+    setShowDetailsModal(true);
+
+    // Load files/folders (check cache first)
+    const cached = await getCachedPropertyData(property.address);
+    if (cached) {
+      setFolders(cached.folders);
+      setPropertyFiles(cached.files);
+      setFoldersLoading(false);
+      setFilesLoading(false);
+    } else {
+      setFoldersLoading(true);
+      setFilesLoading(true);
+      try {
+        if (property.id) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const [folderResult, filesResult] = await Promise.all([
+              supabase
+                .from('property_folders')
+                .select('*')
+                .eq('property_id', property.id)
+                .eq('user_id', user.id)
+                .is('deleted_at', null)
+                .order('created_at', { ascending: true }),
+              supabase
+                .from('property_files')
+                .select('*')
+                .eq('property_id', property.id)
+                .order('uploaded_at', { ascending: false })
+            ]);
+            if (folderResult.data) setFolders(folderResult.data);
+            if (filesResult.data) setPropertyFiles(filesResult.data);
+            if (folderResult.data && filesResult.data) {
+              await cachePropertyData(property.address, filesResult.data, folderResult.data);
+            }
+          }
+        } else {
+          setFolders([]);
+          setPropertyFiles([]);
+        }
+      } catch (error) {
+        console.error('[SIDEBAR] Error loading property data:', error);
+      } finally {
+        setFoldersLoading(false);
+        setFilesLoading(false);
+      }
+    }
+  }, [
+    savedProperty, map, getCachedPropertyData, cachePropertyData,
+    setFolders, setPropertyFiles, setSelectedFolder, setSavedProperty,
+    setAddress, setSnappedLatLng, setMapCenter, setZoom,
+    setShowDetailsModal, setFoldersLoading, setFilesLoading
+  ]);
+
   // Handle property selection from quick access
   const handleQuickAccessPropertySelect = useCallback(async (property: PropertyWithFileCount) => {
     
@@ -2000,7 +2076,7 @@ function MapPage() {
       <WebSidebar
         properties={userProperties}
         selectedPropertyId={savedProperty?.id}
-        onPropertySelect={handlePropertyPinClick}
+        onPropertySelect={handleSidebarPropertySelect}
       />
       <div className={`flex-1 relative overflow-hidden ${mobileClasses.fullScreen}`}
            style={getMobileStyles('page')}>

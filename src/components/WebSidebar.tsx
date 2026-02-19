@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import type { Property } from '../../types';
@@ -16,13 +16,23 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
 }) => {
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Persist collapsed state
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('droppoint-sidebar-collapsed');
+      if (stored === '1') setCollapsed(true);
+    } catch {}
+  }, []);
+
+  const toggleCollapsed = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try { localStorage.setItem('droppoint-sidebar-collapsed', next ? '1' : '0'); } catch {}
+  };
 
   const isActive = (path: string) => router.pathname === path;
-
-  const navItemBase =
-    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 cursor-pointer select-none';
-  const navItemActive = 'bg-blue-50 text-blue-700';
-  const navItemInactive = 'text-gray-600 hover:bg-gray-100 hover:text-gray-900';
 
   const filteredProperties = properties
     ? properties.filter(p =>
@@ -33,51 +43,106 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
     : [];
 
   return (
-    <div className="hidden sm:flex flex-col w-56 shrink-0 bg-white border-r border-gray-200 h-full z-20">
-      {/* Logo */}
-      <div className="px-4 pt-5 pb-3">
-        <span className="text-lg font-extrabold tracking-tight text-gray-900">DropPoint</span>
+    <div
+      className={`hidden sm:flex flex-col shrink-0 bg-white border-r border-gray-200 h-full z-20 transition-all duration-200 ${
+        collapsed ? 'w-14' : 'w-56'
+      }`}
+    >
+      {/* Header row: logo + collapse toggle */}
+      <div className={`flex items-center h-14 border-b border-gray-100 ${collapsed ? 'justify-center px-0' : 'justify-between px-4'}`}>
+        {!collapsed && (
+          <span className="text-base font-extrabold tracking-tight text-gray-900 select-none">DropPoint</span>
+        )}
+        <button
+          onClick={toggleCollapsed}
+          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`}
+          >
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
       </div>
 
       {/* Nav items */}
-      <nav className="px-3 flex flex-col gap-1">
-        <Link href="/map" className={`${navItemBase} ${isActive('/map') ? navItemActive : navItemInactive}`}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="3 6 9 1 15 6 21 4 21 14 15 16 9 21 3 18" />
-            <line x1="9" y1="1" x2="9" y2="21" />
-            <line x1="15" y1="6" x2="15" y2="16" />
-          </svg>
-          Map
-        </Link>
-        <Link href="/list" className={`${navItemBase} ${isActive('/list') ? navItemActive : navItemInactive}`}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="8" y1="6" x2="21" y2="6" />
-            <line x1="8" y1="12" x2="21" y2="12" />
-            <line x1="8" y1="18" x2="21" y2="18" />
-            <line x1="3" y1="6" x2="3.01" y2="6" />
-            <line x1="3" y1="12" x2="3.01" y2="12" />
-            <line x1="3" y1="18" x2="3.01" y2="18" />
-          </svg>
-          List
-        </Link>
-        <Link href="/account" className={`${navItemBase} ${isActive('/account') ? navItemActive : navItemInactive}`}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M4 21v-2a4 4 0 0 1 3-3.87" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-          Account
-        </Link>
+      <nav className={`flex flex-col gap-0.5 py-3 ${collapsed ? 'px-2' : 'px-3'}`}>
+        {[
+          {
+            href: '/map',
+            label: 'Map',
+            icon: (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="3 6 9 1 15 6 21 4 21 14 15 16 9 21 3 18" />
+                <line x1="9" y1="1" x2="9" y2="21" />
+                <line x1="15" y1="6" x2="15" y2="16" />
+              </svg>
+            ),
+          },
+          {
+            href: '/list',
+            label: 'List',
+            icon: (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="12" x2="21" y2="12" />
+                <line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" />
+                <line x1="3" y1="12" x2="3.01" y2="12" />
+                <line x1="3" y1="18" x2="3.01" y2="18" />
+              </svg>
+            ),
+          },
+          {
+            href: '/account',
+            label: 'Account',
+            icon: (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M4 21v-2a4 4 0 0 1 3-3.87" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            ),
+          },
+        ].map(({ href, label, icon }) => {
+          const active = isActive(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              title={collapsed ? label : undefined}
+              className={`flex items-center gap-3 rounded-xl text-sm font-medium transition-colors duration-150 cursor-pointer select-none ${
+                collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5'
+              } ${active ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+            >
+              <span className="shrink-0">{icon}</span>
+              {!collapsed && label}
+            </Link>
+          );
+        })}
       </nav>
 
-      {/* Property list (only when properties prop is provided — map page) */}
-      {properties !== undefined && (
+      {/* Property list — only when properties prop provided and sidebar is expanded */}
+      {properties !== undefined && !collapsed && (
         <>
-          <div className="mx-3 mt-4 mb-2 border-t border-gray-100" />
+          <div className="mx-3 mt-1 mb-2 border-t border-gray-100" />
           <div className="px-3 mb-2">
             <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Properties</div>
             <div className="relative">
-              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                width="13" height="13" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
@@ -122,6 +187,15 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
             )}
           </div>
         </>
+      )}
+
+      {/* Collapsed: property pin icon as hint that list exists */}
+      {properties !== undefined && collapsed && properties.length > 0 && (
+        <div className="flex flex-col items-center pt-2 gap-1">
+          <div className="w-1 h-1 rounded-full bg-gray-300" />
+          <div className="w-1 h-1 rounded-full bg-gray-300" />
+          <div className="w-1 h-1 rounded-full bg-gray-300" />
+        </div>
       )}
     </div>
   );
