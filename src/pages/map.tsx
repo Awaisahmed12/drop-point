@@ -27,6 +27,7 @@ import { withAuth } from '../components/withAuth';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { propertyService, fileService, folderService } from '../services';
 import { useToast } from '../contexts/ToastContext';
+import { prefetchPropertyData, getPropertyDataSync, setPropertyDataCache } from '../hooks/usePropertyPrefetch';
 
 import {
   mapContainerStyleWithSidebar,
@@ -1750,6 +1751,17 @@ function MapPage() {
     return () => window.removeEventListener('droppoint-toggle-map-type', toggleHandler);
   }, [setMapType]);
 
+  // Pre-warm the most recently visited properties so the first pin click is instant.
+  // Fires once after the property list loads, staggered to avoid competing with the
+  // initial page render. Properties are already ordered by updated_at desc.
+  useEffect(() => {
+    if (!propertiesLoaded || userProperties.length === 0) return;
+    const toPreload = userProperties.slice(0, 5);
+    toPreload.forEach((p, i) => {
+      if (p.id) setTimeout(() => prefetchPropertyData(p.id!), i * 300);
+    });
+  }, [propertiesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Handle map click to drop new pin
   const handleMapClick = useCallback(async (event: google.maps.MapMouseEvent) => {
     if (!event.latLng) return;
@@ -1849,59 +1861,53 @@ function MapPage() {
       setFolders([]);
       setPropertyFiles([]);
     }
-    
-    setSelectedFolder('master'); // reset folder to root when opening a property
+
+    setSelectedFolder('master');
     setSelectedProperty(property);
     setSavedProperty(property);
     setAddress(property.address);
     setSnappedLatLng({ lat: property.lat, lng: property.lng });
-    
-    // Check cache first for instant loading
-    const cached = await getCachedPropertyData(property.address);
-    if (cached) {
-      setFolders(cached.folders);
-      setPropertyFiles(cached.files);
-      setFoldersLoading(false);
-      setFilesLoading(false);
-    } else {
+
+    // Fast path: synchronous module-level cache hit (pre-warmed on hover or on load)
+    if (property.id) {
+      const cached = getPropertyDataSync(property.id);
+      if (cached) {
+        setFolders(cached.folders);
+        setPropertyFiles(cached.files);
+        setFoldersLoading(false);
+        setFilesLoading(false);
+        return;
+      }
+    }
+
+    // Slow path: fetch from Supabase
+    if (property.id) {
       setFoldersLoading(true);
       setFilesLoading(true);
-      
       try {
-        if (property.id) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const [folderResult, filesResult] = await Promise.all([
-              supabase
-                .from('property_folders')
-                .select('*')
-                .eq('property_id', property.id)
-                .eq('user_id', user.id)
-                .is('deleted_at', null)
-                .order('created_at', { ascending: true }),
-              supabase
-                .from('property_files')
-                .select('*')
-                .eq('property_id', property.id)
-                .order('uploaded_at', { ascending: false })
-            ]);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const [folderResult, filesResult] = await Promise.all([
+            supabase
+              .from('property_folders')
+              .select('*')
+              .eq('property_id', property.id)
+              .eq('user_id', user.id)
+              .is('deleted_at', null)
+              .order('created_at', { ascending: true }),
+            supabase
+              .from('property_files')
+              .select('*')
+              .eq('property_id', property.id)
+              .order('uploaded_at', { ascending: false })
+          ]);
 
-            if (folderResult.data) {
-              setFolders(folderResult.data);
-            }
-            if (filesResult.data) {
-              setPropertyFiles(filesResult.data);
-            }
-            
-            // Cache the data
-            if (folderResult.data && filesResult.data) {
-              await cachePropertyData(property.address, filesResult.data, folderResult.data);
-            }
+          if (folderResult.data) setFolders(folderResult.data);
+          if (filesResult.data) setPropertyFiles(filesResult.data);
+          if (folderResult.data && filesResult.data) {
+            setPropertyDataCache(property.id, filesResult.data, folderResult.data);
+            void cachePropertyData(property.address, filesResult.data, folderResult.data);
           }
-        } else {
-          // New property - clear data
-          setFolders([]);
-          setPropertyFiles([]);
         }
       } catch (error) {
         console.error('📍 [PINS] Error loading property data:', error);
@@ -1909,12 +1915,13 @@ function MapPage() {
         setFoldersLoading(false);
         setFilesLoading(false);
       }
+    } else {
+      setFolders([]);
+      setPropertyFiles([]);
     }
-    
+
     // Do not open modal immediately; wait for user to confirm via selection card
   }, [
-    getCachedPropertyData,
-    cachePropertyData,
     savedProperty,
     setFolders,
     setPropertyFiles,
@@ -1924,7 +1931,8 @@ function MapPage() {
     setAddress,
     setSnappedLatLng,
     setFoldersLoading,
-    setFilesLoading
+    setFilesLoading,
+    cachePropertyData,
   ]);
 
   // Handle sidebar property click — skip PropertyInfoCard floater, open modal directly
@@ -1951,43 +1959,45 @@ function MapPage() {
     // Open modal immediately — no confirmation card needed
     setShowDetailsModal(true);
 
-    // Load files/folders (check cache first)
-    const cached = await getCachedPropertyData(property.address);
-    if (cached) {
-      setFolders(cached.folders);
-      setPropertyFiles(cached.files);
-      setFoldersLoading(false);
-      setFilesLoading(false);
-    } else {
+    // Fast path: synchronous module-level cache hit
+    if (property.id) {
+      const cached = getPropertyDataSync(property.id);
+      if (cached) {
+        setFolders(cached.folders);
+        setPropertyFiles(cached.files);
+        setFoldersLoading(false);
+        setFilesLoading(false);
+        return;
+      }
+    }
+
+    // Slow path: fetch from Supabase
+    if (property.id) {
       setFoldersLoading(true);
       setFilesLoading(true);
       try {
-        if (property.id) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const [folderResult, filesResult] = await Promise.all([
-              supabase
-                .from('property_folders')
-                .select('*')
-                .eq('property_id', property.id)
-                .eq('user_id', user.id)
-                .is('deleted_at', null)
-                .order('created_at', { ascending: true }),
-              supabase
-                .from('property_files')
-                .select('*')
-                .eq('property_id', property.id)
-                .order('uploaded_at', { ascending: false })
-            ]);
-            if (folderResult.data) setFolders(folderResult.data);
-            if (filesResult.data) setPropertyFiles(filesResult.data);
-            if (folderResult.data && filesResult.data) {
-              await cachePropertyData(property.address, filesResult.data, folderResult.data);
-            }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const [folderResult, filesResult] = await Promise.all([
+            supabase
+              .from('property_folders')
+              .select('*')
+              .eq('property_id', property.id)
+              .eq('user_id', user.id)
+              .is('deleted_at', null)
+              .order('created_at', { ascending: true }),
+            supabase
+              .from('property_files')
+              .select('*')
+              .eq('property_id', property.id)
+              .order('uploaded_at', { ascending: false })
+          ]);
+          if (folderResult.data) setFolders(folderResult.data);
+          if (filesResult.data) setPropertyFiles(filesResult.data);
+          if (folderResult.data && filesResult.data) {
+            setPropertyDataCache(property.id, filesResult.data, folderResult.data);
+            void cachePropertyData(property.address, filesResult.data, folderResult.data);
           }
-        } else {
-          setFolders([]);
-          setPropertyFiles([]);
         }
       } catch (error) {
         console.error('[SIDEBAR] Error loading property data:', error);
@@ -1995,12 +2005,15 @@ function MapPage() {
         setFoldersLoading(false);
         setFilesLoading(false);
       }
+    } else {
+      setFolders([]);
+      setPropertyFiles([]);
     }
   }, [
-    savedProperty, map, getCachedPropertyData, cachePropertyData,
+    savedProperty, map,
     setFolders, setPropertyFiles, setSelectedFolder, setSavedProperty,
     setAddress, setSnappedLatLng, setMapCenter, setZoom,
-    setShowDetailsModal, setFoldersLoading, setFilesLoading
+    setShowDetailsModal, setFoldersLoading, setFilesLoading, cachePropertyData,
   ]);
 
   // Handle property selection from quick access
@@ -2179,6 +2192,7 @@ function MapPage() {
               position={{ lat: property.lat, lng: property.lng }}
               icon={createPropertyPinIcon(selectedProperty?.id === property.id)}
               onClick={() => handlePropertyPinClick(property)}
+              onMouseOver={() => property.id && prefetchPropertyData(property.id)}
               title={property.address}
             />
           ))}
