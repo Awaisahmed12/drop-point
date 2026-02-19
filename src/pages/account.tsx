@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { MobileBottomNav } from '../components/MobileBottomNav';
+import { WebSidebar } from '../components/WebSidebar';
 import Head from 'next/head';
 import Link from 'next/link';
 import { supabase } from '../utils/supabaseClient';
@@ -97,10 +98,12 @@ function AccountPage() {
   const pct = Math.min(100, Math.round((usageBytes / FREE_TIER_MAX_BYTES) * 100));
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
       <Head>
         <title>Account - DropPoint</title>
       </Head>
+      <WebSidebar />
+      <div className="flex-1 overflow-auto">
       <div className="max-w-3xl mx-auto p-6 pb-20">
         <h1 className="text-3xl font-extrabold mb-6 tracking-tight text-gray-900">Account</h1>
         {loading ? (
@@ -112,9 +115,6 @@ function AccountPage() {
                 <div>
                   <div className="text-sm text-gray-500">Signed in as</div>
                   <div className="text-lg font-semibold text-gray-900">{email}</div>
-                </div>
-                <div className="hidden sm:block">
-                  <Link href="/map" className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold">Back to app</Link>
                 </div>
               </div>
               <div className="mt-4">
@@ -384,7 +384,8 @@ function AccountPage() {
       </div>
       {/* Mobile bottom nav fixed */}
       <MobileBottomNav />
-    </div>
+      </div>
+      </div>
   );
 }
 

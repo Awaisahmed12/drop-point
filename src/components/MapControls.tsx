@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Property } from '../../types';
 
 interface MapControlsProps {
@@ -72,61 +71,22 @@ export const MapControls = ({
     </div>
   );
 
-  // Desktop current location button (positioned after search bar)
+  // Desktop current location button (top-right, sidebar handles Account/List nav)
   const desktopCurrentLocationButton = onCurrentLocationClick && (
-    <div className="hidden sm:flex absolute top-6 right-6 z-30 gap-2">
-      <Link
-        className={desktopActionButtonBase}
-        href="/account"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-3-3.87"></path>
-          <path d="M4 21v-2a4 4 0 0 1 3-3.87"></path>
-          <circle cx="12" cy="7" r="4"></circle>
-        </svg>
-        Account
-      </Link>
-      {/* List View Button */}
-      <Link
-        className={desktopActionButtonBase}
-        href="/list"
-        style={floatingButtonShadow}
-      >
-        <svg 
-          width="16" 
-          height="16" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="2" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-        >
-          <line x1="8" y1="6" x2="21" y2="6"></line>
-          <line x1="8" y1="12" x2="21" y2="12"></line>
-          <line x1="8" y1="18" x2="21" y2="18"></line>
-          <line x1="3" y1="6" x2="3.01" y2="6"></line>
-          <line x1="3" y1="12" x2="3.01" y2="12"></line>
-          <line x1="3" y1="18" x2="3.01" y2="18"></line>
-        </svg>
-        List
-      </Link>
-      
-      {/* Current Location Button */}
+    <div className="hidden sm:flex absolute top-6 right-6 z-30">
       <button
         className={desktopActionButtonBase}
         onClick={onCurrentLocationClick}
         style={floatingButtonShadow}
       >
-        {/* Always show static crosshairs/target icon - handles both recenter and deep zoom */}
-        <svg 
-          width="16" 
-          height="16" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="2" 
-          strokeLinecap="round" 
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
           strokeLinejoin="round"
         >
           <circle cx="12" cy="12" r="10"></circle>

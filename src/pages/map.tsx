@@ -21,24 +21,25 @@ import { MapSearch } from '../components/MapSearch';
 import { MapControls } from '../components/MapControls';
 import { PropertyInfoCard } from '../components/PropertyInfoCard';
 import { MobileBottomNav } from '../components/MobileBottomNav';
+import { WebSidebar } from '../components/WebSidebar';
 import { CurrentLocationIndicator } from '../components/CurrentLocationIndicator';
 import { withAuth } from '../components/withAuth';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { propertyService, fileService, folderService } from '../services';
 import { useToast } from '../contexts/ToastContext';
 
-import { 
-  containerStyle, 
-  US_CENTER, 
+import {
+  mapContainerStyleWithSidebar,
+  US_CENTER,
   GOOGLE_MAPS_API_KEY,
-  GOOGLE_MAP_LIBRARIES, 
-  DEFAULT_ZOOM, 
-  SEARCH_ZOOM, 
+  GOOGLE_MAP_LIBRARIES,
+  DEFAULT_ZOOM,
+  SEARCH_ZOOM,
   CURRENT_LOCATION_ZOOM,
   CURRENT_LOCATION_ZOOM_DEEP,
-    MAP_TYPE_KEY, 
-    DEFAULT_MAP_TYPE,
-    COORDINATE_THRESHOLD 
+  MAP_TYPE_KEY,
+  DEFAULT_MAP_TYPE,
+  COORDINATE_THRESHOLD
 } from '../../constants';
 
 // Constants moved to constants/index.ts
@@ -1987,8 +1988,7 @@ function MapPage() {
   }
 
   return (
-    <div className={`relative w-screen h-screen overflow-hidden ${mobileClasses.fullScreen}`} 
-         style={getMobileStyles('page')}>
+    <div className="flex w-screen h-screen overflow-hidden">
       <Head>
         <title>Map View - DropPoint Real Estate Document Management</title>
         <meta name="description" content="Interactive map interface for managing real estate properties and documents. Select properties, upload files, and organize your real estate portfolio with our map-based system." />
@@ -1997,15 +1997,22 @@ function MapPage() {
         <meta property="twitter:title" content="Map View - DropPoint Real Estate Document Management" />
         <meta property="twitter:description" content="Interactive map interface for managing real estate properties and documents. Select properties, upload files, and organize your real estate portfolio with our map-based system." />
       </Head>
+      <WebSidebar
+        properties={userProperties}
+        selectedPropertyId={savedProperty?.id}
+        onPropertySelect={handlePropertyPinClick}
+      />
+      <div className={`flex-1 relative overflow-hidden ${mobileClasses.fullScreen}`}
+           style={getMobileStyles('page')}>
       {/* Google Maps loader */}
       {!isLoaded || !initialCenterResolved ? (
         <div className="absolute inset-0 flex items-center justify-center text-gray-600">Loading map…</div>
       ) : loadError ? (
         <div className="absolute inset-0 flex items-center justify-center text-red-600">Failed to load map.</div>
       ) : (
-        <div onClick={handleMapContainerClick}>
+        <div className="w-full h-full" onClick={handleMapContainerClick}>
           <GoogleMap
-          mapContainerStyle={containerStyle}
+          mapContainerStyle={mapContainerStyleWithSidebar}
           center={mapCenter}
           onLoad={(mapInstance) => {
             setMap(mapInstance);
@@ -2344,6 +2351,7 @@ function MapPage() {
         />
         </ErrorBoundary>
 
+      </div>
     </div>
   );
 }

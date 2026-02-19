@@ -2,6 +2,7 @@ import React, { useCallback, useState, useRef } from 'react';
 import Head from 'next/head';
 import { ListView } from '../components/ListView';
 import { MobileBottomNav } from '../components/MobileBottomNav';
+import { WebSidebar } from '../components/WebSidebar';
 import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload } from '../../types';
 import { supabase } from '../utils/supabaseClient';
@@ -305,11 +306,12 @@ function ListPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
       <Head>
         <title>Properties - DropPoint</title>
       </Head>
-      <div className="pt-4 pb-20">
+      <WebSidebar />
+      <div className="flex-1 overflow-auto pt-4 pb-20">
         <ListView
           isOpen={true}
           variant="page"

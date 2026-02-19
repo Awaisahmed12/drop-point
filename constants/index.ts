@@ -6,6 +6,12 @@ export const containerStyle = {
   height: '100vh',
 };
 
+// Use this when the map lives inside a flex child (sidebar layout)
+export const mapContainerStyleWithSidebar = {
+  width: '100%',
+  height: '100%',
+};
+
 export const US_CENTER = {
   lat: 39.8283, // Geographic center of continental US
   lng: -98.5795,

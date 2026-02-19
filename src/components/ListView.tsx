@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
@@ -215,13 +214,7 @@ export const ListView = ({
             >
               <XMarkIcon className="w-5 h-5 text-gray-500 hover:text-blue-600 transition-colors" />
             </button>
-          ) : (
-            <div className="flex-shrink-0">
-              <Link href="/map" className="hidden sm:inline-flex px-4 py-2 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-700 font-medium hover:bg-blue-100 hover:border-blue-300 transition-all duration-200">
-                Back to Map
-              </Link>
-            </div>
-          )}
+          ) : null}
         </div>
 
         {/* Search Bar - integrated into modal with blue accents */}
@@ -287,9 +280,7 @@ export const ListView = ({
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No properties yet</h3>
                 <p className="text-gray-500 mb-6">Start by selecting a property on the map and uploading some files.</p>
-                {variant === 'page' ? (
-                  <Link href="/map" className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98]">Back to Map</Link>
-                ) : (
+                {variant === 'modal' && (
                   <button
                     onClick={onClose}
                     className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98]"
