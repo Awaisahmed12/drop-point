@@ -123,7 +123,7 @@ export const PropertyInfoCard = ({
          style={{ bottom: '88px' }}>
       <div 
         ref={cardRef}
-        className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-6 pt-5 flex flex-col items-center gap-4 border border-blue-100 animate-fade-in relative"
+        className="bg-white rounded-2xl shadow-xl p-4 flex flex-col gap-3 border border-gray-200 animate-fade-in relative"
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
@@ -142,9 +142,9 @@ export const PropertyInfoCard = ({
             </svg>
           </button>
         )}
-        <div className="w-full text-center">
+        <div className="w-full">
           {addressLoading ? (
-            <div className="flex items-center justify-center gap-2 text-gray-900 text-lg font-semibold">
+            <div className="flex items-center gap-2 text-gray-900 text-base font-semibold">
               <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -169,12 +169,12 @@ export const PropertyInfoCard = ({
                         handleCancelEdit();
                       }
                     }}
-                    className="w-full px-3 py-2 text-lg font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-base font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder={streetAddress || "Enter property name"}
                     autoFocus
                     disabled={isSaving}
                   />
-                  <div className="flex gap-2 justify-center">
+                  <div className="flex gap-2">
                     <button
                       onClick={handleSaveName}
                       disabled={isSaving}
@@ -204,8 +204,8 @@ export const PropertyInfoCard = ({
               ) : (
                 <div className="w-full space-y-2">
                   {/* Main Name Display */}
-                  <div className="flex items-center justify-center gap-2">
-                    <h3 className="text-gray-900 text-lg font-semibold text-center break-words">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-gray-900 text-base font-semibold break-words">
                       {displayName}
                     </h3>
                     {/* Allow renaming for both saved and unsaved properties */}
@@ -222,14 +222,14 @@ export const PropertyInfoCard = ({
                   
                   {/* Real Address (when custom name is used) */}
                   {showRealAddress && (
-                    <div className="text-sm text-gray-600 text-center">
+                    <div className="text-sm text-gray-600">
                       {streetAddress}
                     </div>
                   )}
-                  
+
                   {/* Location Info */}
                   {locationInfo && (
-                    <div className="text-xs text-gray-500 text-center">
+                    <div className="text-xs text-gray-500">
                       {locationInfo}
                     </div>
                   )}
@@ -239,13 +239,13 @@ export const PropertyInfoCard = ({
           )}
         </div>
         <button
-          className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer"
+          className="w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer"
           disabled={addressLoading || !address || address === 'No address found' || address === 'Error fetching address'}
           onClick={() => {
             onSelect();
           }}
         >
-          Select
+          {property?.id ? 'Open' : 'Select'}
         </button>
       </div>
     </div>

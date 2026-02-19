@@ -1110,7 +1110,7 @@ export const PropertyDetailsModal = ({
         }
       }}
     >
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[calc(100vw-20px)] sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-blue-100 relative overflow-hidden"
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[calc(100vw-20px)] sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-gray-200 relative overflow-hidden"
            style={{ 
              borderRadius: '1.5rem', 
              ...getModalDimensions(),
@@ -1366,8 +1366,12 @@ export const PropertyDetailsModal = ({
               <>
                 {/* Empty State */}
                 {sortedItems.length === 0 && selectedFolder === 'master' && (
-                  <div className="text-gray-400 italic self-center py-6 px-4">
-                    No files or folders yet. Upload some files to get started!
+                  <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
+                    <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                    <p className="text-sm font-medium text-gray-500">No files yet</p>
+                    <p className="text-xs text-gray-400 mt-1">Upload files or create folders to get started</p>
                   </div>
                 )}
 
@@ -1382,7 +1386,7 @@ export const PropertyDetailsModal = ({
                         return (
                           <div key={`folder-${folder.id}`}>
                             <div
-                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[56px] sm:min-h-[40px] hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[56px] sm:min-h-[40px] hover:bg-gray-100 rounded-lg transition mb-0.5`}
                               style={{ cursor: 'pointer' }}
                               onClick={() => {
                                 if (fileMenuId || folderMenuId) {
@@ -1487,7 +1491,7 @@ export const PropertyDetailsModal = ({
                         return (
                           <div key={`file-${file.id}`}>
                             <div
-                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[56px] sm:min-h-[40px] hover:bg-gray-100 rounded-lg transition border border-gray-100 mb-1.5`}
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[56px] sm:min-h-[40px] hover:bg-gray-100 rounded-lg transition mb-0.5`}
                               style={{ cursor: 'pointer' }}
                               onClick={async (e) => {
                                 if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
@@ -1617,7 +1621,7 @@ export const PropertyDetailsModal = ({
                               }}
                             >
                               <div className="relative">
-                                <HeroFolderIcon style={{ width: gridIconSize, height: gridIconSize, color: '#3b82f6' }} />
+                                <HeroFolderIcon style={{ width: gridIconSize, height: gridIconSize, color: '#fbbf24' }} />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
                                   className="absolute -top-2 -right-2 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
@@ -2066,18 +2070,18 @@ export const PropertyDetailsModal = ({
         `}</style>
 
         {/* Action Buttons */}
-        <div className="flex w-full bg-white border-t border-blue-100 rounded-b-3xl overflow-hidden flex-shrink-0 h-14 min-h-[56px] sm:h-[70px] sm:min-h-[70px]" style={{
+        <div className="flex w-full bg-white border-t border-gray-200 rounded-b-3xl overflow-hidden flex-shrink-0 h-14 min-h-[56px] sm:h-[70px] sm:min-h-[70px]" style={{
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           ...getMobileStyles('container')
         }}>
           <button
-            className="w-1/2 py-2.5 px-4 sm:py-0 sm:px-0 sm:h-full bg-gray-100 text-blue-700 text-base sm:text-lg font-bold flex items-center justify-center gap-2 border-r border-blue-100 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95"
+            className="w-1/2 py-2.5 px-4 sm:py-0 sm:px-0 sm:h-full bg-gray-100 text-blue-700 text-base sm:text-lg font-bold flex items-center justify-center gap-2 border-r border-gray-200 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95"
             onClick={() => setCreatingFolder(true)}
           >
             <svg className="w-5 h-5 sm:w-7 sm:h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-            Create
+            New Folder
           </button>
           <button
             className="w-1/2 py-2.5 px-4 sm:py-0 sm:px-0 sm:h-full bg-blue-600 text-white text-base sm:text-lg font-bold flex items-center justify-center gap-2 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95"
