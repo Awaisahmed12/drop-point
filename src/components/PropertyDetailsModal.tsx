@@ -12,6 +12,7 @@ import { useMobileViewport } from '../hooks/useMobileViewport';
 import { useResponsiveValue } from '../hooks/useResponsiveValue';
 import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
+import { useToast } from '../contexts/ToastContext';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
 import type { PropertyWithFileCount } from '../../types';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
@@ -78,6 +79,8 @@ export const PropertyDetailsModal = ({
   onPropertySwitch,
   onMapMove
 }: PropertyDetailsModalProps) => {
+  const { showToast } = useToast();
+
   // State for UI interactions
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -290,8 +293,8 @@ export const PropertyDetailsModal = ({
     const rect = buttonElement.getBoundingClientRect();
     const menuHeight = 200; // Approximate menu height
     const menuWidth = 176; // 44 * 4 (w-44)
-    const viewportHeight = window.innerHeight;
-    const viewportWidth = window.innerWidth;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
     const padding = 8; // Minimum distance from screen edge
     
     const position: {top?: number, bottom?: number, left?: number, right?: number} = {};
@@ -915,7 +918,7 @@ export const PropertyDetailsModal = ({
       }
     } catch (error) {
       console.error('Error getting file URL:', error);
-      alert('Unable to open file. Please try again.');
+      showToast('Unable to open file. Please try again.');
     }
   };
 
@@ -1500,7 +1503,7 @@ export const PropertyDetailsModal = ({
                                   await openFileInline(file);
                                 } catch (error) {
                                   console.error('Error opening file:', error);
-                                  alert('Unable to open file. Please try again.');
+                                  showToast('Unable to open file. Please try again.');
                                 }
                               }}
                             >
@@ -1727,7 +1730,7 @@ export const PropertyDetailsModal = ({
                                   await openFileInline(file);
                                 } catch (error) {
                                   console.error('Error opening file:', error);
-                                  alert('Unable to open file. Please try again.');
+                                  showToast('Unable to open file. Please try again.');
                                 }
                               }}
                             >

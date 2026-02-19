@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import Router from "next/router";
 import { CookieConsentBanner } from "../components/CookieConsentBanner";
 import { ConfigProvider } from "../contexts/ConfigContext";
+import { ToastProvider } from "../contexts/ToastContext";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 
 export default function App({ Component, pageProps }: AppProps) {
@@ -76,15 +77,17 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <ErrorBoundary>
       <ConfigProvider>
-        <Head>
-          {/* Mobile viewport optimization */}
-          <meta 
-            name="viewport" 
-            content="width=device-width, initial-scale=1, shrink-to-fit=no, user-scalable=no, viewport-fit=cover" 
-          />
-        </Head>
-        <Component {...pageProps} />
-        <CookieConsentBanner />
+        <ToastProvider>
+          <Head>
+            {/* Mobile viewport optimization */}
+            <meta
+              name="viewport"
+              content="width=device-width, initial-scale=1, shrink-to-fit=no, user-scalable=no, viewport-fit=cover"
+            />
+          </Head>
+          <Component {...pageProps} />
+          <CookieConsentBanner />
+        </ToastProvider>
       </ConfigProvider>
     </ErrorBoundary>
   );

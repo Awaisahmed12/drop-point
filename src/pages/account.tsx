@@ -21,6 +21,10 @@ function AccountPage() {
   const [useCase, setUseCase] = useState<string>('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState(false);
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -60,6 +64,7 @@ function AccountPage() {
 
   const handleSaveProfile = async () => {
     setProfileLoading(true);
+    setProfileError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -74,13 +79,15 @@ function AccountPage() {
           .eq('user_id', user.id);
 
         if (error) {
-          console.error('Error saving profile:', error);
+          setProfileError('Failed to save profile. Please try again.');
         } else {
           setIsEditingProfile(false);
+          setProfileSuccess(true);
+          setTimeout(() => setProfileSuccess(false), 3000);
         }
       }
-    } catch (error) {
-      console.error('Error saving profile:', error);
+    } catch {
+      setProfileError('Failed to save profile. Please try again.');
     } finally {
       setProfileLoading(false);
     }
@@ -149,21 +156,36 @@ function AccountPage() {
                         autoComplete="family-name"
                       />
                     </div>
+                    {nameError && (
+                      <p className="text-sm text-red-600">{nameError}</p>
+                    )}
                     <div className="flex gap-2">
                       <button
-                        className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                        className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                        disabled={nameSaving}
                         onClick={async () => {
-                          const { data: { user } } = await supabase.auth.getUser();
-                          if (!user) return;
-                          await supabase.auth.updateUser({ data: { first_name: firstName, last_name: lastName, full_name: [firstName, lastName].filter(Boolean).join(' ') } });
-                          setIsEditingName(false);
+                          setNameSaving(true);
+                          setNameError(null);
+                          try {
+                            const { error } = await supabase.auth.updateUser({ data: { first_name: firstName, last_name: lastName, full_name: [firstName, lastName].filter(Boolean).join(' ') } });
+                            if (error) {
+                              setNameError('Failed to save name. Please try again.');
+                            } else {
+                              setIsEditingName(false);
+                            }
+                          } catch {
+                            setNameError('Failed to save name. Please try again.');
+                          } finally {
+                            setNameSaving(false);
+                          }
                         }}
                       >
-                        Save
+                        {nameSaving ? 'Saving...' : 'Save'}
                       </button>
                       <button
-                        className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50"
-                        onClick={() => setIsEditingName(false)}
+                        className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                        disabled={nameSaving}
+                        onClick={() => { setIsEditingName(false); setNameError(null); }}
                       >
                         Cancel
                       </button>
@@ -198,7 +220,10 @@ function AccountPage() {
                   <div className="text-lg font-semibold text-gray-900">Help us know you better</div>
                   <div className="text-sm text-gray-500">Optional - helps us improve DropPoint for you</div>
                 </div>
-                {!isEditingProfile && (
+                {profileSuccess && !isEditingProfile && (
+                  <span className="text-sm text-green-600 font-medium">Saved</span>
+                )}
+                {!isEditingProfile && !profileSuccess && (
                   <button
                     className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium"
                     onClick={() => setIsEditingProfile(true)}
@@ -297,10 +322,14 @@ function AccountPage() {
                     </div>
                   </div>
 
+                  {profileError && (
+                    <p className="text-sm text-red-600">{profileError}</p>
+                  )}
                   <div className="flex gap-3 pt-2">
                     <button
-                      onClick={() => setIsEditingProfile(false)}
-                      className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                      onClick={() => { setIsEditingProfile(false); setProfileError(null); }}
+                      disabled={profileLoading}
+                      className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-60"
                     >
                       Cancel
                     </button>
@@ -336,22 +365,19 @@ function AccountPage() {
 
             <div className="bg-white rounded-2xl shadow border p-5">
               <div className="mb-3 flex items-center justify-between">
-                <div className="text-lg font-semibold text-gray-900">Storage usage</div>
-                <div className="text-sm text-gray-900">{formatBytes(usageBytes)} of {limitGB} GB</div>
+                <div>
+                  <div className="text-lg font-semibold text-gray-900">Storage</div>
+                  <div className="text-sm text-gray-500">Free plan · {limitGB} GB total</div>
+                </div>
+                <div className="text-sm font-medium text-gray-900">{formatBytes(usageBytes)} of {limitGB} GB</div>
               </div>
-              <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-4 bg-blue-600" style={{ width: `${pct}%` }}></div>
+              <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-3 rounded-full transition-all ${pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-blue-600'}`}
+                  style={{ width: `${pct}%` }}
+                />
               </div>
-              <div className="mt-2 text-sm text-gray-700">Free plan limit</div>
-              <div className="mt-4">
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700">Upgrade plan</button>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow border p-5">
-              <div className="text-lg font-semibold mb-1 text-gray-900">Plan</div>
-              <div className="text-gray-900">Free • {limitGB} GB total</div>
-              <div className="mt-2 text-sm text-gray-500">Billing coming soon.</div>
+              <div className="mt-3 text-sm text-gray-500">Paid plans coming soon.</div>
             </div>
           </div>
         )}

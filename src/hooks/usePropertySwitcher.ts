@@ -52,25 +52,21 @@ export const usePropertySwitcher = ({
       const cached = propertyCache[cacheKey];
       
       if (cached && (Date.now() - cached.lastFetched) < cacheTimeout) {
-        console.log('[SWITCH] Using cached data for instant property switch:', property.address);
-        
         // Use cached data immediately
         if (onPropertyDataLoad) {
           onPropertyDataLoad(property, cached.files, cached.folders);
         }
-        
-        // Update last accessed in background
-        supabase
+
+        // Update last accessed in background (fire-and-forget with silent error handling)
+        void supabase
           .from('properties')
           .update({ updated_at: new Date().toISOString() })
-          .eq('id', property.id)
-          .then(() => console.log('[SWITCH] Background last_accessed update completed'));
-        
+          .eq('id', property.id);
+
         return;
       }
 
       // No cache - fetch fresh data
-      console.log('[SWITCH] Cache miss - fetching fresh data for:', property.address);
 
       // Fetch folders and files for the property
       const [folderResult, filesResult] = await Promise.all([
@@ -106,8 +102,6 @@ export const usePropertySwitcher = ({
       if (onPropertyDataLoad) {
         onPropertyDataLoad(property, filesResult.data || [], folderResult.data || []);
       }
-
-      console.log('[SWITCH] Fresh data loaded for:', property.address);
 
     } catch (error) {
       console.error('Error switching to property:', error);

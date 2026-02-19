@@ -25,6 +25,7 @@ import { CurrentLocationIndicator } from '../components/CurrentLocationIndicator
 import { withAuth } from '../components/withAuth';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { propertyService, fileService, folderService } from '../services';
+import { useToast } from '../contexts/ToastContext';
 
 import { 
   containerStyle, 
@@ -78,6 +79,7 @@ function MapPage() {
   });
   const router = useRouter();
   const { getMobileStyles, mobileClasses } = useMobileViewport();
+  const { showToast } = useToast();
   
   // Extract state management into custom hooks
   const mapState = useMapState();
@@ -904,7 +906,7 @@ function MapPage() {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Rename failed';
       console.error('[RENAME] Rename operation failed:', errorMessage);
-      alert(`Rename failed: ${errorMessage}`);
+      showToast(`Rename failed: ${errorMessage}`);
     } finally {
       setRenamingFileId(null);
     }
@@ -926,7 +928,7 @@ function MapPage() {
 
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to delete file';
-            alert(`Failed to delete file: ${errorMessage}`);
+            showToast(`Failed to delete file: ${errorMessage}`);
         } finally {
             setFileMenuId(null);
         }
@@ -943,7 +945,7 @@ function MapPage() {
     const hasChildrenFiles = propertyFiles.some(f => f.folder_id === folder.id);
 
     if (hasChildrenFolders || hasChildrenFiles) {
-        alert("Folder must be empty before it can be deleted.");
+        showToast('Folder must be empty before it can be deleted.', 'warning');
         setFolderMenuId(null);
         return;
     }
@@ -960,7 +962,7 @@ function MapPage() {
         
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to delete folder';
-            alert(`Failed to delete folder: ${errorMessage}`);
+            showToast(`Failed to delete folder: ${errorMessage}`);
         } finally {
             setFolderMenuId(null);
         }
@@ -983,7 +985,7 @@ function MapPage() {
       // Ensure property is saved before creating folders
       if (!propertyId) {
         if (!savedProperty) {
-          alert('Please select a property first.');
+          showToast('Please select a property first.', 'warning');
           return;
         }
         try {
@@ -1004,7 +1006,7 @@ function MapPage() {
 
           if (saveError || !newProperty) {
             console.error('📁 [FOLDERS] Error auto-saving property before folder creation:', saveError);
-            alert('Failed to save property. Please try again.');
+            showToast('Failed to save property. Please try again.');
             return;
           }
 
@@ -1016,13 +1018,13 @@ function MapPage() {
           loadUserProperties();
         } catch (err) {
           console.error('📁 [FOLDERS] Unexpected error auto-saving property:', err);
-          alert('Failed to save property. Please try again.');
+          showToast('Failed to save property. Please try again.');
           return;
         }
       }
 
       if (!propertyId) {
-        alert('Failed to resolve property. Please try again.');
+        showToast('Failed to resolve property. Please try again.');
         return;
       }
 
@@ -1041,7 +1043,7 @@ function MapPage() {
 
       if (error) {
         console.error('📁 [FOLDERS] Error creating folder:', error);
-        alert('Could not create folder. Please try again.');
+        showToast('Could not create folder. Please try again.');
         return;
       }
 
@@ -1050,7 +1052,7 @@ function MapPage() {
       }
     } catch (err) {
       console.error('📁 [FOLDERS] Unexpected error creating folder:', err);
-      alert('Could not create folder.');
+      showToast('Could not create folder. Please try again.');
     }
   }
 
@@ -1083,7 +1085,7 @@ function MapPage() {
     }
     
     if (!savedProperty) {
-      alert('Please select a property first before uploading files.');
+      showToast('Please select a property first before uploading files.', 'warning');
       return;
     }
 
@@ -1095,7 +1097,7 @@ function MapPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          alert('You must be logged in to upload files.');
+          showToast('You must be logged in to upload files.');
           return;
         }
 
@@ -1130,7 +1132,7 @@ function MapPage() {
         
       } catch (error) {
         console.error('📁 [UPLOAD] Error auto-saving property:', error);
-        alert('Failed to save property. Please try again.');
+        showToast('Failed to save property. Please try again.');
         return;
       }
     }
@@ -1219,14 +1221,14 @@ function MapPage() {
       const usedBytes = await getUserUsageBytes(user.id);
       const projected = usedBytes + file.size;
       if (projected > FREE_TIER_MAX_BYTES) {
-        alert('Storage limit reached for the free plan (5 GB). Please delete files or upgrade to continue uploading.');
+        showToast('Storage limit reached (5 GB). Delete files to free up space.', 'warning');
         // Remove pending upload entry if present
         setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
         return;
       }
     } catch (err) {
       console.error('[USAGE] Failed to check usage. Blocking upload for safety.', err);
-      alert('Unable to verify your storage usage right now. Please try again shortly.');
+      showToast('Unable to verify storage usage. Please try again shortly.');
       setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
       return;
     }
@@ -1383,7 +1385,7 @@ function MapPage() {
     setAddressLoading(false);
     
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by this browser.');
+      showToast('Geolocation is not supported by this browser.');
       return;
     }
 
@@ -1502,7 +1504,7 @@ function MapPage() {
         currentLocationZoomStageRef.current = 'none';
         currentLocationStageRef.current = 'none';
         
-        alert('Location access denied. Please enable location permissions in your browser settings.\n\nTo enable: Click the location icon in your address bar, or go to browser settings > Privacy > Location.');
+        showToast('Location access denied. Enable location permissions in your browser settings.');
         return;
       }
 
@@ -1588,7 +1590,7 @@ function MapPage() {
           debugInfo = 'An unexpected geolocation error occurred.';
       }
       
-      alert(`${errorMessage}\n\n${debugInfo}`);
+      showToast(errorMessage);
     };
 
     setCurrentLocationLoading(true);
@@ -2289,7 +2291,7 @@ function MapPage() {
                 // Generate unique name if needed
                 newFileName = sanitizeFileName(getUniqueFileName(file.file_name, targetFolderId, propertyFiles));
                 if (!newFileName) {
-                  alert('Invalid file name. Please rename your file and try again.');
+                  showToast('Invalid file name. Please rename your file and try again.', 'warning');
                   return;
                 }
                 // Only use new name if it's different
@@ -2309,7 +2311,7 @@ function MapPage() {
               setPropertyFiles(files);
             } catch (error) {
               console.error('[MOVE] Error moving file:', error);
-              alert(`Failed to move file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              showToast(`Failed to move file: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           }}
           onFolderCreate={handleCreateFolderByName}

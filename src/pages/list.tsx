@@ -7,6 +7,7 @@ import type { Property, PropertyFile, PropertyFolder, PendingUpload } from '../.
 import { supabase } from '../utils/supabaseClient';
 import { withAuth } from '../components/withAuth';
 import { fileService, folderService } from '../services';
+import { useToast } from '../contexts/ToastContext';
 import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
 import { getUserUsageBytes } from '../utils/usage';
 import { FREE_TIER_MAX_BYTES } from '../../constants';
@@ -21,6 +22,7 @@ function ListPage() {
   const [filesLoading, setFilesLoading] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<string>('master');
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const { showToast } = useToast();
   const setRenamingFileId = useRef<((id: string | null) => void) | null>(null);
 
   const openProperty = useCallback(async (p: { id: string | null; address: string; lat: number; lng: number; label?: string | null; notes?: string | null; }) => {
@@ -84,13 +86,13 @@ function ListPage() {
     try {
       const usedBytes = await getUserUsageBytes(user.id);
       if (usedBytes + file.size > FREE_TIER_MAX_BYTES) {
-        alert('Storage limit reached for the free plan (5 GB). Please delete files or upgrade to continue uploading.');
+        showToast('Storage limit reached (5 GB). Delete files to free up space.', 'warning');
         setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
         return;
       }
     } catch (err) {
       console.error('[USAGE] Failed to check usage. Blocking upload for safety.', err);
-      alert('Unable to verify your storage usage right now. Please try again shortly.');
+      showToast('Unable to verify storage usage. Please try again shortly.');
       setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
       return;
     }
@@ -211,7 +213,7 @@ function ListPage() {
       setFiles(prev => prev.filter(f => f.id !== file.id));
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Failed to delete file';
-      alert(`Failed to delete file: ${msg}`);
+      showToast(`Failed to delete file: ${msg}`);
     }
   }, []);
 
@@ -244,7 +246,7 @@ function ListPage() {
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Rename failed';
       console.error('[RENAME] Rename operation failed:', msg);
-      alert(`Rename failed: ${msg}`);
+      showToast(`Rename failed: ${msg}`);
     } finally {
       if (setRenamingFileId.current) setRenamingFileId.current(null);
     }
@@ -269,13 +271,13 @@ function ListPage() {
         .single();
       if (error) {
         console.error('Error creating folder:', error);
-        alert('Could not create folder. Please try again.');
+        showToast('Could not create folder. Please try again.');
         return;
       }
       if (data) setFolders(prev => [...prev, data]);
     } catch (err) {
       console.error('Unexpected error creating folder:', err);
-      alert('Could not create folder.');
+      showToast('Could not create folder. Please try again.');
     }
   }, [savedProperty, selectedFolder]);
 
@@ -284,7 +286,7 @@ function ListPage() {
     const hasChildFolders = folders.some(f => f.parent_id === folder.id);
     const hasChildFiles = files.some(f => f.folder_id === folder.id);
     if (hasChildFolders || hasChildFiles) {
-      alert('Folder must be empty before it can be deleted.');
+      showToast('Folder must be empty before it can be deleted.', 'warning');
       return;
     }
     const isConfirmed = window.confirm(`Are you sure you want to delete the folder "${folder.name}"?`);
@@ -294,7 +296,7 @@ function ListPage() {
       setFolders(prev => prev.filter(f => f.id !== folder.id));
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Failed to delete folder';
-      alert(`Failed to delete folder: ${msg}`);
+      showToast(`Failed to delete folder: ${msg}`);
     }
   }, [folders, files]);
 

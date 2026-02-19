@@ -1,6 +1,7 @@
 import React from 'react';
 import type { PropertyFile } from '../../types';
 import { getFileSignedUrl } from '../utils/supabaseClient';
+import { useToast } from '../contexts/ToastContext';
 
 interface FileMenuProps {
   file: PropertyFile;
@@ -23,6 +24,8 @@ export const FileMenu: React.FC<FileMenuProps> = ({
   menuPosition,
   menuRef,
 }) => {
+  const { showToast } = useToast();
+
   if (!isOpen) return null;
 
   const handleDownload = async () => {
@@ -31,7 +34,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
       window.open(fileUrl, '_blank');
     } catch (error) {
       console.error('Error downloading file:', error);
-      alert('Unable to download file. Please try again.');
+      showToast('Unable to download file. Please try again.');
     }
     onClose();
   };

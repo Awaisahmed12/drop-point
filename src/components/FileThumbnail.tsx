@@ -19,8 +19,5 @@ export const FileThumbnail = ({ fileName, size = 64, className = '' }: FileThumb
   );
 };
 
-// Keep preloadThumbnails function for compatibility but make it a no-op
-export const preloadThumbnails = async () => {
-  // No-op - thumbnails disabled for performance
-  console.log('📁 [THUMBNAILS] Disabled for performance - showing file icons instead');
-}; 
+// No-op kept for call-site compatibility
+export const preloadThumbnails = async () => {}; 

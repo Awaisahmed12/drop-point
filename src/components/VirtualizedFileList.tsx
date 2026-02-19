@@ -29,6 +29,7 @@ interface RowProps {
     handleDeleteFile?: (file: PropertyFile) => Promise<void>;
     setMoveFileTarget?: (file: PropertyFile | null) => void;
     setShowMoveModal?: (show: boolean) => void;
+    showToast?: (message: string, type?: 'error' | 'warning' | 'success') => void;
   };
 }
 
@@ -174,7 +175,7 @@ const Row = ({ index, style, data }: RowProps) => {
                     const [, newExt] = splitFileNameAndExt(trimmed);
                     const [, oldExt] = splitFileNameAndExt(file.file_name);
                     if (!newExt && oldExt) {
-                      alert('File extension cannot be removed. Aborting rename.');
+                      data.showToast?.('File extension cannot be removed.', 'warning');
                       data.setRenamingFileId(null);
                       data.setRenamingFileName('');
                       return;

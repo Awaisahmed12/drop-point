@@ -24,8 +24,6 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
         return;
       }
 
-      console.log('📋 [PROPERTIES] Fetching fresh properties data...');
-
       // Fetch properties with file counts using a more efficient query
       const { data: propertiesData, error: propertiesError } = await supabase
         .from('properties')
@@ -56,7 +54,6 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
         timestamp: Date.now()
       }));
 
-      console.log('📋 [PROPERTIES] Fresh data loaded and cached:', propertiesWithCount.length);
     } catch (error) {
       console.error('Error fetching fresh properties:', error);
       setError(error instanceof Error ? error.message : 'Failed to load properties');
@@ -79,7 +76,6 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
           
           // Use cache if less than 5 minutes old
           if (cacheAge < 5 * 60 * 1000) {
-            console.log('📋 [PROPERTIES] Using cached data for instant load');
             setProperties(cacheData.properties);
             setLoading(false);
             

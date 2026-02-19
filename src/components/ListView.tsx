@@ -28,6 +28,8 @@ export const ListView = ({
   const [renamingPropertyId, setRenamingPropertyId] = useState<string | null>(null);
   const [renamingPropertyName, setRenamingPropertyName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [copiedPropertyId, setCopiedPropertyId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const propertyMenuRef = useRef<HTMLDivElement>(null);
   
@@ -142,23 +144,22 @@ export const ListView = ({
 
   // Handle property rename
   const handleRename = async (property: PropertyWithFileCount, newName: string) => {
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      setRenameError('Name cannot be empty.');
+      return;
+    }
+
     try {
       setIsSaving(true);
-      
-      // Get current session
+      setRenameError(null);
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        console.error('No active session');
+        setRenameError('Session expired. Please refresh and try again.');
         return;
       }
 
-      const trimmedName = newName.trim();
-      if (!trimmedName) {
-        console.error('Property name cannot be empty');
-        return;
-      }
-
-      // Update the property label in the database
       const { error } = await supabase
         .from('properties')
         .update({ label: trimmedName })
@@ -166,21 +167,16 @@ export const ListView = ({
         .eq('user_id', session.user.id);
 
       if (error) {
-        console.error('Error renaming property:', error);
+        setRenameError('Failed to rename. Please try again.');
         return;
       }
 
-      // Close rename mode
       setRenamingPropertyId(null);
       setRenamingPropertyName('');
       setPropertyMenuId(null);
-      
-      // Refresh properties to show the new name in the UI
       await refreshProperties();
-      
-      console.log('Property renamed successfully:', trimmedName);
-    } catch (error) {
-      console.error('Error renaming property:', error);
+    } catch {
+      setRenameError('Failed to rename. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -469,16 +465,29 @@ export const ListView = ({
                             className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-200 last:rounded-b-xl"
                             onClick={e => {
                               e.stopPropagation();
-                              // Copy address to clipboard
-                              navigator.clipboard.writeText(property.address);
+                              navigator.clipboard.writeText(property.address).then(() => {
+                                setCopiedPropertyId(property.id);
+                                setTimeout(() => setCopiedPropertyId(null), 2000);
+                              });
                               setPropertyMenuId(null);
                             }}
                           >
                             <div className="flex items-center gap-3">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H8zM16 8h2a2 2 0 012 2v8a2 2 0 01-2 2h-2M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H8z" />
-                              </svg>
-                              Copy Address
+                              {copiedPropertyId === property.id ? (
+                                <>
+                                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  <span className="text-green-600">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H8zM16 8h2a2 2 0 012 2v8a2 2 0 01-2 2h-2M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H8z" />
+                                  </svg>
+                                  Copy Address
+                                </>
+                              )}
                             </div>
                           </button>
                         </div>
@@ -493,32 +502,37 @@ export const ListView = ({
                             <h3 className="text-lg font-semibold text-gray-900 mb-2">Rename Property</h3>
                             <p className="text-sm text-gray-500">Enter a new name for this property</p>
                           </div>
-                          
+
                           <div className="space-y-4">
                             <input
                               type="text"
                               value={renamingPropertyName}
-                              onChange={(e) => setRenamingPropertyName(e.target.value)}
+                              onChange={(e) => { setRenamingPropertyName(e.target.value); setRenameError(null); }}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !isSaving) {
                                   handleRename(property, renamingPropertyName);
                                 } else if (e.key === 'Escape') {
                                   setRenamingPropertyId(null);
                                   setRenamingPropertyName('');
+                                  setRenameError(null);
                                 }
                               }}
-                              className="w-full px-4 py-3 text-lg font-medium text-gray-900 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className={`w-full px-4 py-3 text-lg font-medium text-gray-900 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${renameError ? 'border-red-400' : 'border-gray-200'}`}
                               placeholder="Enter property name"
                               autoFocus
                               disabled={isSaving}
                             />
-                            
+                            {renameError && (
+                              <p className="text-sm text-red-600">{renameError}</p>
+                            )}
+
                             <div className="flex gap-3">
                               <button
                                 className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
                                 onClick={() => {
                                   setRenamingPropertyId(null);
                                   setRenamingPropertyName('');
+                                  setRenameError(null);
                                 }}
                                 disabled={isSaving}
                               >
@@ -533,7 +547,7 @@ export const ListView = ({
                               </button>
                             </div>
                           </div>
-                          
+
                           <div className="mt-4 text-center">
                             <p className="text-xs text-gray-400">
                               Press Enter to save, Escape to cancel
