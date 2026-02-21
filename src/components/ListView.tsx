@@ -208,9 +208,9 @@ export const ListView = ({
   // ── PAGE VARIANT ──────────────────────────────────────────────────────────────
   if (variant === 'page') {
     return (
-      <div className="w-full px-4 sm:px-8 pb-24">
+      <div className="w-full px-4 sm:px-8 pb-6 sm:pb-24">
         {/* Header */}
-        <div className="pt-5 sm:pt-8 pb-5 sm:pb-6">
+        <div className="pt-5 sm:pt-8 pb-4 sm:pb-6">
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Properties</h1>
           <p className="text-sm text-gray-400 mt-1">
             {searchQuery
@@ -220,7 +220,7 @@ export const ListView = ({
         </div>
 
         {/* Search */}
-        <div className="relative mb-6 max-w-sm">
+        <div className="relative mb-4 sm:mb-6 sm:max-w-sm">
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           <input
             ref={searchInputRef}
@@ -317,39 +317,49 @@ export const ListView = ({
               })}
             </div>
 
-            {/* ── Mobile: grouped list ── */}
-            <div className="sm:hidden bg-white rounded-2xl overflow-hidden shadow-sm divide-y divide-gray-50">
+            {/* ── Mobile: property cards ── */}
+            <div className="sm:hidden space-y-3">
               {sortedProperties.map(property => {
                 const { streetAddress, locationInfo } = parseAddress(property.address);
-                const imgSrc = `https://maps.googleapis.com/maps/api/streetview?size=200x200&location=${property.lat},${property.lng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`;
-                const fallbackSrc = `https://maps.googleapis.com/maps/api/staticmap?center=${property.lat},${property.lng}&zoom=17&size=200x200&maptype=roadmap&markers=color:blue%7C${property.lat},${property.lng}&key=${GOOGLE_MAPS_API_KEY}`;
+                const imgSrc = `https://maps.googleapis.com/maps/api/streetview?size=600x280&location=${property.lat},${property.lng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`;
+                const fallbackSrc = `https://maps.googleapis.com/maps/api/staticmap?center=${property.lat},${property.lng}&zoom=17&size=600x280&maptype=roadmap&markers=color:blue%7C${property.lat},${property.lng}&key=${GOOGLE_MAPS_API_KEY}`;
                 return (
                   <div
                     key={property.id}
                     onClick={() => { if (renamingPropertyId === property.id) return; onPropertySelect(property); }}
-                    className={`flex items-center gap-3.5 px-4 py-3.5 transition-colors ${
+                    className={`bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm transition-all duration-150 ${
                       renamingPropertyId === property.id
-                        ? 'cursor-default bg-blue-50/30'
-                        : 'cursor-pointer active:bg-gray-50'
+                        ? 'cursor-default opacity-80'
+                        : 'cursor-pointer active:scale-[0.985] active:shadow-none'
                     }`}
                   >
-                    <div className="w-[72px] h-[72px] rounded-xl overflow-hidden bg-gray-100 shrink-0">
-                      <Image src={imgSrc} alt="" width={200} height={200} className="w-full h-full object-cover" unoptimized
+                    {/* Banner image */}
+                    <div className="relative h-36 bg-gray-100 overflow-hidden">
+                      <Image src={imgSrc} alt="" fill className="object-cover" unoptimized
                         onError={e => { const t = e.currentTarget as HTMLImageElement; if (t.dataset.fallback !== '1') { t.dataset.fallback = '1'; t.src = fallbackSrc; } }} />
+                      {/* File count badge */}
+                      <div className="absolute bottom-2.5 left-3 px-2 py-0.5 bg-black/50 backdrop-blur-sm text-white text-xs font-medium rounded-full">
+                        {property.file_count} {property.file_count === 1 ? 'file' : 'files'}
+                      </div>
+                      {/* Action menu */}
+                      <div className="absolute top-2 right-2" onClick={e => e.stopPropagation()}>
+                        <ActionMenu
+                          property={property}
+                          btnClassName="p-1.5 rounded-lg bg-white/90 backdrop-blur-sm text-gray-600 hover:bg-white shadow-sm transition-all"
+                        />
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
+                    {/* Card text */}
+                    <div className="px-4 py-3">
                       <div className="text-[15px] font-semibold text-gray-900 truncate">
                         {property.label || streetAddress || property.address}
                       </div>
-                      {property.label && <div className="text-sm text-gray-400 truncate mt-0.5">{streetAddress}</div>}
-                      <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-400">
-                        {locationInfo && <span className="truncate max-w-[150px]">{locationInfo}</span>}
-                        {locationInfo && <span>·</span>}
-                        <span className="shrink-0">{property.file_count} {property.file_count === 1 ? 'file' : 'files'}</span>
-                      </div>
-                    </div>
-                    <div onClick={e => e.stopPropagation()}>
-                      <ActionMenu property={property} />
+                      {property.label && (
+                        <div className="text-sm text-gray-400 truncate mt-0.5">{streetAddress}</div>
+                      )}
+                      {locationInfo && (
+                        <div className="text-xs text-gray-400 truncate mt-0.5">{locationInfo}</div>
+                      )}
                     </div>
                   </div>
                 );
