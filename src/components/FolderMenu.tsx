@@ -34,6 +34,9 @@ export const FolderMenu: React.FC<FolderMenuProps> = ({
         maxHeight: 'calc(100vh - 16px)',
         ...menuPosition
       }}
+      onClick={e => e.stopPropagation()}
+      onPointerDown={e => e.stopPropagation()}
+      onTouchEnd={e => e.stopPropagation()}
     >
       <button
         className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"

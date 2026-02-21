@@ -135,6 +135,8 @@ function MapPage() {
   const [loading, setLoading] = useState(true);
   const justSelectedRef = useRef(false);
   const lastClickTimeRef = useRef(0);
+  // Suppresses ghost clicks that fire on the map after touch-dismissing the info card
+  const suppressMapClickRef = useRef(false);
 
   // Track staged zoom behavior for current location (first -> deep)
   const currentLocationZoomStageRef = useRef<'none' | 'first' | 'deep'>('none');
@@ -1765,7 +1767,13 @@ function MapPage() {
   // Handle map click to drop new pin
   const handleMapClick = useCallback(async (event: google.maps.MapMouseEvent) => {
     if (!event.latLng) return;
-    
+
+    // Eat ghost clicks that arrive after touch-dismissing the info card
+    if (suppressMapClickRef.current) {
+      suppressMapClickRef.current = false;
+      return;
+    }
+
     // Don't drop pins if search is focused or if search elements are visible
     if (showDropdown || document.activeElement?.tagName === 'INPUT') {
       return;
@@ -2255,9 +2263,12 @@ function MapPage() {
             onMouseEnter={() => {}}
             onMouseLeave={() => {}}
             onClose={() => {
+              // Suppress the ghost click that fires on the map ~300ms after a touch dismiss
+              suppressMapClickRef.current = true;
+              setTimeout(() => { suppressMapClickRef.current = false; }, 600);
               setSelectedProperty(null);
               setAddress('');
-              setPropertyCardHeight(0); // Reset height when card is closed
+              setPropertyCardHeight(0);
             }}
             onPropertyUpdate={(updatedProperty) => {
               setSelectedProperty(updatedProperty);

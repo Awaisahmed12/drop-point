@@ -1462,6 +1462,16 @@ export const PropertyDetailsModal = ({
                                       calculateMenuPosition(e.currentTarget, folder.id);
                                     }
                                   }}
+                                  onTouchEnd={e => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    closeMenus();
+                                    const newMenuId = folderMenuId === folder.id ? null : folder.id;
+                                    setFolderMenuId(newMenuId);
+                                    if (newMenuId) {
+                                      calculateMenuPosition(e.currentTarget, folder.id);
+                                    }
+                                  }}
                                   title="Folder actions"
                                 >
                                   <svg className="w-5 h-5 sm:w-4 sm:h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1568,6 +1578,16 @@ export const PropertyDetailsModal = ({
                                   style={{ minWidth: 24, minHeight: 24 }}
                                   onClick={e => {
                                     e.stopPropagation();
+                                    closeMenus();
+                                    const newMenuId = fileMenuId === file.id ? null : file.id;
+                                    setFileMenuId(newMenuId);
+                                    if (newMenuId) {
+                                      calculateMenuPosition(e.currentTarget, file.id);
+                                    }
+                                  }}
+                                  onTouchEnd={e => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
                                     closeMenus();
                                     const newMenuId = fileMenuId === file.id ? null : file.id;
                                     setFileMenuId(newMenuId);
