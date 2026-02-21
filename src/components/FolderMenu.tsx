@@ -40,11 +40,8 @@ export const FolderMenu: React.FC<FolderMenuProps> = ({
     >
       <button
         className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
-        onClick={e => {
-          e.stopPropagation();
-          onRename(folder);
-          onClose();
-        }}
+        onClick={e => { e.stopPropagation(); onRename(folder); onClose(); }}
+        onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onRename(folder); onClose(); }}
       >
         <div className="flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -55,11 +52,8 @@ export const FolderMenu: React.FC<FolderMenuProps> = ({
       </button>
       <button
         className="block w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
-        onClick={e => {
-          e.stopPropagation();
-          onDelete(folder);
-          onClose();
-        }}
+        onClick={e => { e.stopPropagation(); onDelete(folder); onClose(); }}
+        onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onDelete(folder); onClose(); }}
       >
         <div className="flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
