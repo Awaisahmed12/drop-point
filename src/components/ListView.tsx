@@ -6,6 +6,7 @@ import { useUserProperties } from '../hooks/useUserProperties';
 import type { PropertyWithFileCount } from '../../types';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import { supabase } from '../utils/supabaseClient';
+import { useToast } from '../contexts/ToastContext';
 
 interface ListViewProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const ListView = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const propertyMenuRef = useRef<HTMLDivElement>(null);
 
+  const { showToast } = useToast();
   const { getModalDimensions, mobileClasses } = useMobileViewport();
   const { properties, loading, error, refreshProperties } = useUserProperties();
 
@@ -74,11 +76,15 @@ export const ListView = ({
   };
 
   useEffect(() => {
-    const handle = (e: MouseEvent) => {
+    const handle = (e: MouseEvent | TouchEvent) => {
       if (propertyMenuRef.current && !propertyMenuRef.current.contains(e.target as Node)) setPropertyMenuId(null);
     };
     document.addEventListener('mousedown', handle);
-    return () => document.removeEventListener('mousedown', handle);
+    document.addEventListener('touchstart', handle);
+    return () => {
+      document.removeEventListener('mousedown', handle);
+      document.removeEventListener('touchstart', handle);
+    };
   }, []);
 
   const handleRename = async (property: PropertyWithFileCount, newName: string) => {
@@ -92,6 +98,7 @@ export const ListView = ({
       if (error) { setRenameError('Failed to rename. Please try again.'); return; }
       setRenamingPropertyId(null); setRenamingPropertyName(''); setPropertyMenuId(null);
       await refreshProperties();
+      showToast('Property renamed');
     } catch { setRenameError('Failed to rename. Please try again.'); }
     finally { setIsSaving(false); }
   };
@@ -99,9 +106,18 @@ export const ListView = ({
   if (!isOpen) return null;
 
   // ── Rename dialog (shared) ────────────────────────────────────────────────────
+  const closeRenameDialog = () => { setRenamingPropertyId(null); setRenamingPropertyName(''); setRenameError(null); };
   const RenameDialog = ({ property }: { property: PropertyWithFileCount }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={closeRenameDialog}
+      onTouchEnd={e => { e.preventDefault(); closeRenameDialog(); }}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4"
+        onClick={e => e.stopPropagation()}
+        onTouchEnd={e => e.stopPropagation()}
+      >
         <h3 className="text-base font-semibold text-gray-900 mb-1">Rename Property</h3>
         <p className="text-sm text-gray-400 mb-4">Give this property a custom label</p>
         <input
@@ -110,7 +126,7 @@ export const ListView = ({
           onChange={e => { setRenamingPropertyName(e.target.value); setRenameError(null); }}
           onKeyDown={e => {
             if (e.key === 'Enter' && !isSaving) handleRename(property, renamingPropertyName);
-            else if (e.key === 'Escape') { setRenamingPropertyId(null); setRenamingPropertyName(''); setRenameError(null); }
+            else if (e.key === 'Escape') closeRenameDialog();
           }}
           className={`w-full px-3.5 py-2.5 text-sm text-gray-900 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all mb-1 disabled:opacity-50 ${renameError ? 'border-red-300' : 'border-gray-200'}`}
           placeholder="e.g. Beach House, Investment #1"
@@ -121,7 +137,7 @@ export const ListView = ({
         {!renameError && <div className="mb-3" />}
         <div className="flex gap-2">
           <button className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
-            onClick={() => { setRenamingPropertyId(null); setRenamingPropertyName(''); setRenameError(null); }} disabled={isSaving}>Cancel</button>
+            onClick={closeRenameDialog} disabled={isSaving}>Cancel</button>
           <button className="flex-1 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-sm"
             onClick={() => handleRename(property, renamingPropertyName)} disabled={isSaving}>{isSaving ? 'Saving…' : 'Save'}</button>
         </div>
@@ -173,12 +189,12 @@ export const ListView = ({
           <button className="flex items-center gap-2.5 w-full text-left px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
             onClick={e => {
               e.stopPropagation();
-              navigator.clipboard.writeText(property.address).then(() => { setCopiedPropertyId(property.id); setTimeout(() => setCopiedPropertyId(null), 2000); });
+              navigator.clipboard.writeText(property.address).then(() => { setCopiedPropertyId(property.id); setTimeout(() => setCopiedPropertyId(null), 2000); showToast('Address copied'); });
               setPropertyMenuId(null);
             }}
             onTouchEnd={e => {
               e.stopPropagation(); e.preventDefault();
-              navigator.clipboard.writeText(property.address).then(() => { setCopiedPropertyId(property.id); setTimeout(() => setCopiedPropertyId(null), 2000); });
+              navigator.clipboard.writeText(property.address).then(() => { setCopiedPropertyId(property.id); setTimeout(() => setCopiedPropertyId(null), 2000); showToast('Address copied'); });
               setPropertyMenuId(null);
             }}>
             {copiedPropertyId === property.id ? (
