@@ -8,14 +8,27 @@ import { getUserUsageBytes, formatBytes } from '../utils/usage';
 import { FREE_TIER_MAX_BYTES, FREE_TIER_GB } from '../../constants';
 import { withAuth } from '../components/withAuth';
 
+// Deterministic avatar color from a string
+function getAvatarColor(str: string): string {
+  const palette = [
+    '#4f46e5', '#0891b2', '#059669', '#d97706',
+    '#dc2626', '#7c3aed', '#db2777', '#0284c7',
+  ];
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return palette[Math.abs(hash) % palette.length];
+}
+
 function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [usageBytes, setUsageBytes] = useState(0);
   const [email, setEmail] = useState<string | null>(null);
-  const [firstName, setFirstName] = useState<string>("");
-  const [lastName, setLastName] = useState<string>("");
+  const [firstName, setFirstName] = useState<string>('');
+  const [lastName, setLastName] = useState<string>('');
   const [isEditingName, setIsEditingName] = useState(false);
-  
+
   // Profile enrichment fields
   const [userType, setUserType] = useState<string>('');
   const [propertyCount, setPropertyCount] = useState<string>('');
@@ -30,32 +43,22 @@ function AccountPage() {
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        return;
-      }
+      if (!user) return;
       setEmail(user.email ?? null);
-      const metaFirst = (user.user_metadata?.first_name as string) || "";
-      const metaLast = (user.user_metadata?.last_name as string) || "";
-      setFirstName(metaFirst);
-      setLastName(metaLast);
-      
-      // Load profile enrichment data
+      setFirstName((user.user_metadata?.first_name as string) || '');
+      setLastName((user.user_metadata?.last_name as string) || '');
       try {
         const { data: profile } = await supabase
           .from('user_profiles')
           .select('user_type, property_count, use_case')
           .eq('user_id', user.id)
           .single();
-        
         if (profile) {
           setUserType(profile.user_type || '');
           setPropertyCount(profile.property_count || '');
           setUseCase(profile.use_case || '');
         }
-      } catch (error) {
-        console.error('Error loading profile:', error);
-      }
-      
+      } catch {}
       const total = await getUserUsageBytes(user.id);
       setUsageBytes(total);
       setLoading(false);
@@ -75,12 +78,11 @@ function AccountPage() {
             user_type: userType || null,
             property_count: propertyCount || null,
             use_case: useCase || null,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('user_id', user.id);
-
         if (error) {
-          setProfileError('Failed to save profile. Please try again.');
+          setProfileError('Failed to save. Please try again.');
         } else {
           setIsEditingProfile(false);
           setProfileSuccess(true);
@@ -88,7 +90,7 @@ function AccountPage() {
         }
       }
     } catch {
-      setProfileError('Failed to save profile. Please try again.');
+      setProfileError('Failed to save. Please try again.');
     } finally {
       setProfileLoading(false);
     }
@@ -96,6 +98,15 @@ function AccountPage() {
 
   const limitGB = FREE_TIER_GB;
   const pct = Math.min(100, Math.round((usageBytes / FREE_TIER_MAX_BYTES) * 100));
+  const displayName = [firstName, lastName].filter(Boolean).join(' ');
+  const initials = displayName
+    ? displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : (email?.[0] ?? '?').toUpperCase();
+  const avatarColor = getAvatarColor(displayName || email || '?');
+
+  const SectionHeader = ({ label }: { label: string }) => (
+    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">{label}</p>
+  );
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -104,292 +115,295 @@ function AccountPage() {
       </Head>
       <WebSidebar />
       <div className="flex-1 overflow-auto">
-      <div className="max-w-3xl mx-auto p-6 pb-20">
-        <h1 className="text-3xl font-extrabold mb-6 tracking-tight text-gray-900">Account</h1>
-        {loading ? (
-          <div className="text-gray-600">Loading...</div>
-        ) : (
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow border p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-gray-500">Signed in as</div>
-                  <div className="text-lg font-semibold text-gray-900">{email}</div>
+        <div className="max-w-2xl mx-auto px-4 py-8 pb-28">
+
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-white rounded-2xl border border-gray-200 p-5 animate-pulse">
+                  <div className="h-4 bg-gray-100 rounded w-1/3 mb-3" />
+                  <div className="h-3 bg-gray-100 rounded w-2/3" />
                 </div>
-              </div>
-              <div className="mt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">Name</label>
-                  {!isEditingName && (
-                    <button
-                      className="p-2 rounded-lg hover:bg-gray-100 cursor-pointer text-gray-600"
-                      onClick={() => setIsEditingName(true)}
-                      title="Edit name"
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+
+              {/* ── Identity ─────────────────────────────────── */}
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="p-5">
+                  <SectionHeader label="Account" />
+                  <div className="flex items-center gap-4">
+                    {/* Avatar */}
+                    <div
+                      className="w-14 h-14 rounded-full flex items-center justify-center text-white text-lg font-semibold flex-shrink-0 select-none"
+                      style={{ backgroundColor: avatarColor }}
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 20h9"/>
-                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-                      </svg>
-                    </button>
-                  )}
+                      {initials}
+                    </div>
+
+                    {/* Name + Email */}
+                    <div className="flex-1 min-w-0">
+                      {!isEditingName ? (
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900 leading-snug">
+                              {displayName || <span className="text-gray-400 font-normal">Add your name</span>}
+                            </div>
+                            <div className="text-sm text-gray-500 truncate">{email}</div>
+                          </div>
+                          <button
+                            onClick={() => setIsEditingName(true)}
+                            className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
+                            title="Edit name"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <input
+                              value={firstName}
+                              onChange={e => setFirstName(e.target.value)}
+                              className="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                              placeholder="First name"
+                              autoComplete="given-name"
+                              autoFocus
+                            />
+                            <input
+                              value={lastName}
+                              onChange={e => setLastName(e.target.value)}
+                              className="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                              placeholder="Last name"
+                              autoComplete="family-name"
+                            />
+                          </div>
+                          {nameError && <p className="text-xs text-red-600">{nameError}</p>}
+                          <div className="flex gap-2">
+                            <button
+                              disabled={nameSaving}
+                              onClick={async () => {
+                                setNameSaving(true);
+                                setNameError(null);
+                                try {
+                                  const { error } = await supabase.auth.updateUser({
+                                    data: { first_name: firstName, last_name: lastName, full_name: [firstName, lastName].filter(Boolean).join(' ') }
+                                  });
+                                  if (error) { setNameError('Failed to save. Please try again.'); }
+                                  else { setIsEditingName(false); }
+                                } catch { setNameError('Failed to save. Please try again.'); }
+                                finally { setNameSaving(false); }
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                            >
+                              {nameSaving ? 'Saving\u2026' : 'Save'}
+                            </button>
+                            <button
+                              disabled={nameSaving}
+                              onClick={() => { setIsEditingName(false); setNameError(null); }}
+                              className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {!isEditingName ? (
-                  <div className="text-base font-semibold text-gray-900">
-                    {[firstName, lastName].filter(Boolean).join(' ') || <span className="text-gray-500">Add your name</span>}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex flex-col gap-2">
-                      <input
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder:text-gray-600"
-                        placeholder="First name"
-                        autoComplete="given-name"
-                      />
-                      <input
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder:text-gray-600"
-                        placeholder="Last name"
-                        autoComplete="family-name"
-                      />
-                    </div>
-                    {nameError && (
-                      <p className="text-sm text-red-600">{nameError}</p>
+                {/* Sign out */}
+                <div className="border-t border-gray-100 px-5 py-3">
+                  <button
+                    className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                    onClick={async () => {
+                      try {
+                        try { sessionStorage.removeItem('droppoint-map-position'); } catch {}
+                        try { sessionStorage.removeItem('droppoint-selected-property'); } catch {}
+                        try { sessionStorage.removeItem('droppoint-properties-cache'); } catch {}
+                        await supabase.auth.signOut();
+                      } finally {
+                        window.location.href = '/';
+                      }
+                    }}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Profile ──────────────────────────────────── */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <SectionHeader label="Profile" />
+                  <div className="flex items-center gap-3 -mt-3">
+                    {profileSuccess && !isEditingProfile && (
+                      <span className="text-xs text-green-600 font-medium">Saved</span>
                     )}
-                    <div className="flex gap-2">
+                    {!isEditingProfile && (
                       <button
-                        className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-                        disabled={nameSaving}
-                        onClick={async () => {
-                          setNameSaving(true);
-                          setNameError(null);
-                          try {
-                            const { error } = await supabase.auth.updateUser({ data: { first_name: firstName, last_name: lastName, full_name: [firstName, lastName].filter(Boolean).join(' ') } });
-                            if (error) {
-                              setNameError('Failed to save name. Please try again.');
-                            } else {
-                              setIsEditingName(false);
-                            }
-                          } catch {
-                            setNameError('Failed to save name. Please try again.');
-                          } finally {
-                            setNameSaving(false);
-                          }
-                        }}
+                        onClick={() => setIsEditingProfile(true)}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
                       >
-                        {nameSaving ? 'Saving...' : 'Save'}
+                        {userType || propertyCount || useCase ? 'Edit' : 'Add details'}
                       </button>
+                    )}
+                  </div>
+                </div>
+
+                {!isEditingProfile ? (
+                  !userType && !propertyCount && !useCase ? (
+                    <p className="text-sm text-gray-400">No preferences set. Add details to help us improve DropPoint for you.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {userType && (
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400 w-20 flex-shrink-0">I&apos;m a</span>
+                          <span className="text-sm text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-full font-medium">{userType}</span>
+                        </div>
+                      )}
+                      {propertyCount && (
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400 w-20 flex-shrink-0">I manage</span>
+                          <span className="text-sm text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-full font-medium">{propertyCount}</span>
+                        </div>
+                      )}
+                      {useCase && (
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400 w-20 flex-shrink-0">Use case</span>
+                          <span className="text-sm text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-full font-medium">{useCase}</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <div className="space-y-5">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-2">I&apos;m a&hellip;</p>
+                      <div className="flex flex-wrap gap-2">
+                        {['Real Estate Agent', 'Property Manager', 'Investor', 'Homeowner', 'Developer', 'Admin', 'Other'].map(type => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setUserType(type === userType ? '' : type)}
+                            className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all ${
+                              userType === type
+                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-2">I manage about&hellip;</p>
+                      <div className="flex flex-wrap gap-2">
+                        {['1\u20135 properties', '6\u201320 properties', '21\u2013100 properties', '100+ properties'].map(count => (
+                          <button
+                            key={count}
+                            type="button"
+                            onClick={() => setPropertyCount(count === propertyCount ? '' : count)}
+                            className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all ${
+                              propertyCount === count
+                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {count}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-2">I&apos;ll use DropPoint for&hellip;</p>
+                      <div className="flex flex-wrap gap-2">
+                        {['Document storage', 'Client management', 'Property tracking', 'Portfolio organization', 'Team collaboration', 'Personal use'].map(use => (
+                          <button
+                            key={use}
+                            type="button"
+                            onClick={() => setUseCase(use === useCase ? '' : use)}
+                            className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all ${
+                              useCase === use
+                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {use}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {profileError && <p className="text-sm text-red-600">{profileError}</p>}
+                    <div className="flex gap-2 pt-1">
                       <button
-                        className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-60"
-                        disabled={nameSaving}
-                        onClick={() => { setIsEditingName(false); setNameError(null); }}
+                        onClick={() => { setIsEditingProfile(false); setProfileError(null); }}
+                        disabled={profileLoading}
+                        className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition-colors"
                       >
                         Cancel
                       </button>
+                      <button
+                        onClick={handleSaveProfile}
+                        disabled={profileLoading}
+                        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                      >
+                        {profileLoading ? 'Saving\u2026' : 'Save'}
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
-              <div className="mt-6">
-                <button
-                  className="px-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
-                  onClick={async () => {
-                    try {
-                      // Clear lightweight app caches
-                      try { sessionStorage.removeItem('droppoint-map-position'); } catch {}
-                      try { sessionStorage.removeItem('droppoint-selected-property'); } catch {}
-                      try { sessionStorage.removeItem('droppoint-properties-cache'); } catch {}
-                      await supabase.auth.signOut();
-                    } finally {
-                      window.location.href = '/';
-                    }
-                  }}
-                >
-                  Log out
-                </button>
-              </div>
-            </div>
 
-            {/* Profile Enrichment Section */}
-            <div className="bg-white rounded-2xl shadow border p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="text-lg font-semibold text-gray-900">Help us know you better</div>
-                  <div className="text-sm text-gray-500">Optional - helps us improve DropPoint for you</div>
-                </div>
-                {profileSuccess && !isEditingProfile && (
-                  <span className="text-sm text-green-600 font-medium">Saved</span>
-                )}
-                {!isEditingProfile && !profileSuccess && (
-                  <button
-                    className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium"
-                    onClick={() => setIsEditingProfile(true)}
-                  >
-                    {userType || propertyCount || useCase ? 'Edit' : 'Add details'}
-                  </button>
-                )}
-              </div>
-
-              {!isEditingProfile ? (
-                <div className="space-y-3">
-                  {userType && (
-                    <div>
-                      <div className="text-sm text-gray-500">I&apos;m a...</div>
-                      <div className="text-base font-medium text-gray-900">{userType}</div>
-                    </div>
-                  )}
-                  {propertyCount && (
-                    <div>
-                      <div className="text-sm text-gray-500">I manage about...</div>
-                      <div className="text-base font-medium text-gray-900">{propertyCount}</div>
-                    </div>
-                  )}
-                  {useCase && (
-                    <div>
-                      <div className="text-sm text-gray-500">I&apos;ll use DropPoint for...</div>
-                      <div className="text-base font-medium text-gray-900">{useCase}</div>
-                    </div>
-                  )}
-                  {!userType && !propertyCount && !useCase && (
-                    <div className="text-sm text-gray-400 italic">No additional details added yet</div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* User Type */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">I&apos;m a...</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['Real Estate Agent', 'Property Manager', 'Investor', 'Homeowner', 'Developer', 'Admin', 'Other'].map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setUserType(type)}
-                          className={`p-3 rounded-lg border-2 transition-all text-sm ${
-                            userType === type
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Property Count */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">I manage about...</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['1-5 properties', '6-20 properties', '21-100 properties', '100+ properties'].map((count) => (
-                        <button
-                          key={count}
-                          type="button"
-                          onClick={() => setPropertyCount(count)}
-                          className={`p-3 rounded-lg border-2 transition-all text-sm ${
-                            propertyCount === count
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
-                          }`}
-                        >
-                          {count}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Use Case */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">I&apos;ll use DropPoint for...</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['Document storage', 'Client management', 'Property tracking', 'Portfolio organization', 'Team collaboration', 'Personal use'].map((use) => (
-                        <button
-                          key={use}
-                          type="button"
-                          onClick={() => setUseCase(use)}
-                          className={`p-3 rounded-lg border-2 transition-all text-sm ${
-                            useCase === use
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
-                          }`}
-                        >
-                          {use}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {profileError && (
-                    <p className="text-sm text-red-600">{profileError}</p>
-                  )}
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      onClick={() => { setIsEditingProfile(false); setProfileError(null); }}
-                      disabled={profileLoading}
-                      className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-60"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveProfile}
-                      disabled={profileLoading}
-                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
-                    >
-                      {profileLoading ? 'Saving...' : 'Save'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Admin Section */}
-            {userType === 'Admin' && (
-              <div className="bg-white rounded-2xl shadow border p-5">
-                <div className="text-lg font-semibold text-gray-900 mb-3">Admin Tools</div>
-                <div className="space-y-3">
-                  <Link 
+              {/* ── Admin tools ───────────────────────────────── */}
+              {userType === 'Admin' && (
+                <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                  <SectionHeader label="Admin" />
+                  <Link
                     href="/admin"
-                    className="block w-full bg-blue-600 text-white py-3 px-4 rounded-lg text-center font-medium hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                   >
                     Configuration Management
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m9 18 6-6-6-6"/>
+                    </svg>
                   </Link>
-                  <p className="text-sm text-gray-600">
-                    Manage application settings and feature toggles.
-                  </p>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div className="bg-white rounded-2xl shadow border p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <div className="text-lg font-semibold text-gray-900">Storage</div>
-                  <div className="text-sm text-gray-500">Free plan · {limitGB} GB total</div>
+              {/* ── Storage ───────────────────────────────────── */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-1">
+                  <SectionHeader label="Storage" />
+                  <span className="text-xs text-gray-400 -mt-3">Free plan &middot; {limitGB} GB</span>
                 </div>
-                <div className="text-sm font-medium text-gray-900">{formatBytes(usageBytes)} of {limitGB} GB</div>
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="font-medium text-gray-900">{formatBytes(usageBytes)}</span>
+                  <span className="text-gray-400 text-xs">{pct}% of {limitGB} GB</span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#3b82f6',
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-2.5">Paid plans coming soon.</p>
               </div>
-              <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-3 rounded-full transition-all ${pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-blue-600'}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <div className="mt-3 text-sm text-gray-500">Paid plans coming soon.</div>
+
             </div>
-          </div>
-        )}
+          )}
+        </div>
+        <MobileBottomNav />
       </div>
-      {/* Mobile bottom nav fixed */}
-      <MobileBottomNav />
-      </div>
-      </div>
+    </div>
   );
 }
 
-// Wrap with auth protection - require authentication
 export default withAuth(AccountPage, { requireAuth: true });
-
-

@@ -307,6 +307,8 @@ function MapPage() {
 
   // Resolve initial center BEFORE the map displays to avoid flashes from US center -> current location
   useEffect(() => {
+    if (initialCenterResolved) return;
+
     let resolved = false;
     const resolveFallback = async () => {
       if (resolved) return;
@@ -322,7 +324,7 @@ function MapPage() {
             .limit(1);
           if (properties && properties.length > 0) {
             setMapCenter({ lat: properties[0].lat, lng: properties[0].lng });
-            setZoom(14); // Same as DEFAULT_ZOOM, lower than recenter zoom (17) - wide view
+            setZoom(14);
             setInitialCenterResolved(true);
             return;
           }
@@ -341,37 +343,36 @@ function MapPage() {
       currentLocationStageRef.current = 'first';
     }
 
-    if (!initialCenterResolved && (focusCurrent || zoom === DEFAULT_ZOOM)) {
-      if (typeof window !== 'undefined' && 'geolocation' in navigator) {
-        const fallbackTimer = window.setTimeout(resolveFallback, 1200);
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            if (resolved) return;
-            resolved = true;
-            window.clearTimeout(fallbackTimer);
-            setMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
-            setZoom(DEFAULT_ZOOM);
-            // We are at primary at current location; pre-arm deep (next tap goes deep)
-            currentLocationZoomStageRef.current = 'none';
-            currentLocationStageRef.current = 'none';
-            setInitialCenterResolved(true);
-          },
-          () => {
-            window.clearTimeout(fallbackTimer);
-            resolveFallback();
-          },
-          { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
-        );
-        return () => {
-          window.clearTimeout(fallbackTimer);
-        };
-      } else {
-        resolveFallback();
-      }
-    } else if (!initialCenterResolved) {
+    // If the user has a previously saved map position and we're not forcing current location,
+    // restore that position immediately (already loaded by useMapState) and skip geolocation.
+    const hasSavedPosition = typeof window !== 'undefined' && !!sessionStorage.getItem('droppoint-map-position');
+    if (!focusCurrent && hasSavedPosition) {
       setInitialCenterResolved(true);
+      return;
     }
-  }, [zoom, initialCenterResolved, setInitialCenterResolved, setMapCenter, setZoom]);
+
+    // No saved position (or explicit focusCurrent): try geolocation so the map opens at the
+    // user's current location. Wait for the browser permission dialog — no short fallback timer.
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (resolved) return;
+          resolved = true;
+          setMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
+          setZoom(DEFAULT_ZOOM);
+          currentLocationZoomStageRef.current = 'none';
+          currentLocationStageRef.current = 'none';
+          setInitialCenterResolved(true);
+        },
+        () => {
+          resolveFallback();
+        },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+      );
+    } else {
+      resolveFallback();
+    }
+  }, [initialCenterResolved, setInitialCenterResolved, setMapCenter, setZoom]);
 
   // Fetch predictions as user types
   useEffect(() => {
@@ -2103,7 +2104,10 @@ function MapPage() {
            style={getMobileStyles('page')}>
       {/* Google Maps loader */}
       {!isLoaded || !initialCenterResolved ? (
-        <div className="absolute inset-0 flex items-center justify-center text-gray-600">Loading map…</div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-50">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-400">Loading map…</p>
+        </div>
       ) : loadError ? (
         <div className="absolute inset-0 flex items-center justify-center text-red-600">Failed to load map.</div>
       ) : (

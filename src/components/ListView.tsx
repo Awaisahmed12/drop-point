@@ -140,6 +140,7 @@ export const ListView = ({
           setPropertyMenuId(newId);
           if (newId && property.id) calculateMenuPosition(e.currentTarget, property.id);
         }}
+        onTouchEnd={e => e.stopPropagation()}
         title="Property actions"
       >
         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -148,9 +149,13 @@ export const ListView = ({
       </button>
       {propertyMenuId === property.id && (
         <div ref={propertyMenuRef} className="fixed w-44 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
-             style={{ zIndex: 999999, ...(property.id ? menuPosition[property.id] : {}) }}>
+             style={{ zIndex: 999999, ...(property.id ? menuPosition[property.id] : {}) }}
+             onClick={e => e.stopPropagation()}
+             onPointerDown={e => e.stopPropagation()}
+             onTouchEnd={e => e.stopPropagation()}>
           <button className="flex items-center gap-2.5 w-full text-left px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
-            onClick={e => { e.stopPropagation(); onPropertySelect(property); if (variant === 'modal') onClose(); setPropertyMenuId(null); }}>
+            onClick={e => { e.stopPropagation(); onPropertySelect(property); if (variant === 'modal') onClose(); setPropertyMenuId(null); }}
+            onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); }}>
             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -158,7 +163,8 @@ export const ListView = ({
             View Property
           </button>
           <button className="flex items-center gap-2.5 w-full text-left px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
-            onClick={e => { e.stopPropagation(); setRenamingPropertyId(property.id); setRenamingPropertyName(property.label || ''); setPropertyMenuId(null); }}>
+            onClick={e => { e.stopPropagation(); setRenamingPropertyId(property.id); setRenamingPropertyName(property.label || ''); setPropertyMenuId(null); }}
+            onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); }}>
             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
@@ -169,7 +175,8 @@ export const ListView = ({
               e.stopPropagation();
               navigator.clipboard.writeText(property.address).then(() => { setCopiedPropertyId(property.id); setTimeout(() => setCopiedPropertyId(null), 2000); });
               setPropertyMenuId(null);
-            }}>
+            }}
+            onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); }}>
             {copiedPropertyId === property.id ? (
               <><svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg><span className="text-green-600">Copied!</span></>
             ) : (
@@ -201,9 +208,9 @@ export const ListView = ({
   // ── PAGE VARIANT ──────────────────────────────────────────────────────────────
   if (variant === 'page') {
     return (
-      <div className="w-full px-5 sm:px-8 pb-24">
+      <div className="w-full px-4 sm:px-8 pb-24">
         {/* Header */}
-        <div className="pt-8 pb-6">
+        <div className="pt-5 sm:pt-8 pb-5 sm:pb-6">
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Properties</h1>
           <p className="text-sm text-gray-400 mt-1">
             {searchQuery
@@ -310,8 +317,8 @@ export const ListView = ({
               })}
             </div>
 
-            {/* ── Mobile: list rows ── */}
-            <div className="sm:hidden space-y-2">
+            {/* ── Mobile: grouped list ── */}
+            <div className="sm:hidden bg-white rounded-2xl overflow-hidden shadow-sm divide-y divide-gray-50">
               {sortedProperties.map(property => {
                 const { streetAddress, locationInfo } = parseAddress(property.address);
                 const imgSrc = `https://maps.googleapis.com/maps/api/streetview?size=200x200&location=${property.lat},${property.lng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`;
@@ -320,23 +327,23 @@ export const ListView = ({
                   <div
                     key={property.id}
                     onClick={() => { if (renamingPropertyId === property.id) return; onPropertySelect(property); }}
-                    className={`flex items-center gap-4 px-4 py-4 rounded-2xl border bg-white transition-all duration-150 group ${
+                    className={`flex items-center gap-3.5 px-4 py-3.5 transition-colors ${
                       renamingPropertyId === property.id
-                        ? 'cursor-default border-blue-200 bg-blue-50/40'
-                        : 'cursor-pointer border-gray-100 active:scale-[0.99] active:bg-gray-50'
+                        ? 'cursor-default bg-blue-50/30'
+                        : 'cursor-pointer active:bg-gray-50'
                     }`}
                   >
-                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 shrink-0 shadow-sm">
+                    <div className="w-[72px] h-[72px] rounded-xl overflow-hidden bg-gray-100 shrink-0">
                       <Image src={imgSrc} alt="" width={200} height={200} className="w-full h-full object-cover" unoptimized
                         onError={e => { const t = e.currentTarget as HTMLImageElement; if (t.dataset.fallback !== '1') { t.dataset.fallback = '1'; t.src = fallbackSrc; } }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-base font-semibold text-gray-900 truncate">
+                      <div className="text-[15px] font-semibold text-gray-900 truncate">
                         {property.label || streetAddress || property.address}
                       </div>
                       {property.label && <div className="text-sm text-gray-400 truncate mt-0.5">{streetAddress}</div>}
-                      <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-400">
-                        {locationInfo && <span className="truncate">{locationInfo}</span>}
+                      <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-400">
+                        {locationInfo && <span className="truncate max-w-[150px]">{locationInfo}</span>}
                         {locationInfo && <span>·</span>}
                         <span className="shrink-0">{property.file_count} {property.file_count === 1 ? 'file' : 'files'}</span>
                       </div>
