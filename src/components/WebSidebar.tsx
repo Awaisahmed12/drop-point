@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import type { Property } from '../../types';
@@ -163,22 +163,33 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
             ) : (
               filteredProperties.map(property => {
                 const isSelected = property.id === selectedPropertyId;
+                const streetAddress = property.address.split(',')[0];
+                const fileCount = (property as Property & { file_count?: number }).file_count;
                 return (
                   <button
                     key={property.id}
                     onClick={() => onPropertySelect?.(property)}
-                    className={`w-full text-left px-2.5 py-2 rounded-lg mb-0.5 transition-colors duration-100 ${
+                    className={`w-full text-left px-2.5 py-2 rounded-lg mb-0.5 transition-colors duration-100 group ${
                       isSelected
                         ? 'bg-blue-50 text-blue-700'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <div className="text-xs font-medium leading-snug truncate">
-                      {property.label || property.address.split(',')[0]}
+                    <div className="flex items-center justify-between gap-1 min-w-0">
+                      <div className="text-xs font-medium leading-snug truncate flex-1 min-w-0">
+                        {property.label || streetAddress}
+                      </div>
+                      {fileCount !== undefined && fileCount > 0 && (
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                          isSelected ? 'bg-blue-200 text-blue-700' : 'bg-gray-200 text-gray-500 group-hover:bg-gray-300'
+                        }`}>
+                          {fileCount}
+                        </span>
+                      )}
                     </div>
                     {property.label && (
-                      <div className="text-xs text-gray-400 truncate leading-snug">
-                        {property.address.split(',')[0]}
+                      <div className={`text-xs truncate leading-snug mt-0.5 ${isSelected ? 'text-blue-500' : 'text-gray-400'}`}>
+                        {streetAddress}
                       </div>
                     )}
                   </button>

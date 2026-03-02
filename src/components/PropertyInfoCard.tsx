@@ -211,17 +211,17 @@ export const PropertyInfoCard = ({
               ) : (
                 <div className="w-full space-y-2">
                   {/* Main Name Display */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 group/name">
                     <h3 className="text-gray-900 text-base font-semibold break-words">
                       {displayName}
                     </h3>
-                    {/* Allow renaming for both saved and unsaved properties */}
+                    {/* Edit name — visible on hover only */}
                     <button
                       onClick={handleStartEdit}
-                      className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                      title="Edit property name"
+                      className="p-1 text-gray-300 hover:text-blue-600 opacity-0 group-hover/name:opacity-100 transition-all"
+                      title="Rename"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                     </button>
