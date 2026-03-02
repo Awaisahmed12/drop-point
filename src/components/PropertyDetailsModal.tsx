@@ -1104,10 +1104,11 @@ export const PropertyDetailsModal = ({
     <div
       className={`fixed inset-0 z-40 flex ${mobileClasses.modal} justify-center bg-black/50 backdrop-blur-md transition-all animate-fade-in`}
       onClick={(e) => {
-        // Close when clicking the backdrop
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onTouchMove={(e) => {
+        // Prevent the map behind from scrolling when touching the backdrop
+        if (e.target === e.currentTarget) e.preventDefault();
       }}
     >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[calc(100vw-20px)] sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-gray-200 relative overflow-hidden"
@@ -1213,9 +1214,10 @@ export const PropertyDetailsModal = ({
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* File List Container - Scrollable with satellite image first, then all other content */}
-          <div className="flex-1 overflow-y-auto file-list overflow-x-visible mobile-scroll" style={{ 
-            minHeight: '200px', // Minimum height for content
-            // Let content naturally size on mobile instead of fixed height restrictions
+          <div className="flex-1 overflow-y-auto overflow-x-hidden file-list mobile-scroll" style={{
+            minHeight: '200px',
+            touchAction: 'pan-y',
+            overscrollBehavior: 'contain',
           }}>
             {/* Property preview: Street View, Satellite Map, or no image based on configuration */}
             {propertyImageEnabled && (
@@ -2090,26 +2092,27 @@ export const PropertyDetailsModal = ({
         `}</style>
 
         {/* Action Buttons */}
-        <div className="flex w-full bg-white border-t border-gray-100 rounded-b-3xl overflow-hidden flex-shrink-0 h-12 min-h-[48px] sm:h-16 sm:min-h-[64px]" style={{
+        <div className="flex w-full bg-white border-t border-gray-200 rounded-b-3xl overflow-hidden flex-shrink-0" style={{
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          minHeight: '56px',
         }}>
           <button
-            className="w-1/2 py-2 px-4 sm:h-full bg-gray-50 text-blue-700 text-sm sm:text-base font-semibold flex items-center justify-center gap-1.5 border-r border-gray-100 rounded-none rounded-bl-3xl focus:outline-none transition-all hover:bg-blue-50 active:opacity-70"
+            className="w-1/2 py-4 px-4 bg-gray-100 text-blue-700 text-sm font-semibold flex items-center justify-center gap-2 border-r border-gray-200 rounded-none rounded-bl-3xl focus:outline-none transition-all hover:bg-blue-50 active:opacity-70"
             onClick={() => setCreatingFolder(true)}
           >
-            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             New Folder
           </button>
           <button
-            className="w-1/2 py-2 px-4 sm:h-full bg-blue-600 text-white text-sm sm:text-base font-semibold flex items-center justify-center gap-1.5 rounded-none rounded-br-3xl focus:outline-none transition-all hover:bg-blue-700 active:opacity-80"
+            className="w-1/2 py-4 px-4 bg-blue-600 text-white text-sm font-semibold flex items-center justify-center gap-2 rounded-none rounded-br-3xl focus:outline-none transition-all hover:bg-blue-700 active:bg-blue-800 active:opacity-90"
             onClick={() => document.getElementById('file-upload-input')?.click()}
           >
-            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5 5V3" />
             </svg>
-            Upload
+            Upload File
           </button>
         </div>
 
