@@ -2092,27 +2092,26 @@ export const PropertyDetailsModal = ({
         `}</style>
 
         {/* Action Buttons */}
-        <div className="flex w-full bg-white border-t border-gray-200 rounded-b-3xl overflow-hidden flex-shrink-0" style={{
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          minHeight: '56px',
+        <div className="flex items-center justify-center gap-3 bg-white border-t border-gray-100 rounded-b-3xl flex-shrink-0 px-5 py-3" style={{
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
         }}>
           <button
-            className="w-1/2 py-4 px-4 bg-gray-100 text-blue-700 text-sm font-semibold flex items-center justify-center gap-2 border-r border-gray-200 rounded-none rounded-bl-3xl focus:outline-none transition-all hover:bg-blue-50 active:opacity-70"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-100 text-gray-700 text-sm font-medium rounded-full focus:outline-none transition-all hover:bg-gray-200 active:bg-gray-300 active:scale-[0.97]"
             onClick={() => setCreatingFolder(true)}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             New Folder
           </button>
           <button
-            className="w-1/2 py-4 px-4 bg-blue-600 text-white text-sm font-semibold flex items-center justify-center gap-2 rounded-none rounded-br-3xl focus:outline-none transition-all hover:bg-blue-700 active:bg-blue-800 active:opacity-90"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white text-sm font-medium rounded-full focus:outline-none transition-all hover:bg-blue-700 active:bg-blue-800 active:scale-[0.97] shadow-sm"
             onClick={() => document.getElementById('file-upload-input')?.click()}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5 5V3" />
             </svg>
-            Upload File
+            Upload
           </button>
         </div>
 
