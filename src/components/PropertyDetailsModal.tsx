@@ -97,11 +97,67 @@ export const PropertyDetailsModal = ({
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchQuery, setSearchQuery] = useState('');
   const [switchingProperty, setSwitchingProperty] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ url: string; file: PropertyFile } | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const closeMenus = useCallback(() => {
     setFileMenuId(null);
     setFolderMenuId(null);
   }, []);
+
+  // Drag & drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    const droppedFiles = e.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      await onFileUpload(droppedFiles).catch(console.error);
+    }
+  }, [onFileUpload]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (e.key === 'Escape' && imagePreview) {
+        setImagePreview(null);
+      }
+      if (imagePreview && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+        const imageFiles = files.filter(f => imageExts.includes(f.file_name.split('.').pop()?.toLowerCase() || ''));
+        const idx = imageFiles.findIndex(f => f.id === imagePreview.file.id);
+        if (idx === -1) return;
+        const nextIdx = e.key === 'ArrowLeft' ? idx - 1 : idx + 1;
+        if (nextIdx >= 0 && nextIdx < imageFiles.length) {
+          const next = imageFiles[nextIdx];
+          getFileSignedUrl(next.property_id, next.file_name, false)
+            .then(url => setImagePreview({ url, file: next }))
+            .catch(console.error);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, imagePreview, files]);
   
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
@@ -675,9 +731,9 @@ export const PropertyDetailsModal = ({
           newWindow.document.close();
         }
       } 
-      // For images, open directly (these usually work fine)
+      // For images, show in-app lightbox
       else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension || '')) {
-        window.open(fileUrl, '_blank');
+        setImagePreview({ url: fileUrl, file });
       }
       // For other document types, try Google Docs Viewer
       else if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(fileExtension || '')) {
@@ -1212,7 +1268,22 @@ export const PropertyDetailsModal = ({
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div
+          className="flex-1 flex flex-col overflow-hidden relative"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {/* Drag-over overlay */}
+          {isDragOver && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-blue-50/95 border-2 border-dashed border-blue-400 rounded-xl pointer-events-none">
+              <svg className="w-14 h-14 text-blue-400 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+              <p className="text-base font-semibold text-blue-600">Drop to upload</p>
+              <p className="text-sm text-blue-500 mt-1">Files will be added to the current folder</p>
+            </div>
+          )}
           {/* File List Container - Scrollable with satellite image first, then all other content */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden file-list mobile-scroll" style={{
             minHeight: '200px',
@@ -1316,8 +1387,9 @@ export const PropertyDetailsModal = ({
               }}>
                 <div className="relative">
                   <input
+                    ref={searchInputRef}
                     type="text"
-                    placeholder="Search files and folders..."
+                    placeholder="Search files and folders…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className={`w-full ${searchPadding} bg-gray-100 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-colors pl-10 ${searchQuery ? 'pr-10' : ''} text-gray-900 placeholder-gray-400`}
@@ -1367,13 +1439,34 @@ export const PropertyDetailsModal = ({
             {!foldersLoading && !filesLoading && (
               <>
                 {/* Empty State */}
-                {sortedItems.length === 0 && selectedFolder === 'master' && (
+                {sortedItems.length === 0 && !searchQuery && (
+                  <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
+                    {selectedFolder === 'master' ? (
+                      <>
+                        <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                        <p className="text-sm font-medium text-gray-500">No files yet</p>
+                        <p className="text-xs text-gray-400 mt-1">Upload files or create folders to get started</p>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                        </svg>
+                        <p className="text-sm font-medium text-gray-500">This folder is empty</p>
+                        <p className="text-xs text-gray-400 mt-1">Upload files to add them here</p>
+                      </>
+                    )}
+                  </div>
+                )}
+                {sortedItems.length === 0 && searchQuery && (
                   <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
                     <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                     </svg>
-                    <p className="text-sm font-medium text-gray-500">No files yet</p>
-                    <p className="text-xs text-gray-400 mt-1">Upload files or create folders to get started</p>
+                    <p className="text-sm font-medium text-gray-500">No results for &ldquo;{searchQuery}&rdquo;</p>
+                    <p className="text-xs text-gray-400 mt-1">Try a different name or check your spelling</p>
                   </div>
                 )}
 
@@ -2114,6 +2207,81 @@ export const PropertyDetailsModal = ({
             Upload
           </button>
         </div>
+
+        {/* Image Lightbox */}
+        {imagePreview && (
+          <div
+            className="fixed inset-0 z-[999999] bg-black/92 flex flex-col items-center justify-center"
+            onClick={() => setImagePreview(null)}
+            onTouchEnd={e => { e.preventDefault(); setImagePreview(null); }}
+          >
+            {/* Close */}
+            <button
+              className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-colors"
+              onClick={e => { e.stopPropagation(); setImagePreview(null); }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            {/* Image */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imagePreview.url}
+              alt={imagePreview.file.file_name}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={e => e.stopPropagation()}
+              onTouchEnd={e => e.stopPropagation()}
+            />
+            {/* Caption */}
+            <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-1 px-4">
+              <p className="text-white/90 text-sm font-medium text-center">{imagePreview.file.file_name}</p>
+              <p className="text-white/50 text-xs">{formatFileSize(imagePreview.file.file_size)}</p>
+            </div>
+            {/* Navigation arrows */}
+            {(() => {
+              const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+              const imageFiles = files.filter(f => imageExts.includes(f.file_name.split('.').pop()?.toLowerCase() || ''));
+              const idx = imageFiles.findIndex(f => f.id === imagePreview.file.id);
+              return (
+                <>
+                  {idx > 0 && (
+                    <button
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-colors"
+                      onClick={e => {
+                        e.stopPropagation();
+                        const prev = imageFiles[idx - 1];
+                        getFileSignedUrl(prev.property_id, prev.file_name, false)
+                          .then(url => setImagePreview({ url, file: prev }))
+                          .catch(console.error);
+                      }}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                  )}
+                  {idx < imageFiles.length - 1 && (
+                    <button
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-colors"
+                      onClick={e => {
+                        e.stopPropagation();
+                        const next = imageFiles[idx + 1];
+                        getFileSignedUrl(next.property_id, next.file_name, false)
+                          .then(url => setImagePreview({ url, file: next }))
+                          .catch(console.error);
+                      }}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Folder Creation Modal */}
         {creatingFolder && (
