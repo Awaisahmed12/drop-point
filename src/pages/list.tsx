@@ -317,7 +317,7 @@ function ListPage() {
         selectedPropertyId={savedProperty?.id}
         onPropertySelect={(property) => openProperty(property)}
       />
-      <div className="flex-1 overflow-auto pt-4 pb-20">
+      <div className="flex-1 overflow-auto">
         <ListView
           isOpen={true}
           variant="page"

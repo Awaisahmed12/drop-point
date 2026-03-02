@@ -144,13 +144,7 @@ body {
   input[type="number"],
   textarea,
   select {
-    font-size: 16px !important;
-    min-height: 48px; /* Better touch targets */
-  }
-
-  /* Ensure buttons are touch-friendly */
-  button {
-    min-height: 44px;
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
   }
 
   /* Optimize text size for mobile readability */
@@ -276,11 +270,7 @@ body {
 }
 
 .property-title {
-  background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.03);
+  color: #111827;
 }
 
 .property-location {

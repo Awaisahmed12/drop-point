@@ -197,7 +197,7 @@ export const PropertySwitcher = ({
                         ? 'bg-blue-50 cursor-not-allowed opacity-75' 
                         : 'hover:bg-gray-50 cursor-pointer active:bg-gray-100'
                     }`}
-                    style={{ minHeight: '64px' }}
+                    style={{ minHeight: '52px' }}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">

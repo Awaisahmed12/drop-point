@@ -98,7 +98,7 @@ export const ListView = ({
       if (error) { setRenameError('Failed to rename. Please try again.'); return; }
       setRenamingPropertyId(null); setRenamingPropertyName(''); setPropertyMenuId(null);
       await refreshProperties();
-      showToast('Property renamed');
+      showToast('Property renamed', 'success');
     } catch { setRenameError('Failed to rename. Please try again.'); }
     finally { setIsSaving(false); }
   };
@@ -189,12 +189,12 @@ export const ListView = ({
           <button className="flex items-center gap-2.5 w-full text-left px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
             onClick={e => {
               e.stopPropagation();
-              navigator.clipboard.writeText(property.address).then(() => { setCopiedPropertyId(property.id); setTimeout(() => setCopiedPropertyId(null), 2000); showToast('Address copied'); });
+              navigator.clipboard.writeText(property.address).then(() => { setCopiedPropertyId(property.id); setTimeout(() => setCopiedPropertyId(null), 2000); showToast('Address copied', 'success'); });
               setPropertyMenuId(null);
             }}
             onTouchEnd={e => {
               e.stopPropagation(); e.preventDefault();
-              navigator.clipboard.writeText(property.address).then(() => { setCopiedPropertyId(property.id); setTimeout(() => setCopiedPropertyId(null), 2000); showToast('Address copied'); });
+              navigator.clipboard.writeText(property.address).then(() => { setCopiedPropertyId(property.id); setTimeout(() => setCopiedPropertyId(null), 2000); showToast('Address copied', 'success'); });
               setPropertyMenuId(null);
             }}>
             {copiedPropertyId === property.id ? (
@@ -228,7 +228,7 @@ export const ListView = ({
   // ── PAGE VARIANT ──────────────────────────────────────────────────────────────
   if (variant === 'page') {
     return (
-      <div className="w-full px-4 sm:px-8 pb-6 sm:pb-24">
+      <div className="w-full px-4 sm:px-8 pb-24">
         {/* Header */}
         <div className="pt-5 sm:pt-8 pb-4 sm:pb-6">
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Properties</h1>

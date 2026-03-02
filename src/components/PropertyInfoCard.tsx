@@ -132,14 +132,19 @@ export const PropertyInfoCard = ({
         {onClose && !isEditing && (
           <button
             aria-label="Close"
-            className="absolute top-3 right-3 p-1 text-gray-500 hover:text-gray-700 transition-colors duration-200"
+            className="absolute top-2.5 right-2.5 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 active:scale-90 transition-all duration-150"
             onClick={(e) => {
-              e.stopPropagation(); // Prevent event from bubbling up to map
+              e.stopPropagation();
+              onClose();
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
               onClose();
             }}
             title="Close"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -241,13 +246,13 @@ export const PropertyInfoCard = ({
           )}
         </div>
         <button
-          className="w-full bg-blue-600 text-white py-2.5 rounded-xl font-semibold shadow hover:bg-blue-700 transition-all disabled:opacity-60 cursor-pointer"
+          className="w-full bg-blue-600 text-white py-3 rounded-2xl font-semibold text-[15px] shadow-sm hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] transition-all disabled:opacity-60 cursor-pointer"
           disabled={addressLoading || !address || address === 'No address found' || address === 'Error fetching address'}
           onClick={() => {
             onSelect();
           }}
         >
-          {property?.id ? 'Open' : 'Select'}
+          {property?.id ? 'Open' : 'Select Location'}
         </button>
       </div>
     </div>

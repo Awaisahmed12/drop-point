@@ -376,8 +376,8 @@ export const PropertyDetailsModal = ({
   const buttonPadding = useResponsiveValue('p-2', 'p-2.5');
   const iconSize = useResponsiveValue('w-4 h-4', 'w-5 h-5');
   const headerHeight = useResponsiveValue('h-28', 'h-32');
-  const searchPadding = useResponsiveValue('px-4 py-4 text-base', 'px-4 py-2 text-sm');
-  const searchIconPos = useResponsiveValue('top-4 w-5 h-5', 'top-2.5 w-4 h-4');
+  const searchPadding = useResponsiveValue('px-4 py-2.5 text-base', 'px-4 py-2 text-sm');
+  const searchIconPos = useResponsiveValue('top-2.5 w-5 h-5', 'top-2.5 w-4 h-4');
   const tableHeaderPadding = useResponsiveValue('py-3', 'py-2');
   const listItemPadding = useResponsiveValue('px-4 py-2.5', 'px-3 py-3');
   const listIconSize = useResponsiveValue(32, 28);
@@ -1306,7 +1306,7 @@ export const PropertyDetailsModal = ({
               )}
               
               {/* Search Bar - Always visible with enhanced mobile positioning */}
-              <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-3' : 'py-4'} bg-white min-h-[72px] sm:min-h-0`} style={{
+              <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-2.5' : 'py-3'} sm:py-3 bg-white`} style={{
                 // Ensure search bar is always above mobile browser chrome
                 position: 'sticky',
                 top: breadcrumbPath.length > 0 ? '0' : '0',
@@ -1318,7 +1318,7 @@ export const PropertyDetailsModal = ({
                     placeholder="Search files and folders..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className={`w-full ${searchPadding} min-h-[48px] sm:min-h-0 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-10 ${searchQuery ? 'pr-10' : ''} text-black placeholder-gray-400`}
+                    className={`w-full ${searchPadding} bg-gray-100 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-colors pl-10 ${searchQuery ? 'pr-10' : ''} text-gray-900 placeholder-gray-400`}
                   />
                   <svg className={`absolute left-3 ${searchIconPos} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <circle cx="11" cy="11" r="8" />
@@ -1386,7 +1386,7 @@ export const PropertyDetailsModal = ({
                         return (
                           <div key={`folder-${folder.id}`}>
                             <div
-                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[56px] sm:min-h-[40px] hover:bg-gray-100 rounded-lg transition mb-0.5`}
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5`}
                               style={{ cursor: 'pointer' }}
                               onClick={() => {
                                 if (fileMenuId || folderMenuId) {
@@ -1501,7 +1501,7 @@ export const PropertyDetailsModal = ({
                         return (
                           <div key={`file-${file.id}`}>
                             <div
-                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[56px] sm:min-h-[40px] hover:bg-gray-100 rounded-lg transition mb-0.5`}
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5`}
                               style={{ cursor: 'pointer' }}
                               onClick={async (e) => {
                                 if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
@@ -1633,7 +1633,7 @@ export const PropertyDetailsModal = ({
                           return (
                             <div
                               key={`grid-folder-${folder.id}`}
-                              className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition cursor-pointer group relative"
+                              className="flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative"
                               onClick={() => {
                                 // Clear search when entering a folder
                                 setSearchQuery('');
@@ -1738,7 +1738,7 @@ export const PropertyDetailsModal = ({
                           return (
                             <div
                               key={`grid-file-${file.id}`}
-                              className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition cursor-pointer group relative"
+                              className="flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative"
                               onClick={async (e) => {
                                 if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
                                   return;
@@ -1883,7 +1883,7 @@ export const PropertyDetailsModal = ({
 
         {/* Upload Progress Toasts - Apple-inspired design */}
         {pendingUploads.length > 0 && (
-          <div className="fixed z-[9999] top-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96">
+          <div className="fixed z-[9999] left-4 right-4 sm:left-auto sm:right-4 sm:w-96" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
             {/* Summary toast for multiple uploads */}
             {pendingUploads.length > 1 && (
               <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-4 mb-3 transform transition-all duration-300 ease-out">
@@ -2090,24 +2090,23 @@ export const PropertyDetailsModal = ({
         `}</style>
 
         {/* Action Buttons */}
-        <div className="flex w-full bg-white border-t border-gray-200 rounded-b-3xl overflow-hidden flex-shrink-0 h-14 min-h-[56px] sm:h-[70px] sm:min-h-[70px]" style={{
+        <div className="flex w-full bg-white border-t border-gray-100 rounded-b-3xl overflow-hidden flex-shrink-0 h-12 min-h-[48px] sm:h-16 sm:min-h-[64px]" style={{
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          ...getMobileStyles('container')
         }}>
           <button
-            className="w-1/2 py-2.5 px-4 sm:py-0 sm:px-0 sm:h-full bg-gray-100 text-blue-700 text-base sm:text-lg font-bold flex items-center justify-center gap-2 border-r border-gray-200 rounded-none rounded-bl-3xl focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all hover:bg-blue-50 active:scale-95"
+            className="w-1/2 py-2 px-4 sm:h-full bg-gray-50 text-blue-700 text-sm sm:text-base font-semibold flex items-center justify-center gap-1.5 border-r border-gray-100 rounded-none rounded-bl-3xl focus:outline-none transition-all hover:bg-blue-50 active:opacity-70"
             onClick={() => setCreatingFolder(true)}
           >
-            <svg className="w-5 h-5 sm:w-7 sm:h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             New Folder
           </button>
           <button
-            className="w-1/2 py-2.5 px-4 sm:py-0 sm:px-0 sm:h-full bg-blue-600 text-white text-base sm:text-lg font-bold flex items-center justify-center gap-2 rounded-none rounded-br-3xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all hover:bg-blue-700 active:scale-95"
+            className="w-1/2 py-2 px-4 sm:h-full bg-blue-600 text-white text-sm sm:text-base font-semibold flex items-center justify-center gap-1.5 rounded-none rounded-br-3xl focus:outline-none transition-all hover:bg-blue-700 active:opacity-80"
             onClick={() => document.getElementById('file-upload-input')?.click()}
           >
-            <svg className="w-5 h-5 sm:w-7 sm:h-7" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5 5V3" />
             </svg>
             Upload
@@ -2116,8 +2115,16 @@ export const PropertyDetailsModal = ({
 
         {/* Folder Creation Modal */}
         {creatingFolder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-            <div className="bg-white rounded-2xl shadow-2xl p-6 w-11/12 max-w-xs flex flex-col gap-4 border border-blue-100 relative">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+            onClick={() => { setCreatingFolder(false); setNewFolderName(''); setFolderErrorPopup(null); }}
+            onTouchEnd={e => { e.preventDefault(); setCreatingFolder(false); setNewFolderName(''); setFolderErrorPopup(null); }}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl p-6 w-11/12 max-w-xs flex flex-col gap-4 border border-blue-100 relative"
+              onClick={e => e.stopPropagation()}
+              onTouchEnd={e => e.stopPropagation()}
+            >
               <div className="text-lg font-bold text-gray-900 mb-2">Create New Folder</div>
               <input
                 ref={folderInputRef}
