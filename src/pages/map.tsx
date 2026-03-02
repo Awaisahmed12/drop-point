@@ -28,6 +28,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { propertyService, fileService, folderService } from '../services';
 import { useToast } from '../contexts/ToastContext';
 import { prefetchPropertyData, getPropertyDataSync, setPropertyDataCache } from '../hooks/usePropertyPrefetch';
+import { wasRecentTouch } from '../utils/ghostClick';
 
 import {
   mapContainerStyleWithSidebar,
@@ -1769,8 +1770,9 @@ function MapPage() {
   const handleMapClick = useCallback(async (event: google.maps.MapMouseEvent) => {
     if (!event.latLng) return;
 
-    // Eat ghost clicks that arrive after touch-dismissing the info card
-    if (suppressMapClickRef.current) {
+    // Eat ghost clicks: either the explicit suppress flag set by onClose,
+    // or a recent touch anywhere on the page (belt-and-suspenders).
+    if (suppressMapClickRef.current || wasRecentTouch()) {
       suppressMapClickRef.current = false;
       return;
     }

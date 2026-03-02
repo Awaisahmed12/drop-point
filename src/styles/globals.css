@@ -353,6 +353,33 @@ summary {
   cursor: pointer !important;
 }
 
+/* ================================
+   GHOST-CLICK PREVENTION
+   ================================ */
+
+/*
+ * touch-action: manipulation tells the browser to handle panning and pinch-
+ * zoom natively but to NOT wait for a double-tap to recognise a tap as a
+ * click. This eliminates the 300 ms synthetic-click delay on touch devices,
+ * which in turn eliminates the "ghost click" timing window where an element
+ * disappears between touchend and the delayed synthetic click landing on
+ * whatever is now underneath.
+ */
+button,
+a,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+label,
+summary,
+.cursor-pointer {
+  touch-action: manipulation;
+}
+
 /* Apply pointer cursor to elements with click handlers */
 [onclick] {
   cursor: pointer !important;

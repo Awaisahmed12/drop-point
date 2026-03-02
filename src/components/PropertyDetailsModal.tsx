@@ -99,11 +99,13 @@ export const PropertyDetailsModal = ({
   const [switchingProperty, setSwitchingProperty] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [imagePreview, setImagePreview] = useState<{ url: string; file: PropertyFile } | null>(null);
+  const [fabOpen, setFabOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const closeMenus = useCallback(() => {
     setFileMenuId(null);
     setFolderMenuId(null);
+    setFabOpen(false);
   }, []);
 
   // Drag & drop handlers
@@ -2184,27 +2186,77 @@ export const PropertyDetailsModal = ({
           }
         `}</style>
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-center gap-3 bg-white border-t border-gray-100 rounded-b-3xl flex-shrink-0 px-5 py-3" style={{
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
-        }}>
+        {/* FAB — always visible, floats over content, never pushed off-screen */}
+        <div
+          className="absolute z-30 flex flex-col items-end gap-2"
+          style={{
+            bottom: `calc(env(safe-area-inset-bottom, 0px) + 16px)`,
+            right: '16px',
+          }}
+          // Prevent any touch/click leaking to the file list or map below
+          onClick={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+          onTouchEnd={e => e.stopPropagation()}
+        >
+          {/* Expanded options */}
+          {fabOpen && (
+            <>
+              {/* Backdrop to close */}
+              <div
+                className="fixed inset-0 z-[-1]"
+                onClick={() => setFabOpen(false)}
+                onTouchEnd={e => { e.preventDefault(); setFabOpen(false); }}
+              />
+              {/* New Folder option */}
+              <button
+                className="flex items-center gap-2.5 bg-white text-gray-700 text-sm font-medium pl-4 pr-5 py-2.5 rounded-2xl shadow-lg hover:bg-gray-50 active:scale-[0.97] transition-all animate-fade-in"
+                style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
+                onClick={() => { setCreatingFolder(true); setFabOpen(false); }}
+                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); setCreatingFolder(true); setFabOpen(false); }}
+              >
+                <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                </div>
+                New Folder
+              </button>
+              {/* Upload option */}
+              <button
+                className="flex items-center gap-2.5 bg-white text-gray-700 text-sm font-medium pl-4 pr-5 py-2.5 rounded-2xl shadow-lg hover:bg-gray-50 active:scale-[0.97] transition-all animate-fade-in"
+                style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
+                onClick={() => { document.getElementById('file-upload-input')?.click(); setFabOpen(false); }}
+                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); document.getElementById('file-upload-input')?.click(); setFabOpen(false); }}
+              >
+                <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                </div>
+                Upload Files
+              </button>
+            </>
+          )}
+
+          {/* Main FAB button */}
           <button
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-100 text-gray-700 text-sm font-medium rounded-full focus:outline-none transition-all hover:bg-gray-200 active:bg-gray-300 active:scale-[0.97]"
-            onClick={() => setCreatingFolder(true)}
+            className={`w-13 h-13 flex items-center justify-center rounded-full text-white transition-all duration-200 active:scale-90 ${
+              fabOpen ? 'bg-gray-700 rotate-45' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+            style={{
+              width: '52px',
+              height: '52px',
+              boxShadow: fabOpen
+                ? '0 4px 16px rgba(0,0,0,0.25)'
+                : '0 4px 16px rgba(37,99,235,0.4)',
+            }}
+            onClick={() => setFabOpen(v => !v)}
+            onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); setFabOpen(v => !v); }}
+            aria-label={fabOpen ? 'Close actions' : 'New folder or upload'}
           >
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-            New Folder
-          </button>
-          <button
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white text-sm font-medium rounded-full focus:outline-none transition-all hover:bg-blue-700 active:bg-blue-800 active:scale-[0.97] shadow-sm"
-            onClick={() => document.getElementById('file-upload-input')?.click()}
-          >
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5 5V3" />
-            </svg>
-            Upload
           </button>
         </div>
 

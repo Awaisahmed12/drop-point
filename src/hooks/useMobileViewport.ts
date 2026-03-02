@@ -52,10 +52,13 @@ export const useMobileViewport = () => {
       };
     }
     
-    // Mobile: perfect viewport handling with safe area support
+    // Mobile: explicit height so flex children (scroll area, action bar) are
+    // correctly sized. Using `auto` breaks flex-1 because a flex child with
+    // flex-1 needs its parent to have a known height.
+    const sizeCalc = `calc(100dvh - ${topMargin}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, ${bottomMargin}px))`;
     return {
-      height: 'auto', // Let content determine height
-      maxHeight: `calc(100dvh - ${topMargin}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, ${bottomMargin}px))`,
+      height: sizeCalc,
+      maxHeight: sizeCalc,
       margin: `calc(${topMargin}px + env(safe-area-inset-top, 0px)) ${sideMargin}px env(safe-area-inset-bottom, ${bottomMargin}px) ${sideMargin}px`
     };
   };
@@ -99,14 +102,16 @@ export const useMobileViewport = () => {
     if (!isMobile) return baseStyles;
 
     switch (componentType) {
-      case 'modal':
+      case 'modal': {
+        const h = 'calc(100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 20px))';
         return {
           ...baseStyles,
-          height: 'auto',
-          maxHeight: 'calc(100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 20px))',
+          height: h,
+          maxHeight: h,
           margin: 'calc(20px + env(safe-area-inset-top, 0px)) 10px env(safe-area-inset-bottom, 20px) 10px',
           maxWidth: 'calc(100vw - 20px)'
         };
+      }
       
       case 'page':
         return {

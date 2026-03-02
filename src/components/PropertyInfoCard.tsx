@@ -119,10 +119,14 @@ export const PropertyInfoCard = ({
     setIsEditing(false);
   };
   return (
-    <div className="absolute left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md px-4"
-         style={{ bottom: '88px' }}
-         onClick={e => e.stopPropagation()}
-         onPointerDown={e => e.stopPropagation()}>
+    <div
+      className="absolute left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md px-4"
+      style={{ bottom: '88px' }}
+      onClick={e => e.stopPropagation()}
+      onPointerDown={e => e.stopPropagation()}
+      onTouchStart={e => e.stopPropagation()}
+      onTouchEnd={e => e.stopPropagation()}
+    >
       <div 
         ref={cardRef}
         className="bg-white rounded-2xl shadow-xl p-4 flex flex-col gap-3 border border-gray-200 animate-fade-in relative"
