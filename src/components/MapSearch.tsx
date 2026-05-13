@@ -208,6 +208,9 @@ export const MapSearch = ({
   const dropdownContent = showDropdown && predictions.length > 0 ? (
     <div
       ref={dropdownRef}
+      id="map-search-listbox"
+      role="listbox"
+      aria-label="Search results"
       className="absolute z-30 w-full bg-white rounded-2xl shadow-2xl mt-2 overflow-hidden"
       style={{ boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)' }}
     >
@@ -223,12 +226,19 @@ export const MapSearch = ({
         const isSelected = i === selectedIndex;
 
         return (
-          // NOTE: a11y-wise this should be a <button>; tracked in todo #8/#9.
-          // Use pointerdown + preventDefault so the selection works on touch
-          // (where synthesized mousedown may not fire on a scrollable parent)
-          // and so the input doesn't blur before selectPrediction runs.
+          // Long-term this should be a real <button>, but combobox+listbox
+          // pattern (per WAI-ARIA APG) actually expects role="option" divs,
+          // so this is technically correct for screen readers as long as
+          // the listbox/option/aria-selected wiring is in place. The
+          // pointerdown + preventDefault keeps selection working on touch
+          // (where synthesized mousedown may not fire on a scrollable
+          // parent) and prevents the input from blurring before
+          // selectPrediction runs.
           <div
             key={prediction.place_id}
+            role="option"
+            aria-selected={isSelected}
+            id={`map-search-option-${i}`}
             className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-100 ${
               isSelected ? 'bg-gray-50' : 'hover:bg-gray-50'
             }`}
@@ -292,13 +302,20 @@ export const MapSearch = ({
 
           <input
             ref={inputRef}
-            type="text"
+            type="search"
+            role="combobox"
             value={inputValue}
             onChange={e => handleInputChange(e.target.value)}
             onFocus={handleFocus}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             placeholder="Search address or property…"
+            // Placeholders disappear once the user types — explicit aria-label
+            // gives screen readers a stable name.
+            aria-label="Search address or saved property"
+            aria-autocomplete="list"
+            aria-expanded={showDropdown && predictions.length > 0}
+            aria-controls="map-search-listbox"
             className="w-full pl-11 pr-10 py-3 rounded-full bg-white text-gray-900 text-sm font-medium placeholder:text-gray-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
             style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.06)' }}
             autoComplete="off"
