@@ -58,16 +58,46 @@ export function getFileNameWithoutExtension(name: string): string {
 export function getUniqueFileName(baseName: string, folderId: string | null, propertyFiles: PropertyFile[]): string {
   const filesInFolder = propertyFiles.filter(f => f.folder_id === folderId);
   const [nameWithoutExt, ext] = splitFileNameAndExt(baseName);
-  
+
   let counter = 1;
   let newName = baseName;
-  
+
   while (filesInFolder.some(f => f.file_name === newName)) {
     newName = `${nameWithoutExt} (${counter})${ext}`;
     counter++;
   }
-  
+
   return newName;
+}
+
+/**
+ * Generates a name for a duplicated file, Windows-style:
+ *
+ *   report.pdf            -> report - Copy.pdf
+ *   report - Copy.pdf     -> report - Copy (2).pdf
+ *   report - Copy (2).pdf -> report - Copy (3).pdf
+ *
+ * Used by the "Duplicate" action. Distinct from getUniqueFileName, which is
+ * for upload-conflict resolution and uses the simpler "(1)", "(2)" suffix.
+ * The " - Copy" marker makes it visually obvious which file is the new one,
+ * even when the original is in the same view.
+ */
+export function getDuplicateFileName(originalName: string, folderId: string | null, propertyFiles: PropertyFile[]): string {
+  const filesInFolder = propertyFiles.filter(f => f.folder_id === folderId);
+  const [nameWithoutExt, ext] = splitFileNameAndExt(originalName);
+
+  // Strip an existing " - Copy" or " - Copy (N)" suffix so duplicating a copy
+  // produces "name - Copy (2).ext" instead of "name - Copy - Copy.ext".
+  const copySuffix = / - Copy(?: \((\d+)\))?$/;
+  const stripped = nameWithoutExt.replace(copySuffix, '');
+
+  const candidate = (n: number) => n === 1 ? `${stripped} - Copy${ext}` : `${stripped} - Copy (${n})${ext}`;
+
+  let n = 1;
+  while (filesInFolder.some(f => f.file_name === candidate(n))) {
+    n += 1;
+  }
+  return candidate(n);
 }
 
 /**

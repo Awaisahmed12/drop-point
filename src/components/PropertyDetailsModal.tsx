@@ -41,6 +41,7 @@ interface PropertyDetailsModalProps {
   onFileDelete: (file: PropertyFile) => void;
   onFileRename: (item: PropertyFile | PropertyFolder, newName: string) => void;
   onFileMove?: (file: PropertyFile, targetFolderId: string | null) => Promise<void>;
+  onFileCopy?: (file: PropertyFile) => Promise<void>;
   onFolderCreate: (name: string) => void;
   onFolderDelete: (folder: PropertyFolder) => void;
   
@@ -72,6 +73,7 @@ export const PropertyDetailsModal = ({
   onFileDelete,
   onFileRename,
   onFileMove,
+  onFileCopy,
   onFolderCreate,
   onFolderDelete,
   pendingUploads,
@@ -1777,6 +1779,7 @@ export const PropertyDetailsModal = ({
                                     setMoveFileTarget(file);
                                     setShowMoveModal(true);
                                   } : undefined}
+                                  onDuplicate={onFileCopy}
                                   onDelete={onFileDelete}
                                   menuPosition={menuPosition[file.id] || {}}
                                   menuRef={fileMenuRef}
@@ -1982,6 +1985,7 @@ export const PropertyDetailsModal = ({
                                     setMoveFileTarget(file);
                                     setShowMoveModal(true);
                                   } : undefined}
+                                  onDuplicate={onFileCopy}
                                   onDelete={onFileDelete}
                                   menuPosition={menuPosition[file.id] || {}}
                                   menuRef={fileMenuRef}

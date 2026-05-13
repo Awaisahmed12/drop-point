@@ -265,6 +265,77 @@ export class FileService {
   }
 
   /**
+   * Duplicate a file in place: server-side storage copy (no re-upload of
+   * bytes — fast even for big files) plus a new property_files row that
+   * points at the copy.
+   *
+   * The caller is responsible for picking a non-colliding destination name
+   * (use getDuplicateFileName from utils/fileManagement). We pass the
+   * fully-resolved name in instead of generating it here, because the
+   * caller has the already-fetched files list.
+   */
+  async copyFile(file: PropertyFile, newFileName: string): Promise<PropertyFile> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const sanitized = sanitizeFileName(newFileName);
+    if (!sanitized) {
+      throw new Error('Invalid duplicate file name after sanitization');
+    }
+
+    const oldPath = file.file_url;
+    const newPath = `${file.property_id}/${sanitized}`;
+
+    // Server-side copy in storage. If the destination path already exists,
+    // Supabase returns an error — caller should have resolved the conflict
+    // via getDuplicateFileName before calling.
+    const { error: copyError } = await supabase.storage
+      .from('property-files')
+      .copy(oldPath, newPath);
+
+    if (copyError) {
+      console.error('[FileService] Error copying file in storage:', copyError);
+      throw new Error(`Storage error: ${copyError.message}`);
+    }
+
+    // Insert a new DB row for the duplicate. Resets uploaded_at/modified_at
+    // to "now" so sorting by date surfaces the duplicate as the newest file
+    // (which matches Finder/Explorer behavior).
+    const now = new Date().toISOString();
+    const { data, error: dbError } = await supabase
+      .from('property_files')
+      .insert([{
+        property_id: file.property_id,
+        folder_id: file.folder_id,
+        user_id: user.id,
+        file_name: sanitized,
+        file_url: newPath,
+        file_type: file.file_type,
+        file_size: file.file_size,
+        uploaded_at: now,
+        modified_at: now,
+      }])
+      .select()
+      .single();
+
+    if (dbError) {
+      // Storage copy succeeded but DB insert failed — best-effort rollback
+      // so we don't leave an orphaned blob lying around.
+      console.error('[FileService] Error creating duplicate record, rolling back storage copy:', dbError);
+      await supabase.storage.from('property-files').remove([newPath]).catch(() => {});
+      throw dbError;
+    }
+
+    if (!data) {
+      throw new Error('File duplication failed: No data returned');
+    }
+
+    return data;
+  }
+
+  /**
    * Get files in a specific folder
    */
   async getFilesInFolder(

@@ -13,7 +13,7 @@ import { useMenuState } from '../hooks/useMenuState';
 import type { Prediction, Property, PropertyFile, PropertyFolder, PendingUpload, PropertyWithFileCount } from '../../types';
 import { supabase } from '../utils/supabaseClient';
 import { useRouter } from 'next/router';
-import { getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
+import { getUniqueFileName, getDuplicateFileName, sanitizeFileName } from '../../utils/fileManagement';
 import { getAddressFromCache, saveAddressToCache } from '../../utils/propertyCache';
 import { getUserUsageBytes } from '../utils/usage';
 import { FREE_TIER_MAX_BYTES } from '../../constants';
@@ -2426,6 +2426,27 @@ function MapPage() {
             } catch (error) {
               console.error('[MOVE] Error moving file:', error);
               showToast(`Failed to move file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }}
+          onFileCopy={async (file: PropertyFile) => {
+            try {
+              // Resolve a non-colliding destination name in the SAME folder.
+              // getDuplicateFileName handles the "name - Copy", "name - Copy (2)",
+              // ... escalation and also strips an existing copy suffix so a
+              // duplicate of a duplicate doesn't become "name - Copy - Copy".
+              const duplicateName = getDuplicateFileName(file.file_name, file.folder_id, propertyFiles);
+              const sanitized = sanitizeFileName(duplicateName);
+              if (!sanitized) {
+                showToast('Could not generate a valid duplicate name.', 'warning');
+                return;
+              }
+              const newFile = await fileService.copyFile(file, sanitized);
+              // Optimistic insert; we trust the service response.
+              setPropertyFiles(prev => [newFile, ...prev]);
+              showToast(`Duplicated as "${newFile.file_name}"`, 'success');
+            } catch (error) {
+              console.error('[COPY] Error duplicating file:', error);
+              showToast(`Failed to duplicate file: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           }}
           onFolderCreate={handleCreateFolderByName}

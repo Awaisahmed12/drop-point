@@ -9,6 +9,7 @@ interface FileMenuProps {
   onClose: () => void;
   onRename: (file: PropertyFile) => void;
   onMove?: (file: PropertyFile) => void;
+  onDuplicate?: (file: PropertyFile) => void;
   onDelete: (file: PropertyFile) => void;
   menuPosition: { top?: number; bottom?: number; left?: number; right?: number };
   menuRef: React.RefObject<HTMLDivElement | null>;
@@ -20,6 +21,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
   onClose,
   onRename,
   onMove,
+  onDuplicate,
   onDelete,
   menuPosition,
   menuRef,
@@ -87,6 +89,22 @@ export const FileMenu: React.FC<FileMenuProps> = ({
               <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
             </svg>
             Move
+          </div>
+        </button>
+      )}
+      {onDuplicate && (
+        <button
+          className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-amber-50 hover:text-amber-700 transition-all duration-150 border-b border-gray-100/50"
+          onClick={e => { e.stopPropagation(); onDuplicate(file); onClose(); }}
+          onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onDuplicate(file); onClose(); }}
+        >
+          <div className="flex items-center gap-2">
+            {/* Two-rectangle "duplicate" glyph (front sheet offset over back sheet) */}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <rect x="9" y="9" width="11" height="11" rx="2" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+            Duplicate
           </div>
         </button>
       )}
