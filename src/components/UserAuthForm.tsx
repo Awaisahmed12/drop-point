@@ -180,11 +180,18 @@ export default function UserAuthForm() {
           }
         }
         
-        // Always redirect to map after successful login
+        // Always redirect to map after successful login. The 1.2s pause is
+        // intentional UX — it shows the "Welcome back!" spinner branch
+        // (see isLoggingIn render block) before navigating. Using await
+        // here (instead of a fire-and-forget setTimeout) is what keeps the
+        // spinner visible the whole time and prevents the form from
+        // reappearing in the gap with a re-enabled submit button.
         setIsLoggingIn(true);
-        setTimeout(() => {
-          router.push('/map');
-        }, 1200);
+        await new Promise<void>((resolve) => setTimeout(resolve, 1200));
+        await router.push('/map');
+        // Navigation has been kicked off; let the unmounting component
+        // skip the finally state-clears below to avoid flashing the form.
+        return;
       }
     } catch (err: unknown) {
       let errorMsg = 'Something went wrong.';
