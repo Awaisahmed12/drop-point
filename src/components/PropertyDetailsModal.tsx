@@ -2357,45 +2357,61 @@ export const PropertyDetailsModal = ({
               <p className="text-white/90 text-sm font-medium text-center">{imagePreview.file.file_name}</p>
               <p className="text-white/50 text-xs">{formatFileSize(imagePreview.file.file_size)}</p>
             </div>
-            {/* Navigation arrows */}
+            {/* Navigation arrows
+              * Render the buttons unconditionally and disable them at the
+              * boundaries. Previously the buttons were removed at the edges,
+              * but the keyboard arrow-key handler also silently no-oped, so
+              * the user had no feedback that they were at the first/last
+              * image. Visible-but-disabled gives both pointer and keyboard
+              * users a clear "end of the line" indicator.
+              */}
             {(() => {
               const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
               const imageFiles = files.filter(f => imageExts.includes(f.file_name.split('.').pop()?.toLowerCase() || ''));
               const idx = imageFiles.findIndex(f => f.id === imagePreview.file.id);
+              const hasPrev = idx > 0;
+              const hasNext = idx >= 0 && idx < imageFiles.length - 1;
+              const navButtonBase = 'absolute top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full text-white transition-all';
+              const navButtonEnabled = 'bg-white/10 hover:bg-white/20 active:bg-white/30';
+              const navButtonDisabled = 'bg-white/5 text-white/30 cursor-not-allowed';
               return (
                 <>
-                  {idx > 0 && (
-                    <button
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-colors"
-                      onClick={e => {
-                        e.stopPropagation();
-                        const prev = imageFiles[idx - 1];
-                        getFileSignedUrl(prev.property_id, prev.file_name, false)
-                          .then(url => setImagePreview({ url, file: prev }))
-                          .catch(console.error);
-                      }}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                  )}
-                  {idx < imageFiles.length - 1 && (
-                    <button
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-colors"
-                      onClick={e => {
-                        e.stopPropagation();
-                        const next = imageFiles[idx + 1];
-                        getFileSignedUrl(next.property_id, next.file_name, false)
-                          .then(url => setImagePreview({ url, file: next }))
-                          .catch(console.error);
-                      }}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  )}
+                  <button
+                    className={`${navButtonBase} left-3 ${hasPrev ? navButtonEnabled : navButtonDisabled}`}
+                    disabled={!hasPrev}
+                    aria-label={hasPrev ? 'Previous image' : 'No previous image'}
+                    aria-keyshortcuts="ArrowLeft"
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (!hasPrev) return;
+                      const prev = imageFiles[idx - 1];
+                      getFileSignedUrl(prev.property_id, prev.file_name, false)
+                        .then(url => setImagePreview({ url, file: prev }))
+                        .catch(console.error);
+                    }}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    className={`${navButtonBase} right-3 ${hasNext ? navButtonEnabled : navButtonDisabled}`}
+                    disabled={!hasNext}
+                    aria-label={hasNext ? 'Next image' : 'No next image'}
+                    aria-keyshortcuts="ArrowRight"
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (!hasNext) return;
+                      const next = imageFiles[idx + 1];
+                      getFileSignedUrl(next.property_id, next.file_name, false)
+                        .then(url => setImagePreview({ url, file: next }))
+                        .catch(console.error);
+                    }}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 </>
               );
             })()}
