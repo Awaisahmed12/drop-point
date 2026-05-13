@@ -478,7 +478,12 @@ export const PropertyDetailsModal = ({
   const listIconSize = useResponsiveValue(32, 28);
   const listRenameVariant = useResponsiveValue<'full' | 'simple'>('full', 'simple');
   const gridIconSize = useResponsiveValue(48, 56);
-  const gridMenuButtonSize = '28px';
+  // Grid-view menu trigger lives on top of a thumbnail card so a 44px hit
+  // area would cover too much of the artwork. 36px is the largest size that
+  // still respects card padding while getting closer to the WCAG minimum.
+  // A long-press gesture on the card body is the proper fix and is tracked
+  // alongside multi-select (out of scope for this pass).
+  const gridMenuButtonSize = '36px';
 
   // Sorting logic - Folders first, then files (standard document management practice)
   const sortedItems = useMemo(() => {
@@ -1612,8 +1617,7 @@ export const PropertyDetailsModal = ({
                               </div>
                               <div className="relative flex items-center justify-end sm:col-span-2">
                                 <button
-                                  className="p-2 sm:p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex-shrink-0"
-                                  style={{ minWidth: 24, minHeight: 24 }}
+                                  className="tap-target rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex items-center justify-center flex-shrink-0"
                                   onClick={e => {
                                     e.stopPropagation();
                                     closeMenus();
@@ -1735,8 +1739,7 @@ export const PropertyDetailsModal = ({
                               <div className="relative flex items-center justify-end sm:col-span-2">
                                 <span className="hidden sm:inline-block text-xs text-gray-500 mr-2">{formatFileSize(file.file_size)}</span>
                                 <button
-                                  className="p-2 sm:p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex-shrink-0"
-                                  style={{ minWidth: 24, minHeight: 24 }}
+                                  className="tap-target rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex items-center justify-center flex-shrink-0"
                                   onClick={e => {
                                     e.stopPropagation();
                                     closeMenus();

@@ -479,3 +479,21 @@ textarea[class*="placeholder:text-gray-300"]::placeholder {
   color: #6b7280 !important; /* gray-500 - ensure visibility */
   opacity: 1 !important;
 }
+
+/* ---------------------------------------------------------------------------
+ * Tap-target utility
+ *
+ * Enforces a 44x44 minimum interactive area on mobile per Apple HIG / WCAG
+ * 2.5.5. Icon buttons (kebab menus, FAB triggers, close buttons) tend to
+ * shrink to fit a 16-20px icon; the visible chrome can stay small but the
+ * actual hit region needs to be at least 44px wide and tall, or first-tap
+ * activation gets unreliable on phones.
+ *
+ * Use with `flex items-center justify-center` to center the icon inside
+ * the enlarged hit area. Desktop pointers don't need this, but enforcing it
+ * unconditionally also gives keyboard focus rings a sensible size.
+ * --------------------------------------------------------------------------- */
+.tap-target {
+  min-width: 44px;
+  min-height: 44px;
+}

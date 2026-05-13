@@ -65,7 +65,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
       onTouchEnd={e => e.stopPropagation()}
     >
       <button
-        className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
+        className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
         onClick={e => { e.stopPropagation(); onRename(file); onClose(); }}
         onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onRename(file); onClose(); }}
       >
@@ -78,7 +78,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
       </button>
       {onMove && (
         <button
-          className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150 border-b border-gray-100/50"
+          className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150 border-b border-gray-100/50"
           onClick={e => { e.stopPropagation(); onMove(file); onClose(); }}
           onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onMove(file); onClose(); }}
         >
@@ -91,7 +91,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
         </button>
       )}
       <button
-        className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-150 border-b border-gray-100/50"
+        className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-150 border-b border-gray-100/50"
         onClick={async (e) => { e.stopPropagation(); await handleCopyLink(); }}
         onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); handleCopyLink(); }}
       >
@@ -103,7 +103,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
         </div>
       </button>
       <button
-        className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-150 border-b border-gray-100/50"
+        className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-150 border-b border-gray-100/50"
         onClick={async (e) => { e.stopPropagation(); await handleDownload(); }}
         onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); handleDownload(); }}
       >
@@ -115,7 +115,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
         </div>
       </button>
       <button
-        className="block w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
+        className="block w-full text-left px-4 py-3.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
         onClick={e => { e.stopPropagation(); onDelete(file); onClose(); }}
         onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onDelete(file); onClose(); }}
       >
