@@ -596,6 +596,17 @@ export const PropertyDetailsModal = ({
       setRenamingFileId(null);
       setRenamingFileName('');
     } catch (error) {
+      // Surface a useful message — the previous silent console.error
+      // looked identical to "rename succeeded" from the user's POV.
+      // FolderService throws DUPLICATE_FOLDER for unique-constraint hits.
+      const message = error instanceof Error ? error.message : '';
+      const isDuplicate = message === 'DUPLICATE_FOLDER' || /duplicate|unique|already exists/i.test(message);
+      const kind = 'file_name' in item ? 'file' : 'folder';
+      showToast(
+        isDuplicate
+          ? `A ${kind} named "${newName}" already exists here.`
+          : `Couldn't rename ${kind}. Please try again.`
+      );
       console.error('Rename failed:', error);
       // Keep rename state active if there's an error so user can retry
     }
