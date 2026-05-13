@@ -550,16 +550,31 @@ export const PropertyDetailsModal = ({
 
   // Handle folder creation
   const handleCreateFolder = async () => {
+    // Inline validation (folderErrorPopup) is set on input change, and the
+    // submit button is disabled when !isFolderNameValid, so by the time we
+    // get here the name is structurally valid. The input is also disabled
+    // while isCreatingFolder is true (see render), so the "stale validation
+    // captured at click time" concern doesn't apply — the user can't edit
+    // the name mid-submission.
     if (!isFolderNameValid || isCreatingFolder) return;
-    
+
     setIsCreatingFolder(true);
     try {
       await onFolderCreate(newFolderName.trim());
       setCreatingFolder(false);
       setNewFolderName('');
       setFolderErrorPopup(null);
-    } catch {
-      setFolderErrorPopup('Failed to create folder. Please try again.');
+    } catch (error) {
+      // FolderService throws DUPLICATE_FOLDER on unique-constraint hits;
+      // distinguish it from a generic failure so the user knows to pick a
+      // different name rather than just "retry".
+      const message = error instanceof Error ? error.message : '';
+      const isDuplicate = message === 'DUPLICATE_FOLDER' || /duplicate|unique|already exists/i.test(message);
+      setFolderErrorPopup(
+        isDuplicate
+          ? `A folder named "${newFolderName.trim()}" already exists here.`
+          : 'Failed to create folder. Please try again.'
+      );
     } finally {
       setIsCreatingFolder(false);
     }
