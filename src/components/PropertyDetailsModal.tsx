@@ -101,6 +101,17 @@ export const PropertyDetailsModal = ({
   const [imagePreview, setImagePreview] = useState<{ url: string; file: PropertyFile } | null>(null);
   const [fabOpen, setFabOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Drag depth counter. dragenter/dragleave fire in pairs as the cursor crosses
+  // child boundaries, and the "contains(relatedTarget)" guard breaks when
+  // relatedTarget is null (window blur, dragging out of frame, browser DnD
+  // quirks). Counting balanced enter/leave events is the robust pattern: we
+  // only clear isDragOver when the count drops back to 0.
+  const dragDepthRef = useRef(0);
+
+  const resetDragState = useCallback(() => {
+    dragDepthRef.current = 0;
+    setIsDragOver(false);
+  }, []);
 
   const closeMenus = useCallback(() => {
     setFileMenuId(null);
@@ -109,26 +120,52 @@ export const PropertyDetailsModal = ({
   }, []);
 
   // Drag & drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
     e.preventDefault();
     e.stopPropagation();
-    if (e.dataTransfer.types.includes('Files')) setIsDragOver(true);
+    dragDepthRef.current += 1;
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    // preventDefault on dragover is what tells the browser this is a valid
+    // drop target. Without it, the OS shows the "not allowed" cursor and
+    // drop never fires.
+    e.preventDefault();
+    e.stopPropagation();
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false);
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDragOver(false);
   }, []);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(false);
+    resetDragState();
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
       await onFileUpload(droppedFiles).catch(console.error);
     }
-  }, [onFileUpload]);
+  }, [onFileUpload, resetDragState]);
+
+  // Window-level safety net: if the drag is cancelled outside our container
+  // (Escape, drop on another window, tab switch), browsers may not fire a
+  // matching dragleave for every dragenter and the overlay would stick open.
+  // dragend on the drag source + a body-level drop guarantee we reset.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleGlobalEnd = () => resetDragState();
+    window.addEventListener('dragend', handleGlobalEnd);
+    window.addEventListener('drop', handleGlobalEnd);
+    return () => {
+      window.removeEventListener('dragend', handleGlobalEnd);
+      window.removeEventListener('drop', handleGlobalEnd);
+    };
+  }, [isOpen, resetDragState]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1272,6 +1309,7 @@ export const PropertyDetailsModal = ({
         {/* Main Content Area */}
         <div
           className="flex-1 flex flex-col overflow-hidden relative"
+          onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
