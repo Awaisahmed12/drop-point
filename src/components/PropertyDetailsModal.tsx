@@ -13,6 +13,7 @@ import { useResponsiveValue } from '../hooks/useResponsiveValue';
 import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
 import { useToast } from '../contexts/ToastContext';
+import { useInternalDrag } from '../hooks/useInternalDrag';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
 import type { PropertyWithFileCount } from '../../types';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
@@ -103,6 +104,13 @@ export const PropertyDetailsModal = ({
   const [imagePreview, setImagePreview] = useState<{ url: string; file: PropertyFile } | null>(null);
   const [fabOpen, setFabOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Internal drag state for moving files between folders. Distinct from the
+  // dragDepthRef-based external upload overlay above: this tracks "a file
+  // row is being dragged within the app", which uses a custom MIME so the
+  // two flows don't collide. Spring-loaded folders auto-open after 600ms
+  // of hover so the user can drill into nested folders without releasing.
+  const internalDrag = useInternalDrag();
   // Drag depth counter. dragenter/dragleave fire in pairs as the cursor crosses
   // child boundaries, and the "contains(relatedTarget)" guard breaks when
   // relatedTarget is null (window blur, dragging out of frame, browser DnD
@@ -1409,22 +1417,53 @@ export const PropertyDetailsModal = ({
               {(breadcrumbPath.length > 0 || selectedFolder !== 'master') && (
                 <div className="px-4 py-2 bg-white border-b border-gray-100">
                   <div className="flex items-center gap-2 text-xs text-gray-700 overflow-x-auto">
-                    {selectedFolder !== 'master' && (
-                      <button
-                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
-                        onClick={() => {
-                          const currentFolder = folders.find(f => f.id === selectedFolder);
-                          const parentId = currentFolder?.parent_id || 'master';
-                          setSearchQuery('');
-                          onFolderChange(parentId);
-                        }}
-                        aria-label="Back"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                      </button>
-                    )}
+                    {selectedFolder !== 'master' && (() => {
+                      // Resolve the parent of the currently-selected folder so the
+                      // back button can both navigate (click) and be a drop target
+                      // for moving a dragged file up one level.
+                      const currentFolder = folders.find(f => f.id === selectedFolder);
+                      const parentId = currentFolder?.parent_id || null;
+                      const targetFolderId = parentId; // null = master / root
+                      return (
+                        <button
+                          {...internalDrag.getDropTargetProps({
+                            id: 'breadcrumb-back',
+                            canAccept: internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.sourceFolderId !== targetFolderId,
+                            // Spring-back: hovering the Back button mid-drag pops up
+                            // one level so the user can drop into a sibling folder.
+                            spring: () => { setSearchQuery(''); onFolderChange(parentId || 'master'); },
+                            onDrop: (item) => {
+                              if (item.kind !== 'file' || !onFileMove) return;
+                              void onFileMove(item.file, targetFolderId);
+                            },
+                          })}
+                          className={`flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium ${
+                            internalDrag.activeTargetId === 'breadcrumb-back' ? 'ring-2 ring-blue-400 rounded bg-blue-50 px-1' : ''
+                          }`}
+                          onClick={() => {
+                            setSearchQuery('');
+                            onFolderChange(parentId || 'master');
+                          }}
+                          aria-label="Back"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        </button>
+                      );
+                    })()}
                     <button
-                      className="text-gray-500 hover:text-blue-600 flex items-center gap-1 flex-shrink-0"
+                      {...internalDrag.getDropTargetProps({
+                        id: 'breadcrumb-home',
+                        // Master = null folder_id. Don't accept if already at root.
+                        canAccept: internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.sourceFolderId !== null,
+                        spring: () => { setSearchQuery(''); onFolderChange('master'); },
+                        onDrop: (item) => {
+                          if (item.kind !== 'file' || !onFileMove) return;
+                          void onFileMove(item.file, null);
+                        },
+                      })}
+                      className={`text-gray-500 hover:text-blue-600 flex items-center gap-1 flex-shrink-0 ${
+                        internalDrag.activeTargetId === 'breadcrumb-home' ? 'ring-2 ring-blue-400 rounded bg-blue-50 px-1' : ''
+                      }`}
                       onClick={() => {
                         setSearchQuery('');
                         onFolderChange('master');
@@ -1437,7 +1476,18 @@ export const PropertyDetailsModal = ({
                       <div key={folder.id} className="flex items-center gap-2 flex-shrink-0">
                         <span className="text-gray-400">›</span>
                         <button
-                          className="text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
+                          {...internalDrag.getDropTargetProps({
+                            id: `breadcrumb-${folder.id}`,
+                            canAccept: internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.sourceFolderId !== folder.id,
+                            spring: () => { setSearchQuery(''); onFolderChange(folder.id); },
+                            onDrop: (item) => {
+                              if (item.kind !== 'file' || !onFileMove) return;
+                              void onFileMove(item.file, folder.id);
+                            },
+                          })}
+                          className={`text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap ${
+                            internalDrag.activeTargetId === `breadcrumb-${folder.id}` ? 'ring-2 ring-blue-400 rounded bg-blue-50 px-1' : ''
+                          }`}
                           onClick={() => {
                             setSearchQuery('');
                             onFolderChange(folder.id);
@@ -1554,7 +1604,21 @@ export const PropertyDetailsModal = ({
                         return (
                           <div key={`folder-${folder.id}`}>
                             <div
-                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5`}
+                              {...internalDrag.getDropTargetProps({
+                                id: `folder-list-${folder.id}`,
+                                // Don't accept a drop FROM this folder back INTO this folder.
+                                canAccept: internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.sourceFolderId !== folder.id,
+                                // Spring: descend into the folder after the hover delay so the user
+                                // can keep dragging into nested folders without releasing.
+                                spring: () => { setSearchQuery(''); onFolderChange(folder.id); },
+                                onDrop: (item) => {
+                                  if (item.kind !== 'file' || !onFileMove) return;
+                                  void onFileMove(item.file, folder.id);
+                                },
+                              })}
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5 ${
+                                internalDrag.activeTargetId === `folder-list-${folder.id}` ? 'ring-2 ring-blue-400 bg-blue-50' : ''
+                              }`}
                               style={{ cursor: 'pointer' }}
                               onClick={() => {
                                 if (fileMenuId || folderMenuId) {
@@ -1668,7 +1732,14 @@ export const PropertyDetailsModal = ({
                         return (
                           <div key={`file-${file.id}`}>
                             <div
-                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5`}
+                              {...internalDrag.getDragSourceProps({
+                                kind: 'file',
+                                file,
+                                sourceFolderId: file.folder_id,
+                              })}
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5 ${
+                                internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.file.id === file.id ? 'opacity-40' : ''
+                              }`}
                               style={{ cursor: 'pointer' }}
                               onClick={async (e) => {
                                 if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
@@ -1800,7 +1871,18 @@ export const PropertyDetailsModal = ({
                           return (
                             <div
                               key={`grid-folder-${folder.id}`}
-                              className="flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative"
+                              {...internalDrag.getDropTargetProps({
+                                id: `folder-grid-${folder.id}`,
+                                canAccept: internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.sourceFolderId !== folder.id,
+                                spring: () => { setSearchQuery(''); onFolderChange(folder.id); },
+                                onDrop: (item) => {
+                                  if (item.kind !== 'file' || !onFileMove) return;
+                                  void onFileMove(item.file, folder.id);
+                                },
+                              })}
+                              className={`flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative ${
+                                internalDrag.activeTargetId === `folder-grid-${folder.id}` ? 'ring-2 ring-blue-400 bg-blue-50' : ''
+                              }`}
                               onClick={() => {
                                 // Clear search when entering a folder
                                 setSearchQuery('');
@@ -1905,7 +1987,14 @@ export const PropertyDetailsModal = ({
                           return (
                             <div
                               key={`grid-file-${file.id}`}
-                              className="flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative"
+                              {...internalDrag.getDragSourceProps({
+                                kind: 'file',
+                                file,
+                                sourceFolderId: file.folder_id,
+                              })}
+                              className={`flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative ${
+                                internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.file.id === file.id ? 'opacity-40' : ''
+                              }`}
                               onClick={async (e) => {
                                 if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
                                   return;
