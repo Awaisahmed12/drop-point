@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Prediction, PropertyWithFileCount } from '../../types';
 import { supabase } from '../utils/supabaseClient';
+import { AUTOCOMPLETE_DEBOUNCE_MS } from '../../constants';
 import { QuickAccessProperties } from './QuickAccessProperties';
 
 interface MapSearchProps {
@@ -37,6 +38,11 @@ export const MapSearch = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const justSelectedRef = useRef(false);
+  // Cancels the in-flight autocomplete request when a newer one starts, so a
+  // slow response for "New York" can't overwrite the result for "New".
+  const abortRef = useRef<AbortController | null>(null);
+  // Debounce timer for input-driven fetches. Focus / clear bypass this.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateShowDropdown = useCallback((show: boolean) => {
     setShowDropdown(show);
@@ -48,39 +54,71 @@ export const MapSearch = ({
     onShowDropdownChange?.(show || showDropdown);
   }, [onShowDropdownChange, showDropdown]);
 
-  const fetchPredictions = useCallback(async (input: string): Promise<Prediction[]> => {
+  // Performs one autocomplete fetch. The caller owns the AbortController so it
+  // can cancel us mid-flight; we treat AbortError as a no-op rather than an
+  // error, since cancellation is the expected path during fast typing.
+  const fetchPredictions = useCallback(async (input: string, signal: AbortSignal): Promise<Prediction[]> => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (signal.aborted) return [];
       const response = await fetch(`/api/autocomplete?input=${encodeURIComponent(input)}`, {
-        headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        }
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
+        signal,
       });
-      if (response.ok) {
-        const data = await response.json();
-        return data.predictions.map((p: google.maps.places.AutocompletePrediction & { user_property?: boolean; property_id?: string }) => ({
-          description: p.description,
-          place_id: p.place_id,
-          isUserProperty: p.user_property || false,
-          property_id: p.property_id || null,
-          structured_formatting: p.structured_formatting,
-          displayText: p.structured_formatting?.main_text || p.description,
-          secondaryText: p.structured_formatting?.secondary_text || '',
-        }));
-      }
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.predictions.map((p: google.maps.places.AutocompletePrediction & { user_property?: boolean; property_id?: string }) => ({
+        description: p.description,
+        place_id: p.place_id,
+        isUserProperty: p.user_property || false,
+        property_id: p.property_id || null,
+        structured_formatting: p.structured_formatting,
+        displayText: p.structured_formatting?.main_text || p.description,
+        secondaryText: p.structured_formatting?.secondary_text || '',
+      }));
     } catch (error) {
+      if ((error as Error).name === 'AbortError') return [];
       console.error('Error fetching predictions:', error);
+      return [];
     }
-    return [];
   }, []);
 
-  const handleInputChange = useCallback(async (value: string) => {
+  // Wraps fetchPredictions with abort-of-previous semantics. Returns [] if a
+  // newer request started while we were waiting, so callers can safely write
+  // the result back to state without checking themselves.
+  const requestPredictions = useCallback(async (input: string): Promise<Prediction[]> => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const result = await fetchPredictions(input, controller.signal);
+    return controller.signal.aborted ? [] : result;
+  }, [fetchPredictions]);
+
+  // Input-driven fetches debounce. We update the controlled input synchronously
+  // so typing stays responsive, then schedule the network call.
+  const handleInputChange = useCallback((value: string) => {
     onInputChange(value);
-    const newPredictions = await fetchPredictions(value.trim() ? value : '');
-    onPredictionsChange(newPredictions);
-    updateShowDropdown(newPredictions.length > 0);
-    updateShowQuickAccess(false);
-    setSelectedIndex(0);
-  }, [onInputChange, fetchPredictions, onPredictionsChange, updateShowDropdown, updateShowQuickAccess]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const newPredictions = await requestPredictions(value.trim() ? value : '');
+      // requestPredictions returns [] if a newer request superseded us, so the
+      // last-typed query is the only one that ever writes to state.
+      onPredictionsChange(newPredictions);
+      updateShowDropdown(newPredictions.length > 0);
+      updateShowQuickAccess(false);
+      setSelectedIndex(0);
+    }, AUTOCOMPLETE_DEBOUNCE_MS);
+  }, [onInputChange, requestPredictions, onPredictionsChange, updateShowDropdown, updateShowQuickAccess]);
+
+  // Cancel any pending debounce + in-flight fetch when the component unmounts.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const selectPrediction = useCallback((index: number) => {
     const prediction = predictions[index];
@@ -120,12 +158,12 @@ export const MapSearch = ({
     if (inputValue && !justSelectedRef.current) {
       updateShowDropdown(predictions.length > 0);
     } else if (!inputValue) {
-      const recentPredictions = await fetchPredictions('');
+      const recentPredictions = await requestPredictions('');
       onPredictionsChange(recentPredictions);
       updateShowDropdown(recentPredictions.length > 0);
       updateShowQuickAccess(false);
     }
-  }, [inputValue, predictions, updateShowDropdown, fetchPredictions, onPredictionsChange, updateShowQuickAccess]);
+  }, [inputValue, predictions, updateShowDropdown, requestPredictions, onPredictionsChange, updateShowQuickAccess]);
 
   const handleBlur = useCallback(() => {
     updateShowDropdown(false);
@@ -134,13 +172,16 @@ export const MapSearch = ({
 
   const handleClear = useCallback(async () => {
     onInputChange('');
-    const recentPredictions = await fetchPredictions('');
+    // Cancel any pending debounced fetch from prior keystrokes so it can't
+    // arrive after the "recent" results and clobber them.
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const recentPredictions = await requestPredictions('');
     onPredictionsChange(recentPredictions);
     updateShowDropdown(recentPredictions.length > 0);
     setSelectedIndex(0);
     updateShowQuickAccess(false);
     inputRef.current?.focus();
-  }, [onInputChange, fetchPredictions, onPredictionsChange, updateShowDropdown, updateShowQuickAccess]);
+  }, [onInputChange, requestPredictions, onPredictionsChange, updateShowDropdown, updateShowQuickAccess]);
 
   const handlePropertySelect = useCallback((property: PropertyWithFileCount) => {
     updateShowQuickAccess(false);
@@ -182,12 +223,19 @@ export const MapSearch = ({
         const isSelected = i === selectedIndex;
 
         return (
+          // NOTE: a11y-wise this should be a <button>; tracked in todo #8/#9.
+          // Use pointerdown + preventDefault so the selection works on touch
+          // (where synthesized mousedown may not fire on a scrollable parent)
+          // and so the input doesn't blur before selectPrediction runs.
           <div
             key={prediction.place_id}
             className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-100 ${
               isSelected ? 'bg-gray-50' : 'hover:bg-gray-50'
-            } ${i < predictions.length - 1 ? '' : ''}`}
-            onMouseDown={() => selectPrediction(i)}
+            }`}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              selectPrediction(i);
+            }}
             onMouseEnter={() => setSelectedIndex(i)}
           >
             {/* Icon */}

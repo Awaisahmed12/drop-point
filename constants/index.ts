@@ -86,6 +86,12 @@ export const fileTypeColorMap: Record<string, string> = {
 // Animation durations
 export const FLOAT_MESSAGE_DURATION = 2500; // 2.5 seconds
 
+// Search / autocomplete
+// Debounce window for map search autocomplete requests. Keeps us from hitting the
+// Google Places quota on every keystroke and prevents stale responses from racing
+// the latest one. Pair with AbortController-based cancellation in MapSearch.
+export const AUTOCOMPLETE_DEBOUNCE_MS = 200;
+
 // Text color standards - Ensure proper contrast for accessibility
 // These correspond to Tailwind classes but serve as documentation
 export const TEXT_COLORS = {
