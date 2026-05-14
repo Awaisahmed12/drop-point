@@ -883,10 +883,16 @@ function MapPage() {
           throw new Error('Invalid file name after sanitization.');
         }
         
-        // File-specific logic
-        const existingFile = propertyFiles.find(f => f.folder_id === file.folder_id && f.file_name.toLowerCase() === sanitizedNewName.toLowerCase() && f.id !== file.id);
+        // Pre-check property-wide (NOT folder-scoped) because the storage
+        // path is `${propertyId}/${file_name}` — flat. Two files in
+        // different folders with the same name would both map to the same
+        // storage object, and renameFile's storage.move() would 400 with
+        // "resource already exists" at the destination.
+        const existingFile = propertyFiles.find(
+          f => f.file_name.toLowerCase() === sanitizedNewName.toLowerCase() && f.id !== file.id,
+        );
         if (existingFile) {
-          throw new Error('A file with this name already exists in this folder.');
+          throw new Error('A file with this name already exists in this property.');
         }
 
         // Use service to rename file
@@ -1150,17 +1156,18 @@ function MapPage() {
 
     // Create pending uploads for each file
     const newPendingUploads: PendingUpload[] = filesArray.map(file => {
-      // Generate unique file name for this folder
-      const existingFiles = propertyFiles.filter(f => 
-        folderIdForUpload ? f.folder_id === folderIdForUpload : !f.folder_id
-      );
-      const existingNames = existingFiles.map(f => f.file_name);
-      
+      // Property-wide uniqueness — NOT folder-scoped. Storage paths are
+      // `${propertyId}/${file_name}` (flat), so uploading "image.jpg" to
+      // folder B when "image.jpg" already exists in folder A would 400 at
+      // the storage layer. iPhones make this common because the Photos
+      // share sheet names everything "image.jpg".
+      const existingNames = propertyFiles.map(f => f.file_name);
+
       const baseName = sanitizeFileName(file.name); // Sanitize the original filename first
       let uniqueName = baseName;
       let counter = 1;
       while (existingNames.includes(uniqueName)) {
-        const [name, ext] = baseName.includes('.') 
+        const [name, ext] = baseName.includes('.')
           ? [baseName.substring(0, baseName.lastIndexOf('.')), baseName.substring(baseName.lastIndexOf('.'))]
           : [baseName, ''];
         uniqueName = `${name} (${counter})${ext}`;
@@ -2414,8 +2421,13 @@ function MapPage() {
               let newFileName: string | undefined = undefined;
               
               if (movingToDifferentFolder) {
-                // Generate unique name if needed
-                newFileName = sanitizeFileName(getUniqueFileName(file.file_name, targetFolderId, propertyFiles));
+                // Pass file.id as excludeFileId so getUniqueFileName doesn't
+                // see the moving file's own row as a conflict with itself.
+                // Property-wide uniqueness; folder is only a DB concept,
+                // storage paths don't have hierarchy.
+                newFileName = sanitizeFileName(
+                  getUniqueFileName(file.file_name, targetFolderId, propertyFiles, file.id),
+                );
                 if (!newFileName) {
                   showToast('Invalid file name. Please rename your file and try again.', 'warning');
                   return;

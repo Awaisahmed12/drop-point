@@ -54,16 +54,37 @@ export function getFileNameWithoutExtension(name: string): string {
 }
 
 /**
- * Generates a unique filename when there are conflicts
+ * Generates a non-colliding filename. Scope is the WHOLE PROPERTY, not the
+ * containing folder, because storage paths are flat: every file lives at
+ * `${propertyId}/${file_name}` regardless of folder_id. Two files in
+ * different DB folders with the same file_name would map to the same
+ * storage object — uploads + renames + moves would all fail 400 at the
+ * storage layer.
+ *
+ * The `folderId` parameter is ignored. It's retained in the signature so
+ * existing callers keep compiling; remove it on the next refactor.
+ *
+ * `excludeFileId` lets callers carve their own row out of the check when
+ * the operation is on an existing file (rename, move) — without it,
+ * renaming "report.pdf" → "report.pdf" would always claim the name is
+ * taken (by the file itself).
  */
-export function getUniqueFileName(baseName: string, folderId: string | null, propertyFiles: PropertyFile[]): string {
-  const filesInFolder = propertyFiles.filter(f => f.folder_id === folderId);
+export function getUniqueFileName(
+  baseName: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _folderId: string | null,
+  propertyFiles: PropertyFile[],
+  excludeFileId?: string,
+): string {
+  const others = excludeFileId
+    ? propertyFiles.filter(f => f.id !== excludeFileId)
+    : propertyFiles;
   const [nameWithoutExt, ext] = splitFileNameAndExt(baseName);
 
   let counter = 1;
   let newName = baseName;
 
-  while (filesInFolder.some(f => f.file_name === newName)) {
+  while (others.some(f => f.file_name === newName)) {
     newName = `${nameWithoutExt} (${counter})${ext}`;
     counter++;
   }
@@ -78,13 +99,18 @@ export function getUniqueFileName(baseName: string, folderId: string | null, pro
  *   report - Copy.pdf     -> report - Copy (2).pdf
  *   report - Copy (2).pdf -> report - Copy (3).pdf
  *
- * Used by the "Duplicate" action. Distinct from getUniqueFileName, which is
- * for upload-conflict resolution and uses the simpler "(1)", "(2)" suffix.
- * The " - Copy" marker makes it visually obvious which file is the new one,
- * even when the original is in the same view.
+ * Same property-wide scope as getUniqueFileName (see note there).
+ *
+ * Distinct from getUniqueFileName: this is for the "Duplicate" action, so
+ * the " - Copy" marker stays as a visual cue. getUniqueFileName is for
+ * upload-conflict resolution and uses the simpler "(1)", "(2)" suffix.
  */
-export function getDuplicateFileName(originalName: string, folderId: string | null, propertyFiles: PropertyFile[]): string {
-  const filesInFolder = propertyFiles.filter(f => f.folder_id === folderId);
+export function getDuplicateFileName(
+  originalName: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _folderId: string | null,
+  propertyFiles: PropertyFile[],
+): string {
   const [nameWithoutExt, ext] = splitFileNameAndExt(originalName);
 
   // Strip an existing " - Copy" or " - Copy (N)" suffix so duplicating a copy
@@ -95,7 +121,7 @@ export function getDuplicateFileName(originalName: string, folderId: string | nu
   const candidate = (n: number) => n === 1 ? `${stripped} - Copy${ext}` : `${stripped} - Copy (${n})${ext}`;
 
   let n = 1;
-  while (filesInFolder.some(f => f.file_name === candidate(n))) {
+  while (propertyFiles.some(f => f.file_name === candidate(n))) {
     n += 1;
   }
   return candidate(n);

@@ -66,9 +66,12 @@ describe('getUniqueFileName', () => {
     expect(getUniqueFileName('a.txt', null, [])).toBe('a.txt');
   });
 
-  it('only conflicts within the same folder', () => {
+  it('conflicts property-wide, not just within the same folder', () => {
+    // Storage paths are `${propertyId}/${file_name}` — flat. A name used
+    // in any folder collides at the storage layer with a same-named file
+    // in any other folder. This test pins the cross-folder check.
     const files = [file({ file_name: 'a.txt', folder_id: 'other' })];
-    expect(getUniqueFileName('a.txt', null, files)).toBe('a.txt');
+    expect(getUniqueFileName('a.txt', null, files)).toBe('a (1).txt');
   });
 
   it('appends (1) on first conflict', () => {
@@ -88,6 +91,17 @@ describe('getUniqueFileName', () => {
   it('handles names without an extension', () => {
     const files = [file({ file_name: 'README' })];
     expect(getUniqueFileName('README', null, files)).toBe('README (1)');
+  });
+
+  it('excludes a file by id so it does not conflict with itself', () => {
+    // Used by move/rename: the operation is ON an existing row, so that
+    // row should be carved out of the uniqueness check or the helper
+    // would always think the name was taken (by the file itself).
+    const files = [
+      file({ id: 'self', file_name: 'report.pdf' }),
+      file({ id: 'other', file_name: 'other.pdf' }),
+    ];
+    expect(getUniqueFileName('report.pdf', null, files, 'self')).toBe('report.pdf');
   });
 });
 
@@ -125,9 +139,13 @@ describe('getDuplicateFileName', () => {
     expect(getDuplicateFileName('doc - Copy (2).pdf', null, files)).toBe('doc - Copy (3).pdf');
   });
 
-  it('only conflicts within the source folder', () => {
+  it('conflicts property-wide, not just within the source folder', () => {
+    // Same storage-path-is-flat reasoning as getUniqueFileName.
+    // Duplicating "a.pdf" must escalate even if the only conflict is in
+    // a different folder, because the storage copy() lands at
+    // `${propertyId}/a - Copy.pdf` regardless of source folder.
     const files = [file({ file_name: 'a - Copy.pdf', folder_id: 'other' })];
-    expect(getDuplicateFileName('a.pdf', null, files)).toBe('a - Copy.pdf');
+    expect(getDuplicateFileName('a.pdf', null, files)).toBe('a - Copy (2).pdf');
   });
 
   it('handles files without an extension', () => {
