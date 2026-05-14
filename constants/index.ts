@@ -92,6 +92,34 @@ export const FLOAT_MESSAGE_DURATION = 2500; // 2.5 seconds
 // the latest one. Pair with AbortController-based cancellation in MapSearch.
 export const AUTOCOMPLETE_DEBOUNCE_MS = 200;
 
+// Auth flow: after a successful login, hold the "Welcome back!" spinner for this
+// many ms before navigating to /map. Purely cosmetic; long enough to register as
+// a confirmation, short enough not to feel slow.
+export const POST_LOGIN_SPINNER_MS = 1200;
+
+// Toast auto-dismiss timeouts. Errors stay longer because they're easier to miss
+// and the user may need a moment to read them.
+export const TOAST_SUCCESS_MS = 3000;
+export const TOAST_ERROR_MS = 5000;
+
+// FileThumbnail batches signed-URL requests across all mounted thumbnails so the
+// Supabase storage API gets one call instead of N. THUMBNAIL_BATCH_WINDOW_MS is
+// the time we wait after the first queued request before flushing — anything
+// queued in that window joins the same batch. BATCH_MAX caps each call (Supabase
+// has its own per-request limit; 100 is well under it and keeps payloads small).
+export const THUMBNAIL_BATCH_WINDOW_MS = 80;
+export const THUMBNAIL_BATCH_MAX = 100;
+
+// Storage signed-URL expiry. 3600s = 1 hour. Long enough that the URL embedded
+// in an inline-viewer iframe stays valid for a normal reading session, short
+// enough that a leaked URL has limited reuse.
+export const SIGNED_URL_EXPIRY_SEC = 3600;
+
+// In-memory cache TTL for the user's property list and property data prefetch.
+// 5 minutes balances UI snappiness (avoid re-querying on every tab switch) with
+// staleness (recent uploads / new properties surface quickly).
+export const PROPERTY_CACHE_TTL_MS = 5 * 60 * 1000;
+
 // Text color standards - Ensure proper contrast for accessibility
 // These correspond to Tailwind classes but serve as documentation
 export const TEXT_COLORS = {

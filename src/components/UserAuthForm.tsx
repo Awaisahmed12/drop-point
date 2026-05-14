@@ -5,6 +5,7 @@ import { supabase } from '../utils/supabaseClient';
 import Image from 'next/image';
 import { EyeIcon } from './EyeIcon';
 import { useMobileViewport } from '../hooks/useMobileViewport';
+import { POST_LOGIN_SPINNER_MS } from '../../constants';
 
 const getSiteUrl = (): string => {
   const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
@@ -188,7 +189,7 @@ export default function UserAuthForm() {
         // spinner visible the whole time and prevents the form from
         // reappearing in the gap with a re-enabled submit button.
         setIsLoggingIn(true);
-        await new Promise<void>((resolve) => setTimeout(resolve, 1200));
+        await new Promise<void>((resolve) => setTimeout(resolve, POST_LOGIN_SPINNER_MS));
         await router.push('/map');
         // Navigation has been kicked off; let the unmounting component
         // skip the finally state-clears below to avoid flashing the form.

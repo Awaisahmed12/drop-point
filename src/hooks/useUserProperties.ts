@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabaseClient';
+import { PROPERTY_CACHE_TTL_MS } from '../../constants';
 import type { PropertyWithFileCount } from '../../types';
 
 export interface UseUserPropertiesReturn {
@@ -75,8 +76,8 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
           const cacheData = JSON.parse(cached);
           const cacheAge = Date.now() - cacheData.timestamp;
           
-          // Use cache if less than 5 minutes old
-          if (cacheAge < 5 * 60 * 1000) {
+          // Use cache if still within the TTL window (PROPERTY_CACHE_TTL_MS)
+          if (cacheAge < PROPERTY_CACHE_TTL_MS) {
             setProperties(cacheData.properties);
             setLoading(false);
             
