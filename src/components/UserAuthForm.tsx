@@ -1,9 +1,11 @@
+import { logger } from '../utils/logger';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
 import Image from 'next/image';
 import { EyeIcon } from './EyeIcon';
 import { useMobileViewport } from '../hooks/useMobileViewport';
+import { POST_LOGIN_SPINNER_MS } from '../../constants';
 
 const getSiteUrl = (): string => {
   const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
@@ -173,18 +175,25 @@ export default function UserAuthForm() {
               });
 
             if (profileError) {
-              console.error('Error saving profile:', profileError);
+              logger.error('Error saving profile:', profileError);
             }
           } catch (profileErr) {
-            console.error('Error creating profile:', profileErr);
+            logger.error('Error creating profile:', profileErr);
           }
         }
         
-        // Always redirect to map after successful login
+        // Always redirect to map after successful login. The 1.2s pause is
+        // intentional UX — it shows the "Welcome back!" spinner branch
+        // (see isLoggingIn render block) before navigating. Using await
+        // here (instead of a fire-and-forget setTimeout) is what keeps the
+        // spinner visible the whole time and prevents the form from
+        // reappearing in the gap with a re-enabled submit button.
         setIsLoggingIn(true);
-        setTimeout(() => {
-          router.push('/map');
-        }, 1200);
+        await new Promise<void>((resolve) => setTimeout(resolve, POST_LOGIN_SPINNER_MS));
+        await router.push('/map');
+        // Navigation has been kicked off; let the unmounting component
+        // skip the finally state-clears below to avoid flashing the form.
+        return;
       }
     } catch (err: unknown) {
       let errorMsg = 'Something went wrong.';

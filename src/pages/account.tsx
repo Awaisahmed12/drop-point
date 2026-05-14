@@ -5,7 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { supabase } from '../utils/supabaseClient';
 import { getUserUsageBytes, formatBytes } from '../utils/usage';
-import { FREE_TIER_MAX_BYTES, FREE_TIER_GB } from '../../constants';
+import { FREE_TIER_MAX_BYTES, FREE_TIER_GB, TOAST_SUCCESS_MS } from '../../constants';
 import { withAuth } from '../components/withAuth';
 
 // Deterministic avatar color from a string
@@ -86,7 +86,7 @@ function AccountPage() {
         } else {
           setIsEditingProfile(false);
           setProfileSuccess(true);
-          setTimeout(() => setProfileSuccess(false), 3000);
+          setTimeout(() => setProfileSuccess(false), TOAST_SUCCESS_MS);
         }
       }
     } catch {

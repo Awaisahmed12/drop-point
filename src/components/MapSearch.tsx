@@ -1,6 +1,8 @@
+import { logger } from '../utils/logger';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Prediction, PropertyWithFileCount } from '../../types';
 import { supabase } from '../utils/supabaseClient';
+import { AUTOCOMPLETE_DEBOUNCE_MS } from '../../constants';
 import { QuickAccessProperties } from './QuickAccessProperties';
 
 interface MapSearchProps {
@@ -37,6 +39,11 @@ export const MapSearch = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const justSelectedRef = useRef(false);
+  // Cancels the in-flight autocomplete request when a newer one starts, so a
+  // slow response for "New York" can't overwrite the result for "New".
+  const abortRef = useRef<AbortController | null>(null);
+  // Debounce timer for input-driven fetches. Focus / clear bypass this.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateShowDropdown = useCallback((show: boolean) => {
     setShowDropdown(show);
@@ -48,39 +55,71 @@ export const MapSearch = ({
     onShowDropdownChange?.(show || showDropdown);
   }, [onShowDropdownChange, showDropdown]);
 
-  const fetchPredictions = useCallback(async (input: string): Promise<Prediction[]> => {
+  // Performs one autocomplete fetch. The caller owns the AbortController so it
+  // can cancel us mid-flight; we treat AbortError as a no-op rather than an
+  // error, since cancellation is the expected path during fast typing.
+  const fetchPredictions = useCallback(async (input: string, signal: AbortSignal): Promise<Prediction[]> => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (signal.aborted) return [];
       const response = await fetch(`/api/autocomplete?input=${encodeURIComponent(input)}`, {
-        headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        }
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
+        signal,
       });
-      if (response.ok) {
-        const data = await response.json();
-        return data.predictions.map((p: google.maps.places.AutocompletePrediction & { user_property?: boolean; property_id?: string }) => ({
-          description: p.description,
-          place_id: p.place_id,
-          isUserProperty: p.user_property || false,
-          property_id: p.property_id || null,
-          structured_formatting: p.structured_formatting,
-          displayText: p.structured_formatting?.main_text || p.description,
-          secondaryText: p.structured_formatting?.secondary_text || '',
-        }));
-      }
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.predictions.map((p: google.maps.places.AutocompletePrediction & { user_property?: boolean; property_id?: string }) => ({
+        description: p.description,
+        place_id: p.place_id,
+        isUserProperty: p.user_property || false,
+        property_id: p.property_id || null,
+        structured_formatting: p.structured_formatting,
+        displayText: p.structured_formatting?.main_text || p.description,
+        secondaryText: p.structured_formatting?.secondary_text || '',
+      }));
     } catch (error) {
-      console.error('Error fetching predictions:', error);
+      if ((error as Error).name === 'AbortError') return [];
+      logger.error('Error fetching predictions:', error);
+      return [];
     }
-    return [];
   }, []);
 
-  const handleInputChange = useCallback(async (value: string) => {
+  // Wraps fetchPredictions with abort-of-previous semantics. Returns [] if a
+  // newer request started while we were waiting, so callers can safely write
+  // the result back to state without checking themselves.
+  const requestPredictions = useCallback(async (input: string): Promise<Prediction[]> => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const result = await fetchPredictions(input, controller.signal);
+    return controller.signal.aborted ? [] : result;
+  }, [fetchPredictions]);
+
+  // Input-driven fetches debounce. We update the controlled input synchronously
+  // so typing stays responsive, then schedule the network call.
+  const handleInputChange = useCallback((value: string) => {
     onInputChange(value);
-    const newPredictions = await fetchPredictions(value.trim() ? value : '');
-    onPredictionsChange(newPredictions);
-    updateShowDropdown(newPredictions.length > 0);
-    updateShowQuickAccess(false);
-    setSelectedIndex(0);
-  }, [onInputChange, fetchPredictions, onPredictionsChange, updateShowDropdown, updateShowQuickAccess]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const newPredictions = await requestPredictions(value.trim() ? value : '');
+      // requestPredictions returns [] if a newer request superseded us, so the
+      // last-typed query is the only one that ever writes to state.
+      onPredictionsChange(newPredictions);
+      updateShowDropdown(newPredictions.length > 0);
+      updateShowQuickAccess(false);
+      setSelectedIndex(0);
+    }, AUTOCOMPLETE_DEBOUNCE_MS);
+  }, [onInputChange, requestPredictions, onPredictionsChange, updateShowDropdown, updateShowQuickAccess]);
+
+  // Cancel any pending debounce + in-flight fetch when the component unmounts.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const selectPrediction = useCallback((index: number) => {
     const prediction = predictions[index];
@@ -120,12 +159,12 @@ export const MapSearch = ({
     if (inputValue && !justSelectedRef.current) {
       updateShowDropdown(predictions.length > 0);
     } else if (!inputValue) {
-      const recentPredictions = await fetchPredictions('');
+      const recentPredictions = await requestPredictions('');
       onPredictionsChange(recentPredictions);
       updateShowDropdown(recentPredictions.length > 0);
       updateShowQuickAccess(false);
     }
-  }, [inputValue, predictions, updateShowDropdown, fetchPredictions, onPredictionsChange, updateShowQuickAccess]);
+  }, [inputValue, predictions, updateShowDropdown, requestPredictions, onPredictionsChange, updateShowQuickAccess]);
 
   const handleBlur = useCallback(() => {
     updateShowDropdown(false);
@@ -134,13 +173,16 @@ export const MapSearch = ({
 
   const handleClear = useCallback(async () => {
     onInputChange('');
-    const recentPredictions = await fetchPredictions('');
+    // Cancel any pending debounced fetch from prior keystrokes so it can't
+    // arrive after the "recent" results and clobber them.
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const recentPredictions = await requestPredictions('');
     onPredictionsChange(recentPredictions);
     updateShowDropdown(recentPredictions.length > 0);
     setSelectedIndex(0);
     updateShowQuickAccess(false);
     inputRef.current?.focus();
-  }, [onInputChange, fetchPredictions, onPredictionsChange, updateShowDropdown, updateShowQuickAccess]);
+  }, [onInputChange, requestPredictions, onPredictionsChange, updateShowDropdown, updateShowQuickAccess]);
 
   const handlePropertySelect = useCallback((property: PropertyWithFileCount) => {
     updateShowQuickAccess(false);
@@ -167,6 +209,9 @@ export const MapSearch = ({
   const dropdownContent = showDropdown && predictions.length > 0 ? (
     <div
       ref={dropdownRef}
+      id="map-search-listbox"
+      role="listbox"
+      aria-label="Search results"
       className="absolute z-30 w-full bg-white rounded-2xl shadow-2xl mt-2 overflow-hidden"
       style={{ boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)' }}
     >
@@ -182,12 +227,26 @@ export const MapSearch = ({
         const isSelected = i === selectedIndex;
 
         return (
+          // Long-term this should be a real <button>, but combobox+listbox
+          // pattern (per WAI-ARIA APG) actually expects role="option" divs,
+          // so this is technically correct for screen readers as long as
+          // the listbox/option/aria-selected wiring is in place. The
+          // pointerdown + preventDefault keeps selection working on touch
+          // (where synthesized mousedown may not fire on a scrollable
+          // parent) and prevents the input from blurring before
+          // selectPrediction runs.
           <div
             key={prediction.place_id}
+            role="option"
+            aria-selected={isSelected}
+            id={`map-search-option-${i}`}
             className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-100 ${
               isSelected ? 'bg-gray-50' : 'hover:bg-gray-50'
-            } ${i < predictions.length - 1 ? '' : ''}`}
-            onMouseDown={() => selectPrediction(i)}
+            }`}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              selectPrediction(i);
+            }}
             onMouseEnter={() => setSelectedIndex(i)}
           >
             {/* Icon */}
@@ -244,13 +303,20 @@ export const MapSearch = ({
 
           <input
             ref={inputRef}
-            type="text"
+            type="search"
+            role="combobox"
             value={inputValue}
             onChange={e => handleInputChange(e.target.value)}
             onFocus={handleFocus}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             placeholder="Search address or property…"
+            // Placeholders disappear once the user types — explicit aria-label
+            // gives screen readers a stable name.
+            aria-label="Search address or saved property"
+            aria-autocomplete="list"
+            aria-expanded={showDropdown && predictions.length > 0}
+            aria-controls="map-search-listbox"
             className="w-full pl-11 pr-10 py-3 rounded-full bg-white text-gray-900 text-sm font-medium placeholder:text-gray-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
             style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.06)' }}
             autoComplete="off"

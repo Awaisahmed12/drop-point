@@ -1,0 +1,41 @@
+name: CI
+
+# Run on every push to any branch, and on every PR. PR runs are what gives
+# you a green/red check in the GitHub UI before merging; push runs catch
+# anything pushed directly to a branch (e.g. via `git push` from this
+# worktree) without a PR.
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Next.js 16 requires >=20.9; pin to 22 to match local dev.
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check + production build
+        # Next's build step also runs `tsc` under the hood, so this catches
+        # type regressions in addition to bundling failures.
+        # Dummy env vars so the build doesn't error on missing
+        # NEXT_PUBLIC_* values; they're only read at runtime in the
+        # browser, never baked into the build artifact in a way that
+        # would matter here.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
+          NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ci-dummy-maps-key
+        run: npm run build
+
+      - name: Unit tests
+        run: npm run test:run

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileIcon } from './FileIcon';
 import { supabase } from '../utils/supabaseClient';
+import { THUMBNAIL_BATCH_WINDOW_MS, THUMBNAIL_BATCH_MAX, SIGNED_URL_EXPIRY_SEC } from '../../constants';
 
 interface FileThumbnailProps {
   fileName: string;
@@ -23,14 +24,14 @@ let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleFlush() {
   if (flushTimer !== null) return;
-  flushTimer = setTimeout(flushQueue, 80); // 80ms window to accumulate a batch
+  flushTimer = setTimeout(flushQueue, THUMBNAIL_BATCH_WINDOW_MS);
 }
 
 async function flushQueue() {
   flushTimer = null;
   if (pendingQueue.length === 0) return;
 
-  const batch = pendingQueue.splice(0, 100); // max 100 per Supabase call
+  const batch = pendingQueue.splice(0, THUMBNAIL_BATCH_MAX);
   if (pendingQueue.length > 0) scheduleFlush(); // schedule next batch if more remain
 
   const paths = batch.map(item => item.key); // key = "propertyId/fileName"
@@ -38,7 +39,7 @@ async function flushQueue() {
   try {
     const { data, error } = await supabase.storage
       .from('property-files')
-      .createSignedUrls(paths, 3600); // single HTTP request for all N URLs
+      .createSignedUrls(paths, SIGNED_URL_EXPIRY_SEC); // single HTTP request for all N URLs
 
     if (error || !data) {
       batch.forEach(item => { urlCache.set(item.key, false); item.resolve(false); });

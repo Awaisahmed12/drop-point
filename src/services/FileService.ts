@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { supabase } from '../utils/supabaseClient';
 import type { PropertyFile } from '../../types';
 import { sanitizeFileName } from '../../utils/fileManagement';
@@ -27,7 +28,7 @@ export class FileService {
       });
 
     if (error) {
-      console.error('[FileService] Error uploading file:', error);
+      logger.error('[FileService] Error uploading file:', error);
       throw error;
     }
 
@@ -72,7 +73,7 @@ export class FileService {
       .single();
 
     if (error) {
-      console.error('[FileService] Error creating file record:', error);
+      logger.error('[FileService] Error creating file record:', error);
       throw error;
     }
 
@@ -98,7 +99,7 @@ export class FileService {
       .remove([file.file_url]);
 
     if (storageError) {
-      console.error('[FileService] Error deleting file from storage:', storageError);
+      logger.error('[FileService] Error deleting file from storage:', storageError);
       // Continue with database deletion even if storage deletion fails
     }
 
@@ -110,7 +111,7 @@ export class FileService {
       .eq('user_id', user.id);
 
     if (dbError) {
-      console.error('[FileService] Error deleting file from database:', dbError);
+      logger.error('[FileService] Error deleting file from database:', dbError);
       throw dbError;
     }
   }
@@ -132,7 +133,7 @@ export class FileService {
       .order('uploaded_at', { ascending: false });
 
     if (error) {
-      console.error('[FileService] Error fetching property files:', error);
+      logger.error('[FileService] Error fetching property files:', error);
       throw error;
     }
 
@@ -165,7 +166,7 @@ export class FileService {
       .move(oldPath, newPath);
 
     if (moveError) {
-      console.error('[FileService] Error moving file in storage:', moveError);
+      logger.error('[FileService] Error moving file in storage:', moveError);
       throw new Error(`Storage error: ${moveError.message}`);
     }
 
@@ -182,7 +183,7 @@ export class FileService {
       .single();
 
     if (dbError) {
-      console.error('[FileService] Error updating file record:', dbError);
+      logger.error('[FileService] Error updating file record:', dbError);
       throw dbError;
     }
 
@@ -221,7 +222,7 @@ export class FileService {
         .copy(oldPath, newPath);
 
       if (copyError) {
-        console.error('[FileService] Error copying file:', copyError);
+        logger.error('[FileService] Error copying file:', copyError);
         throw new Error(`Storage error: ${copyError.message}`);
       }
 
@@ -231,7 +232,7 @@ export class FileService {
         .remove([oldPath]);
 
       if (removeError) {
-        console.warn('[FileService] Warning removing old file:', removeError);
+        logger.warn('[FileService] Warning removing old file:', removeError);
         // Continue anyway
       }
 
@@ -253,12 +254,83 @@ export class FileService {
       .single();
 
     if (dbError) {
-      console.error('[FileService] Error updating file record:', dbError);
+      logger.error('[FileService] Error updating file record:', dbError);
       throw dbError;
     }
 
     if (!data) {
       throw new Error('File move failed: No data returned');
+    }
+
+    return data;
+  }
+
+  /**
+   * Duplicate a file in place: server-side storage copy (no re-upload of
+   * bytes — fast even for big files) plus a new property_files row that
+   * points at the copy.
+   *
+   * The caller is responsible for picking a non-colliding destination name
+   * (use getDuplicateFileName from utils/fileManagement). We pass the
+   * fully-resolved name in instead of generating it here, because the
+   * caller has the already-fetched files list.
+   */
+  async copyFile(file: PropertyFile, newFileName: string): Promise<PropertyFile> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    const sanitized = sanitizeFileName(newFileName);
+    if (!sanitized) {
+      throw new Error('Invalid duplicate file name after sanitization');
+    }
+
+    const oldPath = file.file_url;
+    const newPath = `${file.property_id}/${sanitized}`;
+
+    // Server-side copy in storage. If the destination path already exists,
+    // Supabase returns an error — caller should have resolved the conflict
+    // via getDuplicateFileName before calling.
+    const { error: copyError } = await supabase.storage
+      .from('property-files')
+      .copy(oldPath, newPath);
+
+    if (copyError) {
+      logger.error('[FileService] Error copying file in storage:', copyError);
+      throw new Error(`Storage error: ${copyError.message}`);
+    }
+
+    // Insert a new DB row for the duplicate. Resets uploaded_at/modified_at
+    // to "now" so sorting by date surfaces the duplicate as the newest file
+    // (which matches Finder/Explorer behavior).
+    const now = new Date().toISOString();
+    const { data, error: dbError } = await supabase
+      .from('property_files')
+      .insert([{
+        property_id: file.property_id,
+        folder_id: file.folder_id,
+        user_id: user.id,
+        file_name: sanitized,
+        file_url: newPath,
+        file_type: file.file_type,
+        file_size: file.file_size,
+        uploaded_at: now,
+        modified_at: now,
+      }])
+      .select()
+      .single();
+
+    if (dbError) {
+      // Storage copy succeeded but DB insert failed — best-effort rollback
+      // so we don't leave an orphaned blob lying around.
+      logger.error('[FileService] Error creating duplicate record, rolling back storage copy:', dbError);
+      await supabase.storage.from('property-files').remove([newPath]).catch(() => {});
+      throw dbError;
+    }
+
+    if (!data) {
+      throw new Error('File duplication failed: No data returned');
     }
 
     return data;
@@ -279,7 +351,7 @@ export class FileService {
       .order('uploaded_at', { ascending: false });
 
     if (error) {
-      console.error('[FileService] Error fetching files in folder:', error);
+      logger.error('[FileService] Error fetching files in folder:', error);
       throw error;
     }
 

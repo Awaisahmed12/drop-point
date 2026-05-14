@@ -1,5 +1,7 @@
+import { logger } from '../utils/logger';
 import { useCallback } from 'react';
 import { supabase } from '../utils/supabaseClient';
+import { PROPERTY_CACHE_TTL_MS } from '../../constants';
 import type { PropertyFile, PropertyFolder } from '../../types';
 import type { PropertyWithFileCount } from '../../types';
 
@@ -26,7 +28,7 @@ export const usePropertySwitcher = ({
   onLoadingStateChange,
   onError,
   propertyCache = {},
-  cacheTimeout = 5 * 60 * 1000 // 5 minutes
+  cacheTimeout = PROPERTY_CACHE_TTL_MS
 }: UsePropertySwitcherProps): UsePropertySwitcherReturn => {
 
   const switchToProperty = useCallback(async (property: PropertyWithFileCount) => {
@@ -104,7 +106,7 @@ export const usePropertySwitcher = ({
       }
 
     } catch (error) {
-      console.error('Error switching to property:', error);
+      logger.error('Error switching to property:', error);
       onError?.(error instanceof Error ? error.message : 'Failed to switch property');
     } finally {
       onLoadingStateChange?.(false);

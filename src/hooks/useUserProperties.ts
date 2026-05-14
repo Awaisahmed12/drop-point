@@ -1,5 +1,7 @@
+import { logger } from '../utils/logger';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabaseClient';
+import { PROPERTY_CACHE_TTL_MS } from '../../constants';
 import type { PropertyWithFileCount } from '../../types';
 
 export interface UseUserPropertiesReturn {
@@ -55,7 +57,7 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
       }));
 
     } catch (error) {
-      console.error('Error fetching fresh properties:', error);
+      logger.error('Error fetching fresh properties:', error);
       setError(error instanceof Error ? error.message : 'Failed to load properties');
     } finally {
       setLoading(false);
@@ -74,8 +76,8 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
           const cacheData = JSON.parse(cached);
           const cacheAge = Date.now() - cacheData.timestamp;
           
-          // Use cache if less than 5 minutes old
-          if (cacheAge < 5 * 60 * 1000) {
+          // Use cache if still within the TTL window (PROPERTY_CACHE_TTL_MS)
+          if (cacheAge < PROPERTY_CACHE_TTL_MS) {
             setProperties(cacheData.properties);
             setLoading(false);
             
@@ -84,14 +86,14 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
             return;
           }
         } catch (error) {
-          console.error('Error parsing cached properties:', error);
+          logger.error('Error parsing cached properties:', error);
         }
       }
 
       // No valid cache, fetch fresh data
       await fetchFreshProperties();
     } catch (error) {
-      console.error('Error in fetchProperties:', error);
+      logger.error('Error in fetchProperties:', error);
       setError(error instanceof Error ? error.message : 'Failed to load properties');
       setLoading(false);
     }
@@ -105,10 +107,10 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
         .eq('id', propertyId);
 
       if (error) {
-        console.error('Error updating last accessed:', error);
+        logger.error('Error updating last accessed:', error);
       }
     } catch (err) {
-      console.error('Error updating last accessed:', err);
+      logger.error('Error updating last accessed:', err);
     }
   }, []);
 

@@ -1,3 +1,4 @@
+import { logger } from '../src/utils/logger';
 import type { PropertyFile } from '../types';
 
 /**
@@ -58,38 +59,68 @@ export function getFileNameWithoutExtension(name: string): string {
 export function getUniqueFileName(baseName: string, folderId: string | null, propertyFiles: PropertyFile[]): string {
   const filesInFolder = propertyFiles.filter(f => f.folder_id === folderId);
   const [nameWithoutExt, ext] = splitFileNameAndExt(baseName);
-  
+
   let counter = 1;
   let newName = baseName;
-  
+
   while (filesInFolder.some(f => f.file_name === newName)) {
     newName = `${nameWithoutExt} (${counter})${ext}`;
     counter++;
   }
-  
+
   return newName;
+}
+
+/**
+ * Generates a name for a duplicated file, Windows-style:
+ *
+ *   report.pdf            -> report - Copy.pdf
+ *   report - Copy.pdf     -> report - Copy (2).pdf
+ *   report - Copy (2).pdf -> report - Copy (3).pdf
+ *
+ * Used by the "Duplicate" action. Distinct from getUniqueFileName, which is
+ * for upload-conflict resolution and uses the simpler "(1)", "(2)" suffix.
+ * The " - Copy" marker makes it visually obvious which file is the new one,
+ * even when the original is in the same view.
+ */
+export function getDuplicateFileName(originalName: string, folderId: string | null, propertyFiles: PropertyFile[]): string {
+  const filesInFolder = propertyFiles.filter(f => f.folder_id === folderId);
+  const [nameWithoutExt, ext] = splitFileNameAndExt(originalName);
+
+  // Strip an existing " - Copy" or " - Copy (N)" suffix so duplicating a copy
+  // produces "name - Copy (2).ext" instead of "name - Copy - Copy.ext".
+  const copySuffix = / - Copy(?: \((\d+)\))?$/;
+  const stripped = nameWithoutExt.replace(copySuffix, '');
+
+  const candidate = (n: number) => n === 1 ? `${stripped} - Copy${ext}` : `${stripped} - Copy (${n})${ext}`;
+
+  let n = 1;
+  while (filesInFolder.some(f => f.file_name === candidate(n))) {
+    n += 1;
+  }
+  return candidate(n);
 }
 
 /**
  * Sanitizes a filename by removing/replacing invalid characters and making it URL-safe
  */
 export function sanitizeFileName(name: string): string {
-  console.log('[SANITIZE] Starting sanitization for:', name);
+  logger.debug('[SANITIZE] Starting sanitization for:', name);
   
   if (!name) {
-    console.log('[SANITIZE] Empty name, returning default:', 'unnamed_file');
+    logger.debug('[SANITIZE] Empty name, returning default:', 'unnamed_file');
     return 'unnamed_file';
   }
   
   // First, normalize Unicode characters
   const normalized = name.normalize('NFD');
-  console.log('[SANITIZE] After normalization:', normalized);
+  logger.debug('[SANITIZE] After normalization:', normalized);
   
   // Split into name and extension
   const lastDot = normalized.lastIndexOf('.');
   const nameWithoutExt = lastDot === -1 ? normalized : normalized.substring(0, lastDot);
   const ext = lastDot === -1 ? '' : normalized.substring(lastDot);
-  console.log('[SANITIZE] Split - name:', nameWithoutExt, 'ext:', ext);
+  logger.debug('[SANITIZE] Split - name:', nameWithoutExt, 'ext:', ext);
   
   // Clean the name part
   let cleanName = nameWithoutExt
@@ -112,12 +143,12 @@ export function sanitizeFileName(name: string): string {
     .replace(/^[\s_]+|[\s_]+$/g, '')
     .trim();
   
-  console.log('[SANITIZE] After character replacement:', cleanName);
+  logger.debug('[SANITIZE] After character replacement:', cleanName);
   
   // If name is empty after cleaning, use a default
   if (!cleanName) {
     cleanName = 'file';
-    console.log('[SANITIZE] Name was empty after cleaning, using default:', cleanName);
+    logger.debug('[SANITIZE] Name was empty after cleaning, using default:', cleanName);
   }
   
   // Clean the extension
@@ -125,7 +156,7 @@ export function sanitizeFileName(name: string): string {
     .replace(/[^\w.-]/g, '')
     .toLowerCase();
   
-  console.log('[SANITIZE] Cleaned extension:', cleanExt);
+  logger.debug('[SANITIZE] Cleaned extension:', cleanExt);
   
   // Combine and limit length
   const result = (cleanName + cleanExt).substring(0, 200);
@@ -133,7 +164,7 @@ export function sanitizeFileName(name: string): string {
   // Ensure it doesn't start with a dot
   const finalResult = result.startsWith('.') ? 'file' + result : result;
   
-  console.log('[SANITIZE] Final result:', finalResult);
+  logger.debug('[SANITIZE] Final result:', finalResult);
   return finalResult;
 }
 

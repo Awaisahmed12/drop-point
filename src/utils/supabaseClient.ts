@@ -1,4 +1,6 @@
+import { logger } from './logger';
 import { createClient, type SupportedStorage } from '@supabase/supabase-js';
+import { SIGNED_URL_EXPIRY_SEC } from '../../constants';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
@@ -35,12 +37,12 @@ export const getFileSignedUrl = async (
     // For downloads, use signed URL with download flag
     const { data, error } = await supabase.storage
       .from('property-files')
-      .createSignedUrl(filePath, 3600, { 
+      .createSignedUrl(filePath, SIGNED_URL_EXPIRY_SEC, { 
         download: true
       });
     
     if (error) {
-      console.error('Error creating download URL:', error);
+      logger.error('Error creating download URL:', error);
       throw error;
     }
     
@@ -49,10 +51,10 @@ export const getFileSignedUrl = async (
     // For inline viewing, try signed URL without download flag first
     const { data, error } = await supabase.storage
       .from('property-files')
-      .createSignedUrl(filePath, 3600);
+      .createSignedUrl(filePath, SIGNED_URL_EXPIRY_SEC);
     
     if (error) {
-      console.error('Error creating signed URL:', error);
+      logger.error('Error creating signed URL:', error);
       throw error;
     }
     

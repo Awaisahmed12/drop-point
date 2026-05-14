@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import React from 'react';
 import type { PropertyFile } from '../../types';
 import { getFileSignedUrl } from '../utils/supabaseClient';
@@ -9,6 +10,7 @@ interface FileMenuProps {
   onClose: () => void;
   onRename: (file: PropertyFile) => void;
   onMove?: (file: PropertyFile) => void;
+  onDuplicate?: (file: PropertyFile) => void;
   onDelete: (file: PropertyFile) => void;
   menuPosition: { top?: number; bottom?: number; left?: number; right?: number };
   menuRef: React.RefObject<HTMLDivElement | null>;
@@ -20,6 +22,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
   onClose,
   onRename,
   onMove,
+  onDuplicate,
   onDelete,
   menuPosition,
   menuRef,
@@ -33,7 +36,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
       const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
       window.open(fileUrl, '_blank');
     } catch (error) {
-      console.error('Error downloading file:', error);
+      logger.error('Error downloading file:', error);
       showToast('Unable to download file. Please try again.');
     }
     onClose();
@@ -45,7 +48,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
       await navigator.clipboard.writeText(fileUrl);
       showToast('Link copied to clipboard', 'success');
     } catch (error) {
-      console.error('Error copying link:', error);
+      logger.error('Error copying link:', error);
       showToast('Unable to copy link. Please try again.');
     }
     onClose();
@@ -65,7 +68,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
       onTouchEnd={e => e.stopPropagation()}
     >
       <button
-        className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
+        className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
         onClick={e => { e.stopPropagation(); onRename(file); onClose(); }}
         onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onRename(file); onClose(); }}
       >
@@ -78,7 +81,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
       </button>
       {onMove && (
         <button
-          className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150 border-b border-gray-100/50"
+          className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150 border-b border-gray-100/50"
           onClick={e => { e.stopPropagation(); onMove(file); onClose(); }}
           onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onMove(file); onClose(); }}
         >
@@ -90,8 +93,24 @@ export const FileMenu: React.FC<FileMenuProps> = ({
           </div>
         </button>
       )}
+      {onDuplicate && (
+        <button
+          className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-amber-50 hover:text-amber-700 transition-all duration-150 border-b border-gray-100/50"
+          onClick={e => { e.stopPropagation(); onDuplicate(file); onClose(); }}
+          onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onDuplicate(file); onClose(); }}
+        >
+          <div className="flex items-center gap-2">
+            {/* Two-rectangle "duplicate" glyph (front sheet offset over back sheet) */}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <rect x="9" y="9" width="11" height="11" rx="2" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+            Duplicate
+          </div>
+        </button>
+      )}
       <button
-        className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-150 border-b border-gray-100/50"
+        className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-150 border-b border-gray-100/50"
         onClick={async (e) => { e.stopPropagation(); await handleCopyLink(); }}
         onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); handleCopyLink(); }}
       >
@@ -103,7 +122,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
         </div>
       </button>
       <button
-        className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-150 border-b border-gray-100/50"
+        className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-green-50 hover:text-green-700 transition-all duration-150 border-b border-gray-100/50"
         onClick={async (e) => { e.stopPropagation(); await handleDownload(); }}
         onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); handleDownload(); }}
       >
@@ -115,7 +134,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
         </div>
       </button>
       <button
-        className="block w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
+        className="block w-full text-left px-4 py-3.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
         onClick={e => { e.stopPropagation(); onDelete(file); onClose(); }}
         onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onDelete(file); onClose(); }}
       >

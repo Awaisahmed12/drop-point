@@ -1,3 +1,4 @@
+import { logger } from './logger';
 import { supabase } from '../utils/supabaseClient';
 
 export const bytesToGB = (bytes: number): number => bytes / (1024 * 1024 * 1024);
@@ -23,7 +24,7 @@ export const getUserUsageBytes = async (userId: string): Promise<number> => {
     .eq('user_id', userId);
 
   if (error) {
-    console.error('Error fetching usage:', error);
+    logger.error('Error fetching usage:', error);
     throw error;
   }
 

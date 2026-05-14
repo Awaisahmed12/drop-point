@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { US_CENTER, DEFAULT_ZOOM, DEFAULT_MAP_TYPE } from '../../constants';
 
@@ -44,7 +45,7 @@ export function useMapState() {
           setMapCenter({ lat: position.lat, lng: position.lng });
           setZoom(position.zoom || DEFAULT_ZOOM);
         } catch (error) {
-          console.error('[MapState] Error loading saved position:', error);
+          logger.error('[MapState] Error loading saved position:', error);
         }
       }
     }

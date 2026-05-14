@@ -39,7 +39,7 @@ export const FolderMenu: React.FC<FolderMenuProps> = ({
       onTouchEnd={e => e.stopPropagation()}
     >
       <button
-        className="block w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
+        className="block w-full text-left px-4 py-3.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-150 border-b border-gray-100/50"
         onClick={e => { e.stopPropagation(); onRename(folder); onClose(); }}
         onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onRename(folder); onClose(); }}
       >
@@ -51,7 +51,7 @@ export const FolderMenu: React.FC<FolderMenuProps> = ({
         </div>
       </button>
       <button
-        className="block w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
+        className="block w-full text-left px-4 py-3.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-150"
         onClick={e => { e.stopPropagation(); onDelete(folder); onClose(); }}
         onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onDelete(folder); onClose(); }}
       >

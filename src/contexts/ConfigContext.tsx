@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import type { AdminConfiguration } from '../../types';
@@ -46,7 +47,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
 
       setConfigurations(configObject);
     } catch (err) {
-      console.error('Error fetching configurations:', err);
+      logger.error('Error fetching configurations:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch configurations');
       
       // Set default configurations if fetch fails
@@ -81,7 +82,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
       // Refresh configurations from database
       await fetchConfigurations();
     } catch (err) {
-      console.error('Error updating configuration:', err);
+      logger.error('Error updating configuration:', err);
       throw err;
     }
   };
@@ -147,7 +148,7 @@ export const useAdminConfig = () => {
 
         setIsAdmin(profile?.user_type === 'Admin');
       } catch (error) {
-        console.error('Error checking admin status:', error);
+        logger.error('Error checking admin status:', error);
         setIsAdmin(false);
       } finally {
         setAdminLoading(false);

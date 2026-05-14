@@ -5,6 +5,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './vitest.setup.ts',
-    include: ['src/**/*.test.{ts,tsx}'],
+    // utils/ at the repo root holds pure-function helpers re-exported through
+    // src/utils/formatting.ts; tests for them live colocated rather than
+    // forced into src/.
+    include: ['src/**/*.test.{ts,tsx}', 'utils/**/*.test.{ts,tsx}'],
   },
 }); 

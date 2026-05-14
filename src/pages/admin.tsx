@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
@@ -5,6 +6,7 @@ import { useAdminConfig } from '../contexts/ConfigContext';
 import { withAuth } from '../components/withAuth';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { useMobileViewport } from '../hooks/useMobileViewport';
+import { TOAST_SUCCESS_MS, TOAST_ERROR_MS } from '../../constants';
 
 interface ConfigItem {
   key: string;
@@ -67,11 +69,11 @@ function AdminConfigPage() {
     try {
       await updateConfiguration(key, value);
       setSuccessMessage(`Configuration "${key}" updated successfully!`);
-      setTimeout(() => setSuccessMessage(null), 3000);
+      setTimeout(() => setSuccessMessage(null), TOAST_SUCCESS_MS);
     } catch (err) {
-      console.error('Error updating configuration:', err);
+      logger.error('Error updating configuration:', err);
       setSaveError(err instanceof Error ? err.message : 'Failed to update configuration');
-      setTimeout(() => setSaveError(null), 5000);
+      setTimeout(() => setSaveError(null), TOAST_ERROR_MS);
     } finally {
       setSaving(prev => ({ ...prev, [key]: false }));
     }

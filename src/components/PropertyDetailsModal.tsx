@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 
@@ -13,6 +14,8 @@ import { useResponsiveValue } from '../hooks/useResponsiveValue';
 import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
 import { useToast } from '../contexts/ToastContext';
+import { useInternalDrag } from '../hooks/useInternalDrag';
+import { tryWithToast } from '../utils/tryWithToast';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
 import type { PropertyWithFileCount } from '../../types';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
@@ -41,6 +44,7 @@ interface PropertyDetailsModalProps {
   onFileDelete: (file: PropertyFile) => void;
   onFileRename: (item: PropertyFile | PropertyFolder, newName: string) => void;
   onFileMove?: (file: PropertyFile, targetFolderId: string | null) => Promise<void>;
+  onFileCopy?: (file: PropertyFile) => Promise<void>;
   onFolderCreate: (name: string) => void;
   onFolderDelete: (folder: PropertyFolder) => void;
   
@@ -72,6 +76,7 @@ export const PropertyDetailsModal = ({
   onFileDelete,
   onFileRename,
   onFileMove,
+  onFileCopy,
   onFolderCreate,
   onFolderDelete,
   pendingUploads,
@@ -102,6 +107,42 @@ export const PropertyDetailsModal = ({
   const [fabOpen, setFabOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Internal drag state for moving files between folders. Distinct from the
+  // dragDepthRef-based external upload overlay above: this tracks "a file
+  // row is being dragged within the app", which uses a custom MIME so the
+  // two flows don't collide. Spring-loaded folders auto-open after 600ms
+  // of hover so the user can drill into nested folders without releasing.
+  const internalDrag = useInternalDrag();
+
+  // Shared loader for the image preview overlay (keyboard nav + prev/next
+  // buttons all called this same pattern silently). Surfaces a toast if
+  // the signed-URL fetch fails so the user isn't left wondering why
+  // ArrowRight did nothing.
+  const loadImagePreview = useCallback(async (file: PropertyFile) => {
+    await tryWithToast(
+      async () => {
+        const url = await getFileSignedUrl(file.property_id, file.file_name, false);
+        setImagePreview({ url, file });
+      },
+      {
+        showToast,
+        errorMessage: `Couldn't load "${file.file_name}".`,
+        tag: 'ImagePreview',
+      },
+    );
+  }, [showToast]);
+  // Drag depth counter. dragenter/dragleave fire in pairs as the cursor crosses
+  // child boundaries, and the "contains(relatedTarget)" guard breaks when
+  // relatedTarget is null (window blur, dragging out of frame, browser DnD
+  // quirks). Counting balanced enter/leave events is the robust pattern: we
+  // only clear isDragOver when the count drops back to 0.
+  const dragDepthRef = useRef(0);
+
+  const resetDragState = useCallback(() => {
+    dragDepthRef.current = 0;
+    setIsDragOver(false);
+  }, []);
+
   const closeMenus = useCallback(() => {
     setFileMenuId(null);
     setFolderMenuId(null);
@@ -109,26 +150,60 @@ export const PropertyDetailsModal = ({
   }, []);
 
   // Drag & drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
     e.preventDefault();
     e.stopPropagation();
-    if (e.dataTransfer.types.includes('Files')) setIsDragOver(true);
+    dragDepthRef.current += 1;
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    // preventDefault on dragover is what tells the browser this is a valid
+    // drop target. Without it, the OS shows the "not allowed" cursor and
+    // drop never fires.
+    e.preventDefault();
+    e.stopPropagation();
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false);
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDragOver(false);
   }, []);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(false);
+    resetDragState();
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
-      await onFileUpload(droppedFiles).catch(console.error);
+      // Previously a silent .catch(logger.error) — user saw nothing if the
+      // upload failed. tryWithToast surfaces the failure visibly.
+      await tryWithToast(() => onFileUpload(droppedFiles), {
+        showToast,
+        errorMessage: droppedFiles.length === 1
+          ? `Failed to upload "${droppedFiles[0].name}".`
+          : `Failed to upload ${droppedFiles.length} files.`,
+        tag: 'DragDropUpload',
+      });
     }
-  }, [onFileUpload]);
+  }, [onFileUpload, resetDragState, showToast]);
+
+  // Window-level safety net: if the drag is cancelled outside our container
+  // (Escape, drop on another window, tab switch), browsers may not fire a
+  // matching dragleave for every dragenter and the overlay would stick open.
+  // dragend on the drag source + a body-level drop guarantee we reset.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleGlobalEnd = () => resetDragState();
+    window.addEventListener('dragend', handleGlobalEnd);
+    window.addEventListener('drop', handleGlobalEnd);
+    return () => {
+      window.removeEventListener('dragend', handleGlobalEnd);
+      window.removeEventListener('drop', handleGlobalEnd);
+    };
+  }, [isOpen, resetDragState]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -150,10 +225,7 @@ export const PropertyDetailsModal = ({
         if (idx === -1) return;
         const nextIdx = e.key === 'ArrowLeft' ? idx - 1 : idx + 1;
         if (nextIdx >= 0 && nextIdx < imageFiles.length) {
-          const next = imageFiles[nextIdx];
-          getFileSignedUrl(next.property_id, next.file_name, false)
-            .then(url => setImagePreview({ url, file: next }))
-            .catch(console.error);
+          void loadImagePreview(imageFiles[nextIdx]);
         }
       }
     };
@@ -225,7 +297,7 @@ export const PropertyDetailsModal = ({
     },
     onLoadingStateChange: setSwitchingProperty,
     onError: (error) => {
-      console.error('Property switch error:', error);
+      logger.error('Property switch error:', error);
       // You could add a toast notification here
     },
     propertyCache: (globalThis as { 
@@ -441,7 +513,12 @@ export const PropertyDetailsModal = ({
   const listIconSize = useResponsiveValue(32, 28);
   const listRenameVariant = useResponsiveValue<'full' | 'simple'>('full', 'simple');
   const gridIconSize = useResponsiveValue(48, 56);
-  const gridMenuButtonSize = '28px';
+  // Grid-view menu trigger lives on top of a thumbnail card so a 44px hit
+  // area would cover too much of the artwork. 36px is the largest size that
+  // still respects card padding while getting closer to the WCAG minimum.
+  // A long-press gesture on the card body is the proper fix and is tracked
+  // alongside multi-select (out of scope for this pass).
+  const gridMenuButtonSize = '36px';
 
   // Sorting logic - Folders first, then files (standard document management practice)
   const sortedItems = useMemo(() => {
@@ -513,16 +590,31 @@ export const PropertyDetailsModal = ({
 
   // Handle folder creation
   const handleCreateFolder = async () => {
+    // Inline validation (folderErrorPopup) is set on input change, and the
+    // submit button is disabled when !isFolderNameValid, so by the time we
+    // get here the name is structurally valid. The input is also disabled
+    // while isCreatingFolder is true (see render), so the "stale validation
+    // captured at click time" concern doesn't apply — the user can't edit
+    // the name mid-submission.
     if (!isFolderNameValid || isCreatingFolder) return;
-    
+
     setIsCreatingFolder(true);
     try {
       await onFolderCreate(newFolderName.trim());
       setCreatingFolder(false);
       setNewFolderName('');
       setFolderErrorPopup(null);
-    } catch {
-      setFolderErrorPopup('Failed to create folder. Please try again.');
+    } catch (error) {
+      // FolderService throws DUPLICATE_FOLDER on unique-constraint hits;
+      // distinguish it from a generic failure so the user knows to pick a
+      // different name rather than just "retry".
+      const message = error instanceof Error ? error.message : '';
+      const isDuplicate = message === 'DUPLICATE_FOLDER' || /duplicate|unique|already exists/i.test(message);
+      setFolderErrorPopup(
+        isDuplicate
+          ? `A folder named "${newFolderName.trim()}" already exists here.`
+          : 'Failed to create folder. Please try again.'
+      );
     } finally {
       setIsCreatingFolder(false);
     }
@@ -559,7 +651,18 @@ export const PropertyDetailsModal = ({
       setRenamingFileId(null);
       setRenamingFileName('');
     } catch (error) {
-      console.error('Rename failed:', error);
+      // Surface a useful message — the previous silent console.error
+      // looked identical to "rename succeeded" from the user's POV.
+      // FolderService throws DUPLICATE_FOLDER for unique-constraint hits.
+      const message = error instanceof Error ? error.message : '';
+      const isDuplicate = message === 'DUPLICATE_FOLDER' || /duplicate|unique|already exists/i.test(message);
+      const kind = 'file_name' in item ? 'file' : 'folder';
+      showToast(
+        isDuplicate
+          ? `A ${kind} named "${newName}" already exists here.`
+          : `Couldn't rename ${kind}. Please try again.`
+      );
+      logger.error('Rename failed:', error);
       // Keep rename state active if there's an error so user can retry
     }
   };
@@ -975,7 +1078,7 @@ export const PropertyDetailsModal = ({
         window.open(fileUrl, '_blank');
       }
     } catch (error) {
-      console.error('Error getting file URL:', error);
+      logger.error('Error getting file URL:', error);
       showToast('Unable to open file. Please try again.');
     }
   };
@@ -1272,6 +1375,7 @@ export const PropertyDetailsModal = ({
         {/* Main Content Area */}
         <div
           className="flex-1 flex flex-col overflow-hidden relative"
+          onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -1338,22 +1442,53 @@ export const PropertyDetailsModal = ({
               {(breadcrumbPath.length > 0 || selectedFolder !== 'master') && (
                 <div className="px-4 py-2 bg-white border-b border-gray-100">
                   <div className="flex items-center gap-2 text-xs text-gray-700 overflow-x-auto">
-                    {selectedFolder !== 'master' && (
-                      <button
-                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
-                        onClick={() => {
-                          const currentFolder = folders.find(f => f.id === selectedFolder);
-                          const parentId = currentFolder?.parent_id || 'master';
-                          setSearchQuery('');
-                          onFolderChange(parentId);
-                        }}
-                        aria-label="Back"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                      </button>
-                    )}
+                    {selectedFolder !== 'master' && (() => {
+                      // Resolve the parent of the currently-selected folder so the
+                      // back button can both navigate (click) and be a drop target
+                      // for moving a dragged file up one level.
+                      const currentFolder = folders.find(f => f.id === selectedFolder);
+                      const parentId = currentFolder?.parent_id || null;
+                      const targetFolderId = parentId; // null = master / root
+                      return (
+                        <button
+                          {...internalDrag.getDropTargetProps({
+                            id: 'breadcrumb-back',
+                            canAccept: internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.sourceFolderId !== targetFolderId,
+                            // Spring-back: hovering the Back button mid-drag pops up
+                            // one level so the user can drop into a sibling folder.
+                            spring: () => { setSearchQuery(''); onFolderChange(parentId || 'master'); },
+                            onDrop: (item) => {
+                              if (item.kind !== 'file' || !onFileMove) return;
+                              void onFileMove(item.file, targetFolderId);
+                            },
+                          })}
+                          className={`flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium ${
+                            internalDrag.activeTargetId === 'breadcrumb-back' ? 'ring-2 ring-blue-400 rounded bg-blue-50 px-1' : ''
+                          }`}
+                          onClick={() => {
+                            setSearchQuery('');
+                            onFolderChange(parentId || 'master');
+                          }}
+                          aria-label="Back"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        </button>
+                      );
+                    })()}
                     <button
-                      className="text-gray-500 hover:text-blue-600 flex items-center gap-1 flex-shrink-0"
+                      {...internalDrag.getDropTargetProps({
+                        id: 'breadcrumb-home',
+                        // Master = null folder_id. Don't accept if already at root.
+                        canAccept: internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.sourceFolderId !== null,
+                        spring: () => { setSearchQuery(''); onFolderChange('master'); },
+                        onDrop: (item) => {
+                          if (item.kind !== 'file' || !onFileMove) return;
+                          void onFileMove(item.file, null);
+                        },
+                      })}
+                      className={`text-gray-500 hover:text-blue-600 flex items-center gap-1 flex-shrink-0 ${
+                        internalDrag.activeTargetId === 'breadcrumb-home' ? 'ring-2 ring-blue-400 rounded bg-blue-50 px-1' : ''
+                      }`}
                       onClick={() => {
                         setSearchQuery('');
                         onFolderChange('master');
@@ -1366,7 +1501,18 @@ export const PropertyDetailsModal = ({
                       <div key={folder.id} className="flex items-center gap-2 flex-shrink-0">
                         <span className="text-gray-400">›</span>
                         <button
-                          className="text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
+                          {...internalDrag.getDropTargetProps({
+                            id: `breadcrumb-${folder.id}`,
+                            canAccept: internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.sourceFolderId !== folder.id,
+                            spring: () => { setSearchQuery(''); onFolderChange(folder.id); },
+                            onDrop: (item) => {
+                              if (item.kind !== 'file' || !onFileMove) return;
+                              void onFileMove(item.file, folder.id);
+                            },
+                          })}
+                          className={`text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap ${
+                            internalDrag.activeTargetId === `breadcrumb-${folder.id}` ? 'ring-2 ring-blue-400 rounded bg-blue-50 px-1' : ''
+                          }`}
                           onClick={() => {
                             setSearchQuery('');
                             onFolderChange(folder.id);
@@ -1483,7 +1629,21 @@ export const PropertyDetailsModal = ({
                         return (
                           <div key={`folder-${folder.id}`}>
                             <div
-                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5`}
+                              {...internalDrag.getDropTargetProps({
+                                id: `folder-list-${folder.id}`,
+                                // Don't accept a drop FROM this folder back INTO this folder.
+                                canAccept: internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.sourceFolderId !== folder.id,
+                                // Spring: descend into the folder after the hover delay so the user
+                                // can keep dragging into nested folders without releasing.
+                                spring: () => { setSearchQuery(''); onFolderChange(folder.id); },
+                                onDrop: (item) => {
+                                  if (item.kind !== 'file' || !onFileMove) return;
+                                  void onFileMove(item.file, folder.id);
+                                },
+                              })}
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5 ${
+                                internalDrag.activeTargetId === `folder-list-${folder.id}` ? 'ring-2 ring-blue-400 bg-blue-50' : ''
+                              }`}
                               style={{ cursor: 'pointer' }}
                               onClick={() => {
                                 if (fileMenuId || folderMenuId) {
@@ -1548,8 +1708,7 @@ export const PropertyDetailsModal = ({
                               </div>
                               <div className="relative flex items-center justify-end sm:col-span-2">
                                 <button
-                                  className="p-2 sm:p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex-shrink-0"
-                                  style={{ minWidth: 24, minHeight: 24 }}
+                                  className="tap-target rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex items-center justify-center flex-shrink-0"
                                   onClick={e => {
                                     e.stopPropagation();
                                     closeMenus();
@@ -1598,7 +1757,14 @@ export const PropertyDetailsModal = ({
                         return (
                           <div key={`file-${file.id}`}>
                             <div
-                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5`}
+                              {...internalDrag.getDragSourceProps({
+                                kind: 'file',
+                                file,
+                                sourceFolderId: file.folder_id,
+                              })}
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5 ${
+                                internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.file.id === file.id ? 'opacity-40' : ''
+                              }`}
                               style={{ cursor: 'pointer' }}
                               onClick={async (e) => {
                                 if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
@@ -1613,7 +1779,7 @@ export const PropertyDetailsModal = ({
                                 try {
                                   await openFileInline(file);
                                 } catch (error) {
-                                  console.error('Error opening file:', error);
+                                  logger.error('Error opening file:', error);
                                   showToast('Unable to open file. Please try again.');
                                 }
                               }}
@@ -1671,8 +1837,7 @@ export const PropertyDetailsModal = ({
                               <div className="relative flex items-center justify-end sm:col-span-2">
                                 <span className="hidden sm:inline-block text-xs text-gray-500 mr-2">{formatFileSize(file.file_size)}</span>
                                 <button
-                                  className="p-2 sm:p-1 rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex-shrink-0"
-                                  style={{ minWidth: 24, minHeight: 24 }}
+                                  className="tap-target rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex items-center justify-center flex-shrink-0"
                                   onClick={e => {
                                     e.stopPropagation();
                                     closeMenus();
@@ -1710,6 +1875,7 @@ export const PropertyDetailsModal = ({
                                     setMoveFileTarget(file);
                                     setShowMoveModal(true);
                                   } : undefined}
+                                  onDuplicate={onFileCopy}
                                   onDelete={onFileDelete}
                                   menuPosition={menuPosition[file.id] || {}}
                                   menuRef={fileMenuRef}
@@ -1730,7 +1896,18 @@ export const PropertyDetailsModal = ({
                           return (
                             <div
                               key={`grid-folder-${folder.id}`}
-                              className="flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative"
+                              {...internalDrag.getDropTargetProps({
+                                id: `folder-grid-${folder.id}`,
+                                canAccept: internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.sourceFolderId !== folder.id,
+                                spring: () => { setSearchQuery(''); onFolderChange(folder.id); },
+                                onDrop: (item) => {
+                                  if (item.kind !== 'file' || !onFileMove) return;
+                                  void onFileMove(item.file, folder.id);
+                                },
+                              })}
+                              className={`flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative ${
+                                internalDrag.activeTargetId === `folder-grid-${folder.id}` ? 'ring-2 ring-blue-400 bg-blue-50' : ''
+                              }`}
                               onClick={() => {
                                 // Clear search when entering a folder
                                 setSearchQuery('');
@@ -1835,7 +2012,14 @@ export const PropertyDetailsModal = ({
                           return (
                             <div
                               key={`grid-file-${file.id}`}
-                              className="flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative"
+                              {...internalDrag.getDragSourceProps({
+                                kind: 'file',
+                                file,
+                                sourceFolderId: file.folder_id,
+                              })}
+                              className={`flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative ${
+                                internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.file.id === file.id ? 'opacity-40' : ''
+                              }`}
                               onClick={async (e) => {
                                 if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('[role="menu"]')) {
                                   return;
@@ -1850,7 +2034,7 @@ export const PropertyDetailsModal = ({
                                 try {
                                   await openFileInline(file);
                                 } catch (error) {
-                                  console.error('Error opening file:', error);
+                                  logger.error('Error opening file:', error);
                                   showToast('Unable to open file. Please try again.');
                                 }
                               }}
@@ -1915,6 +2099,7 @@ export const PropertyDetailsModal = ({
                                     setMoveFileTarget(file);
                                     setShowMoveModal(true);
                                   } : undefined}
+                                  onDuplicate={onFileCopy}
                                   onDelete={onFileDelete}
                                   menuPosition={menuPosition[file.id] || {}}
                                   menuRef={fileMenuRef}
@@ -1972,7 +2157,7 @@ export const PropertyDetailsModal = ({
             try {
               await onFileUpload(e.target.files);
             } catch (error) {
-              console.error('File upload error:', error);
+              logger.error('File upload error:', error);
               // You could add a toast notification here
             }
           }
@@ -2290,45 +2475,55 @@ export const PropertyDetailsModal = ({
               <p className="text-white/90 text-sm font-medium text-center">{imagePreview.file.file_name}</p>
               <p className="text-white/50 text-xs">{formatFileSize(imagePreview.file.file_size)}</p>
             </div>
-            {/* Navigation arrows */}
+            {/* Navigation arrows
+              * Render the buttons unconditionally and disable them at the
+              * boundaries. Previously the buttons were removed at the edges,
+              * but the keyboard arrow-key handler also silently no-oped, so
+              * the user had no feedback that they were at the first/last
+              * image. Visible-but-disabled gives both pointer and keyboard
+              * users a clear "end of the line" indicator.
+              */}
             {(() => {
               const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
               const imageFiles = files.filter(f => imageExts.includes(f.file_name.split('.').pop()?.toLowerCase() || ''));
               const idx = imageFiles.findIndex(f => f.id === imagePreview.file.id);
+              const hasPrev = idx > 0;
+              const hasNext = idx >= 0 && idx < imageFiles.length - 1;
+              const navButtonBase = 'absolute top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full text-white transition-all';
+              const navButtonEnabled = 'bg-white/10 hover:bg-white/20 active:bg-white/30';
+              const navButtonDisabled = 'bg-white/5 text-white/30 cursor-not-allowed';
               return (
                 <>
-                  {idx > 0 && (
-                    <button
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-colors"
-                      onClick={e => {
-                        e.stopPropagation();
-                        const prev = imageFiles[idx - 1];
-                        getFileSignedUrl(prev.property_id, prev.file_name, false)
-                          .then(url => setImagePreview({ url, file: prev }))
-                          .catch(console.error);
-                      }}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                  )}
-                  {idx < imageFiles.length - 1 && (
-                    <button
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-colors"
-                      onClick={e => {
-                        e.stopPropagation();
-                        const next = imageFiles[idx + 1];
-                        getFileSignedUrl(next.property_id, next.file_name, false)
-                          .then(url => setImagePreview({ url, file: next }))
-                          .catch(console.error);
-                      }}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  )}
+                  <button
+                    className={`${navButtonBase} left-3 ${hasPrev ? navButtonEnabled : navButtonDisabled}`}
+                    disabled={!hasPrev}
+                    aria-label={hasPrev ? 'Previous image' : 'No previous image'}
+                    aria-keyshortcuts="ArrowLeft"
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (!hasPrev) return;
+                      void loadImagePreview(imageFiles[idx - 1]);
+                    }}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    className={`${navButtonBase} right-3 ${hasNext ? navButtonEnabled : navButtonDisabled}`}
+                    disabled={!hasNext}
+                    aria-label={hasNext ? 'Next image' : 'No next image'}
+                    aria-keyshortcuts="ArrowRight"
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (!hasNext) return;
+                      void loadImagePreview(imageFiles[idx + 1]);
+                    }}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 </>
               );
             })()}
@@ -2420,7 +2615,7 @@ export const PropertyDetailsModal = ({
               try {
                 await onFileMove(moveFileTarget, targetFolderId);
               } catch (error) {
-                console.error('Move failed:', error);
+                logger.error('Move failed:', error);
                 // Error handling is done in the parent onFileMove function
               }
             }
