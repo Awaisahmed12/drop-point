@@ -15,6 +15,7 @@ import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
 import { useToast } from '../contexts/ToastContext';
 import { useInternalDrag } from '../hooks/useInternalDrag';
+import { tryWithToast } from '../utils/tryWithToast';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
 import type { PropertyWithFileCount } from '../../types';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
@@ -112,6 +113,24 @@ export const PropertyDetailsModal = ({
   // two flows don't collide. Spring-loaded folders auto-open after 600ms
   // of hover so the user can drill into nested folders without releasing.
   const internalDrag = useInternalDrag();
+
+  // Shared loader for the image preview overlay (keyboard nav + prev/next
+  // buttons all called this same pattern silently). Surfaces a toast if
+  // the signed-URL fetch fails so the user isn't left wondering why
+  // ArrowRight did nothing.
+  const loadImagePreview = useCallback(async (file: PropertyFile) => {
+    await tryWithToast(
+      async () => {
+        const url = await getFileSignedUrl(file.property_id, file.file_name, false);
+        setImagePreview({ url, file });
+      },
+      {
+        showToast,
+        errorMessage: `Couldn't load "${file.file_name}".`,
+        tag: 'ImagePreview',
+      },
+    );
+  }, [showToast]);
   // Drag depth counter. dragenter/dragleave fire in pairs as the cursor crosses
   // child boundaries, and the "contains(relatedTarget)" guard breaks when
   // relatedTarget is null (window blur, dragging out of frame, browser DnD
@@ -159,9 +178,17 @@ export const PropertyDetailsModal = ({
     resetDragState();
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
-      await onFileUpload(droppedFiles).catch(logger.error);
+      // Previously a silent .catch(logger.error) — user saw nothing if the
+      // upload failed. tryWithToast surfaces the failure visibly.
+      await tryWithToast(() => onFileUpload(droppedFiles), {
+        showToast,
+        errorMessage: droppedFiles.length === 1
+          ? `Failed to upload "${droppedFiles[0].name}".`
+          : `Failed to upload ${droppedFiles.length} files.`,
+        tag: 'DragDropUpload',
+      });
     }
-  }, [onFileUpload, resetDragState]);
+  }, [onFileUpload, resetDragState, showToast]);
 
   // Window-level safety net: if the drag is cancelled outside our container
   // (Escape, drop on another window, tab switch), browsers may not fire a
@@ -198,10 +225,7 @@ export const PropertyDetailsModal = ({
         if (idx === -1) return;
         const nextIdx = e.key === 'ArrowLeft' ? idx - 1 : idx + 1;
         if (nextIdx >= 0 && nextIdx < imageFiles.length) {
-          const next = imageFiles[nextIdx];
-          getFileSignedUrl(next.property_id, next.file_name, false)
-            .then(url => setImagePreview({ url, file: next }))
-            .catch(logger.error);
+          void loadImagePreview(imageFiles[nextIdx]);
         }
       }
     };
@@ -2478,10 +2502,7 @@ export const PropertyDetailsModal = ({
                     onClick={e => {
                       e.stopPropagation();
                       if (!hasPrev) return;
-                      const prev = imageFiles[idx - 1];
-                      getFileSignedUrl(prev.property_id, prev.file_name, false)
-                        .then(url => setImagePreview({ url, file: prev }))
-                        .catch(logger.error);
+                      void loadImagePreview(imageFiles[idx - 1]);
                     }}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -2496,10 +2517,7 @@ export const PropertyDetailsModal = ({
                     onClick={e => {
                       e.stopPropagation();
                       if (!hasNext) return;
-                      const next = imageFiles[idx + 1];
-                      getFileSignedUrl(next.property_id, next.file_name, false)
-                        .then(url => setImagePreview({ url, file: next }))
-                        .catch(logger.error);
+                      void loadImagePreview(imageFiles[idx + 1]);
                     }}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
