@@ -1,5 +1,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../utils/supabaseClient';
+import { fileService } from './FileService';
+import { folderService } from './FolderService';
 import type { Property, PropertyFile, PropertyFolder } from '../../types';
 
 /**
@@ -163,63 +165,24 @@ export class PropertyService {
   }
 
   /**
-   * Get files for a property
-   */
-  async getPropertyFiles(propertyId: string): Promise<PropertyFile[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const { data, error } = await supabase
-      .from('property_files')
-      .select('*')
-      .eq('property_id', propertyId)
-      .order('uploaded_at', { ascending: false });
-
-    if (error) {
-      logger.error('[PropertyService] Error fetching property files:', error);
-      throw error;
-    }
-
-    return data || [];
-  }
-
-  /**
-   * Get folders for a property
-   */
-  async getPropertyFolders(propertyId: string): Promise<PropertyFolder[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const { data, error } = await supabase
-      .from('property_folders')
-      .select('*')
-      .eq('property_id', propertyId)
-      .eq('user_id', user.id)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      logger.error('[PropertyService] Error fetching property folders:', error);
-      throw error;
-    }
-
-    return data || [];
-  }
-
-  /**
-   * Get both files and folders for a property
+   * Get both files and folders for a property. Delegates to FileService /
+   * FolderService rather than duplicating the queries — those services
+   * are the source of truth for their respective collections (and apply
+   * the right RLS-style filters, e.g. folders' deleted_at IS NULL).
+   *
+   * Previously PropertyService had its own getPropertyFiles and
+   * getPropertyFolders that performed the same queries but with slightly
+   * different filters (user_id check missing on files, deleted_at filter
+   * inconsistent), which was a recipe for subtle bugs as the schema
+   * evolves. Consolidated here.
    */
   async getPropertyData(propertyId: string): Promise<{
     files: PropertyFile[];
     folders: PropertyFolder[];
   }> {
     const [files, folders] = await Promise.all([
-      this.getPropertyFiles(propertyId),
-      this.getPropertyFolders(propertyId)
+      fileService.getPropertyFiles(propertyId),
+      folderService.getPropertyFolders(propertyId),
     ]);
 
     return { files, folders };
