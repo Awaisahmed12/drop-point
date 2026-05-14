@@ -152,8 +152,11 @@ export function cleanupResources() {
   // Clear any stored data if needed
   // localStorage.clear(); // Uncomment if you want to clear localStorage
   
-  // Force garbage collection (if available)
-  if ('gc' in window) {
-    (window as any).gc();
+  // Force garbage collection (if available). `window.gc` exists only when
+  // Chrome is run with --js-flags="--expose-gc" — useful in dev for memory
+  // profiling, never present in production. Typed cast avoids `as any`.
+  const win = window as Window & { gc?: () => void };
+  if (typeof win.gc === 'function') {
+    win.gc();
   }
-} 
+}

@@ -108,7 +108,10 @@ export type SortDirection = 'asc' | 'desc';
 export type AdminConfiguration = {
   id: string;
   key: string;
-  value: any; // JSONB value
+  // JSONB column — shape varies per config key. Consumers must narrow at the
+  // call site (e.g. via a typed getValue<T>(key, fallback) helper). `unknown`
+  // forces that narrowing instead of letting `any` propagate quietly.
+  value: unknown;
   description?: string;
   category: string;
   is_active: boolean;
