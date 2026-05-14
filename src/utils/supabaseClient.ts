@@ -1,3 +1,4 @@
+import { logger } from './logger';
 import { createClient, type SupportedStorage } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
@@ -40,7 +41,7 @@ export const getFileSignedUrl = async (
       });
     
     if (error) {
-      console.error('Error creating download URL:', error);
+      logger.error('Error creating download URL:', error);
       throw error;
     }
     
@@ -52,7 +53,7 @@ export const getFileSignedUrl = async (
       .createSignedUrl(filePath, 3600);
     
     if (error) {
-      console.error('Error creating signed URL:', error);
+      logger.error('Error creating signed URL:', error);
       throw error;
     }
     

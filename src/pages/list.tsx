@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import React, { useCallback, useState, useRef } from 'react';
 import Head from 'next/head';
 import { ListView } from '../components/ListView';
@@ -69,7 +70,7 @@ function ListPage() {
         setFiles([]);
       }
     } catch (e) {
-      console.error('Error loading property data:', e);
+      logger.error('Error loading property data:', e);
     } finally {
       setFoldersLoading(false);
       setFilesLoading(false);
@@ -94,7 +95,7 @@ function ListPage() {
         return;
       }
     } catch (err) {
-      console.error('[USAGE] Failed to check usage. Blocking upload for safety.', err);
+      logger.error('[USAGE] Failed to check usage. Blocking upload for safety.', err);
       showToast('Unable to verify storage usage. Please try again shortly.');
       setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
       return;
@@ -141,7 +142,7 @@ function ListPage() {
       const refreshed = await fileService.getPropertyFiles(propertyId);
       setFiles(refreshed);
     } catch (error) {
-      console.error('[UPLOAD] Upload failed:', error);
+      logger.error('[UPLOAD] Upload failed:', error);
       setPendingUploads(prev => prev.map(p =>
         p.id === uploadId ? { ...p, status: 'error', progress: 0 } : p
       ));
@@ -248,7 +249,7 @@ function ListPage() {
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Rename failed';
-      console.error('[RENAME] Rename operation failed:', msg);
+      logger.error('[RENAME] Rename operation failed:', msg);
       showToast(`Rename failed: ${msg}`);
     } finally {
       if (setRenamingFileId.current) setRenamingFileId.current(null);
@@ -273,13 +274,13 @@ function ListPage() {
         .select('*')
         .single();
       if (error) {
-        console.error('Error creating folder:', error);
+        logger.error('Error creating folder:', error);
         showToast('Could not create folder. Please try again.');
         return;
       }
       if (data) setFolders(prev => [...prev, data]);
     } catch (err) {
-      console.error('Unexpected error creating folder:', err);
+      logger.error('Unexpected error creating folder:', err);
       showToast('Could not create folder. Please try again.');
     }
   }, [savedProperty, selectedFolder]);

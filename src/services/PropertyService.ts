@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { supabase } from '../utils/supabaseClient';
 import type { Property, PropertyFile, PropertyFolder } from '../../types';
 
@@ -22,7 +23,7 @@ export class PropertyService {
       .order('updated_at', { ascending: false });
 
     if (error) {
-      console.error('[PropertyService] Error fetching user properties:', error);
+      logger.error('[PropertyService] Error fetching user properties:', error);
       throw error;
     }
 
@@ -50,7 +51,7 @@ export class PropertyService {
         // No rows returned
         return null;
       }
-      console.error('[PropertyService] Error fetching property:', error);
+      logger.error('[PropertyService] Error fetching property:', error);
       throw error;
     }
 
@@ -88,7 +89,7 @@ export class PropertyService {
       .single();
 
     if (error) {
-      console.error('[PropertyService] Error creating property:', error);
+      logger.error('[PropertyService] Error creating property:', error);
       throw error;
     }
 
@@ -129,7 +130,7 @@ export class PropertyService {
       .single();
 
     if (error) {
-      console.error('[PropertyService] Error updating property:', error);
+      logger.error('[PropertyService] Error updating property:', error);
       throw error;
     }
 
@@ -156,7 +157,7 @@ export class PropertyService {
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('[PropertyService] Error deleting property:', error);
+      logger.error('[PropertyService] Error deleting property:', error);
       throw error;
     }
   }
@@ -177,7 +178,7 @@ export class PropertyService {
       .order('uploaded_at', { ascending: false });
 
     if (error) {
-      console.error('[PropertyService] Error fetching property files:', error);
+      logger.error('[PropertyService] Error fetching property files:', error);
       throw error;
     }
 
@@ -202,7 +203,7 @@ export class PropertyService {
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('[PropertyService] Error fetching property folders:', error);
+      logger.error('[PropertyService] Error fetching property folders:', error);
       throw error;
     }
 
@@ -232,7 +233,7 @@ export class PropertyService {
       const property = await this.getPropertyById(propertyId);
       return property !== null;
     } catch (error) {
-      console.error('[PropertyService] Error verifying property:', error);
+      logger.error('[PropertyService] Error verifying property:', error);
       return false;
     }
   }

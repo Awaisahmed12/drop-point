@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useState, useRef, useEffect } from 'react';
 import type { Property } from '../../types';
 
@@ -82,7 +83,7 @@ export const PropertyInfoCard = ({
           .eq('id', property.id);
 
         if (error) {
-          console.error('Error updating property label:', error);
+          logger.error('Error updating property label:', error);
           return;
         }
 
@@ -102,7 +103,7 @@ export const PropertyInfoCard = ({
       }
       setIsEditing(false);
     } catch (error) {
-      console.error('Error updating property label:', error);
+      logger.error('Error updating property label:', error);
     } finally {
       setIsSaving(false);
     }

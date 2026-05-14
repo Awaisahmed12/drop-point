@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
@@ -69,7 +70,7 @@ function AdminConfigPage() {
       setSuccessMessage(`Configuration "${key}" updated successfully!`);
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      console.error('Error updating configuration:', err);
+      logger.error('Error updating configuration:', err);
       setSaveError(err instanceof Error ? err.message : 'Failed to update configuration');
       setTimeout(() => setSaveError(null), 5000);
     } finally {

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useState, useCallback } from 'react';
 import type { Property } from '../../types';
 import { propertyService } from '../services';
@@ -17,7 +18,7 @@ export function usePropertyState() {
       const properties = await propertyService.getUserProperties();
       setUserProperties(properties);
     } catch (error) {
-      console.error('[PropertyState] Error loading user properties:', error);
+      logger.error('[PropertyState] Error loading user properties:', error);
     } finally {
       setPropertiesLoaded(true);
     }

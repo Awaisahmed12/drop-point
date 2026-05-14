@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { supabase } from '../utils/supabaseClient';
 import type { PropertyFolder } from '../../types';
 
@@ -43,7 +44,7 @@ export class FolderService {
       if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique')) {
         throw new Error('DUPLICATE_FOLDER');
       }
-      console.error('[FolderService] Error creating folder:', error);
+      logger.error('[FolderService] Error creating folder:', error);
       throw error;
     }
 
@@ -118,7 +119,7 @@ export class FolderService {
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('[FolderService] Error deleting folder:', error);
+      logger.error('[FolderService] Error deleting folder:', error);
       throw error;
     }
   }
@@ -150,7 +151,7 @@ export class FolderService {
       .single();
 
     if (error) {
-      console.error('[FolderService] Error renaming folder:', error);
+      logger.error('[FolderService] Error renaming folder:', error);
       throw error;
     }
 
@@ -179,7 +180,7 @@ export class FolderService {
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.error('[FolderService] Error fetching folders:', error);
+      logger.error('[FolderService] Error fetching folders:', error);
       throw error;
     }
 
@@ -216,7 +217,7 @@ export class FolderService {
     const { data, error } = await query.limit(1);
 
     if (error) {
-      console.error('[FolderService] Error checking folder name:', error);
+      logger.error('[FolderService] Error checking folder name:', error);
       return false; // Assume doesn't exist on error
     }
 

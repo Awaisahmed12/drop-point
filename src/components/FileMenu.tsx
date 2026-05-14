@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import React from 'react';
 import type { PropertyFile } from '../../types';
 import { getFileSignedUrl } from '../utils/supabaseClient';
@@ -35,7 +36,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
       const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
       window.open(fileUrl, '_blank');
     } catch (error) {
-      console.error('Error downloading file:', error);
+      logger.error('Error downloading file:', error);
       showToast('Unable to download file. Please try again.');
     }
     onClose();
@@ -47,7 +48,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
       await navigator.clipboard.writeText(fileUrl);
       showToast('Link copied to clipboard', 'success');
     } catch (error) {
-      console.error('Error copying link:', error);
+      logger.error('Error copying link:', error);
       showToast('Unable to copy link. Please try again.');
     }
     onClose();

@@ -1,3 +1,4 @@
+import { logger } from '../src/utils/logger';
 // Debounce function for search inputs and other frequent events
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
@@ -98,7 +99,7 @@ export class PerformanceMonitor {
     
     if (start && end) {
       const duration = end - start;
-      console.log(`${name}: ${duration.toFixed(2)}ms`);
+      logger.debug(`${name}: ${duration.toFixed(2)}ms`);
       return duration;
     }
     

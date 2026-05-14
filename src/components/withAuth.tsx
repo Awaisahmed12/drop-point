@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
@@ -33,7 +34,7 @@ export function withAuth<P extends object>(
             return;
           }
         } catch (error) {
-          console.error('Auth check error:', error);
+          logger.error('Auth check error:', error);
           if (requireAuth) {
             router.replace('/');
           }

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useCallback } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import type { PropertyFile, PropertyFolder } from '../../types';
@@ -104,7 +105,7 @@ export const usePropertySwitcher = ({
       }
 
     } catch (error) {
-      console.error('Error switching to property:', error);
+      logger.error('Error switching to property:', error);
       onError?.(error instanceof Error ? error.message : 'Failed to switch property');
     } finally {
       onLoadingStateChange?.(false);

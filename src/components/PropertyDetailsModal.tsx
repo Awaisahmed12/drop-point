@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 
@@ -158,7 +159,7 @@ export const PropertyDetailsModal = ({
     resetDragState();
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
-      await onFileUpload(droppedFiles).catch(console.error);
+      await onFileUpload(droppedFiles).catch(logger.error);
     }
   }, [onFileUpload, resetDragState]);
 
@@ -200,7 +201,7 @@ export const PropertyDetailsModal = ({
           const next = imageFiles[nextIdx];
           getFileSignedUrl(next.property_id, next.file_name, false)
             .then(url => setImagePreview({ url, file: next }))
-            .catch(console.error);
+            .catch(logger.error);
         }
       }
     };
@@ -272,7 +273,7 @@ export const PropertyDetailsModal = ({
     },
     onLoadingStateChange: setSwitchingProperty,
     onError: (error) => {
-      console.error('Property switch error:', error);
+      logger.error('Property switch error:', error);
       // You could add a toast notification here
     },
     propertyCache: (globalThis as { 
@@ -637,7 +638,7 @@ export const PropertyDetailsModal = ({
           ? `A ${kind} named "${newName}" already exists here.`
           : `Couldn't rename ${kind}. Please try again.`
       );
-      console.error('Rename failed:', error);
+      logger.error('Rename failed:', error);
       // Keep rename state active if there's an error so user can retry
     }
   };
@@ -1053,7 +1054,7 @@ export const PropertyDetailsModal = ({
         window.open(fileUrl, '_blank');
       }
     } catch (error) {
-      console.error('Error getting file URL:', error);
+      logger.error('Error getting file URL:', error);
       showToast('Unable to open file. Please try again.');
     }
   };
@@ -1754,7 +1755,7 @@ export const PropertyDetailsModal = ({
                                 try {
                                   await openFileInline(file);
                                 } catch (error) {
-                                  console.error('Error opening file:', error);
+                                  logger.error('Error opening file:', error);
                                   showToast('Unable to open file. Please try again.');
                                 }
                               }}
@@ -2009,7 +2010,7 @@ export const PropertyDetailsModal = ({
                                 try {
                                   await openFileInline(file);
                                 } catch (error) {
-                                  console.error('Error opening file:', error);
+                                  logger.error('Error opening file:', error);
                                   showToast('Unable to open file. Please try again.');
                                 }
                               }}
@@ -2132,7 +2133,7 @@ export const PropertyDetailsModal = ({
             try {
               await onFileUpload(e.target.files);
             } catch (error) {
-              console.error('File upload error:', error);
+              logger.error('File upload error:', error);
               // You could add a toast notification here
             }
           }
@@ -2480,7 +2481,7 @@ export const PropertyDetailsModal = ({
                       const prev = imageFiles[idx - 1];
                       getFileSignedUrl(prev.property_id, prev.file_name, false)
                         .then(url => setImagePreview({ url, file: prev }))
-                        .catch(console.error);
+                        .catch(logger.error);
                     }}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -2498,7 +2499,7 @@ export const PropertyDetailsModal = ({
                       const next = imageFiles[idx + 1];
                       getFileSignedUrl(next.property_id, next.file_name, false)
                         .then(url => setImagePreview({ url, file: next }))
-                        .catch(console.error);
+                        .catch(logger.error);
                     }}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -2596,7 +2597,7 @@ export const PropertyDetailsModal = ({
               try {
                 await onFileMove(moveFileTarget, targetFolderId);
               } catch (error) {
-                console.error('Move failed:', error);
+                logger.error('Move failed:', error);
                 // Error handling is done in the parent onFileMove function
               }
             }

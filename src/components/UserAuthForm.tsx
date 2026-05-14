@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../utils/supabaseClient';
@@ -173,10 +174,10 @@ export default function UserAuthForm() {
               });
 
             if (profileError) {
-              console.error('Error saving profile:', profileError);
+              logger.error('Error saving profile:', profileError);
             }
           } catch (profileErr) {
-            console.error('Error creating profile:', profileErr);
+            logger.error('Error creating profile:', profileErr);
           }
         }
         

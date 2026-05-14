@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
@@ -240,7 +241,7 @@ function MapPage() {
           }
         }
       } catch (error) {
-        console.error('[PRELOAD] Error preloading properties:', error);
+        logger.error('[PRELOAD] Error preloading properties:', error);
       }
     };
 
@@ -274,7 +275,7 @@ function MapPage() {
             setZoom(position.zoom);
           }
         } catch (error) {
-          console.error('Error parsing saved map position:', error);
+          logger.error('Error parsing saved map position:', error);
         }
       }
 
@@ -298,7 +299,7 @@ function MapPage() {
           // Clear after using
           sessionStorage.removeItem('droppoint-selected-property');
         } catch (error) {
-          console.error('Error parsing saved property data:', error);
+          logger.error('Error parsing saved property data:', error);
         }
       }
     }
@@ -483,13 +484,13 @@ function MapPage() {
         saveAddressToCache(lat, lng, 'No address found', null);
       }
     } catch (error) {
-      console.error('📍 [GEOCODE] Error fetching address:', error);
+      logger.error('📍 [GEOCODE] Error fetching address:', error);
       
       let errorAddress = 'Error fetching address';
       
       // Check if it's a JSON parsing error
       if (error instanceof SyntaxError && error.message.includes('JSON')) {
-        console.error('📍 [GEOCODE] JSON parsing error - likely API key issue');
+        logger.error('📍 [GEOCODE] JSON parsing error - likely API key issue');
         errorAddress = 'Address lookup failed - check API key';
       }
       
@@ -513,7 +514,7 @@ function MapPage() {
         return data.predictions || [];
       }
     } catch (error) {
-      console.error('Error fetching predictions:', error);
+      logger.error('Error fetching predictions:', error);
     }
     return [];
   }
@@ -535,7 +536,7 @@ function MapPage() {
         });
       });
     } catch (error) {
-      console.error('Error geocoding place ID:', error);
+      logger.error('Error geocoding place ID:', error);
       return null;
     }
   }
@@ -847,7 +848,7 @@ function MapPage() {
         await cachePropertyData(savedProperty.address, filesResult.data, folderResult.data);
       }
     } catch (error) {
-      console.error('Error fetching property data:', error);
+      logger.error('Error fetching property data:', error);
     } finally {
       setFoldersLoading(false);
       setFilesLoading(false);
@@ -911,7 +912,7 @@ function MapPage() {
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Rename failed';
-      console.error('[RENAME] Rename operation failed:', errorMessage);
+      logger.error('[RENAME] Rename operation failed:', errorMessage);
       showToast(`Rename failed: ${errorMessage}`);
     } finally {
       setRenamingFileId(null);
@@ -1011,7 +1012,7 @@ function MapPage() {
             .single();
 
           if (saveError || !newProperty) {
-            console.error('📁 [FOLDERS] Error auto-saving property before folder creation:', saveError);
+            logger.error('📁 [FOLDERS] Error auto-saving property before folder creation:', saveError);
             showToast('Failed to save property. Please try again.');
             return;
           }
@@ -1023,7 +1024,7 @@ function MapPage() {
           // Optional: refresh pins (non-blocking)
           loadUserProperties();
         } catch (err) {
-          console.error('📁 [FOLDERS] Unexpected error auto-saving property:', err);
+          logger.error('📁 [FOLDERS] Unexpected error auto-saving property:', err);
           showToast('Failed to save property. Please try again.');
           return;
         }
@@ -1048,7 +1049,7 @@ function MapPage() {
         .single();
 
       if (error) {
-        console.error('📁 [FOLDERS] Error creating folder:', error);
+        logger.error('📁 [FOLDERS] Error creating folder:', error);
         showToast('Could not create folder. Please try again.');
         return;
       }
@@ -1057,7 +1058,7 @@ function MapPage() {
         setFolders(prev => [...prev, data]);
       }
     } catch (err) {
-      console.error('📁 [FOLDERS] Unexpected error creating folder:', err);
+      logger.error('📁 [FOLDERS] Unexpected error creating folder:', err);
       showToast('Could not create folder. Please try again.');
     }
   }
@@ -1137,7 +1138,7 @@ function MapPage() {
         }
         
       } catch (error) {
-        console.error('📁 [UPLOAD] Error auto-saving property:', error);
+        logger.error('📁 [UPLOAD] Error auto-saving property:', error);
         showToast('Failed to save property. Please try again.');
         return;
       }
@@ -1233,7 +1234,7 @@ function MapPage() {
         return;
       }
     } catch (err) {
-      console.error('[USAGE] Failed to check usage. Blocking upload for safety.', err);
+      logger.error('[USAGE] Failed to check usage. Blocking upload for safety.', err);
       showToast('Unable to verify storage usage. Please try again shortly.');
       setPendingUploads(prev => prev.filter(p => p.id !== uploadId));
       return;
@@ -1306,7 +1307,7 @@ function MapPage() {
       }
 
     } catch (error) {
-      console.error('[UPLOAD] Upload failed:', error);
+      logger.error('[UPLOAD] Upload failed:', error);
       
       // Mark as failed
       setPendingUploads(prev => prev.map(p => 
@@ -1498,7 +1499,7 @@ function MapPage() {
 
     // Helper function to handle errors with fallback
     const handlePositionError = (error: GeolocationPositionError, isFallback: boolean = false) => {
-      console.error('[GEOLOCATION] Error:', {
+      logger.error('[GEOLOCATION] Error:', {
         code: error.code,
         message: error.message,
         isFallback
@@ -1526,7 +1527,7 @@ function MapPage() {
             handlePositionSuccess(position);
           },
           (fallbackError) => {
-            console.error('[GEOLOCATION] Fallback also failed:', fallbackError.message);
+            logger.error('[GEOLOCATION] Fallback also failed:', fallbackError.message);
             handlePositionError(fallbackError, true);
           },
           {
@@ -1555,7 +1556,7 @@ function MapPage() {
         timestamp: new Date().toISOString()
       };
       
-      console.error('[GEOLOCATION] DIAGNOSTICS - Both attempts failed:', diagnostics);
+      logger.error('[GEOLOCATION] DIAGNOSTICS - Both attempts failed:', diagnostics);
       
       let errorMessage = 'Unable to retrieve your location.';
       let debugInfo = '';
@@ -1636,7 +1637,7 @@ function MapPage() {
         (error) => {
           if (positionReceived) return; // Already handled
           
-          console.error(`[GEOLOCATION] watchPosition error (highAccuracy: ${useHighAccuracy}):`, error);
+          logger.error(`[GEOLOCATION] watchPosition error (highAccuracy: ${useHighAccuracy}):`, error);
           
           if (error.code === error.PERMISSION_DENIED) {
             cleanup();
@@ -1666,7 +1667,7 @@ function MapPage() {
               handlePositionSuccess(position);
             },
             (error) => {
-              console.error('[GEOLOCATION] All methods failed:', error);
+              logger.error('[GEOLOCATION] All methods failed:', error);
               handlePositionError(error, true);
             },
             simpleOptions
@@ -1688,7 +1689,7 @@ function MapPage() {
                 handlePositionSuccess(position);
               },
               (error) => {
-                console.error('[GEOLOCATION] All location methods exhausted:', error);
+                logger.error('[GEOLOCATION] All location methods exhausted:', error);
                 handlePositionError(error, true);
               },
               { enableHighAccuracy: false, timeout: 15000, maximumAge: 86400000 }
@@ -1857,7 +1858,7 @@ function MapPage() {
           setSelectedProperty(newProperty);
         }
       } catch (error) {
-        console.error('[PINS] Address lookup failed:', error);
+        logger.error('[PINS] Address lookup failed:', error);
         // Keep the original property with coordinates - no error handling needed
       } finally {
         setAddressLoading(false);
@@ -1921,7 +1922,7 @@ function MapPage() {
           }
         }
       } catch (error) {
-        console.error('📍 [PINS] Error loading property data:', error);
+        logger.error('📍 [PINS] Error loading property data:', error);
       } finally {
         setFoldersLoading(false);
         setFilesLoading(false);
@@ -2011,7 +2012,7 @@ function MapPage() {
           }
         }
       } catch (error) {
-        console.error('[SIDEBAR] Error loading property data:', error);
+        logger.error('[SIDEBAR] Error loading property data:', error);
       } finally {
         setFoldersLoading(false);
         setFilesLoading(false);
@@ -2288,7 +2289,7 @@ function MapPage() {
               try {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
-                  console.error('No user found for property save');
+                  logger.error('No user found for property save');
                   return;
                 }
 
@@ -2307,7 +2308,7 @@ function MapPage() {
                   .single();
 
                 if (error) {
-                  console.error('Error saving property:', error);
+                  logger.error('Error saving property:', error);
                   return;
                 }
 
@@ -2320,7 +2321,7 @@ function MapPage() {
                 setUserProperties(prev => [...prev, savedProperty]);
                 
               } catch (error) {
-                console.error('Error saving property:', error);
+                logger.error('Error saving property:', error);
               }
             }}
             onHeightChange={setPropertyCardHeight}
@@ -2424,7 +2425,7 @@ function MapPage() {
               const files = await fileService.getPropertyFiles(file.property_id);
               setPropertyFiles(files);
             } catch (error) {
-              console.error('[MOVE] Error moving file:', error);
+              logger.error('[MOVE] Error moving file:', error);
               showToast(`Failed to move file: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           }}
@@ -2445,7 +2446,7 @@ function MapPage() {
               setPropertyFiles(prev => [newFile, ...prev]);
               showToast(`Duplicated as "${newFile.file_name}"`, 'success');
             } catch (error) {
-              console.error('[COPY] Error duplicating file:', error);
+              logger.error('[COPY] Error duplicating file:', error);
               showToast(`Failed to duplicate file: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           }}

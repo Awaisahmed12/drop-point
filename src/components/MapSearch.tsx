@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Prediction, PropertyWithFileCount } from '../../types';
 import { supabase } from '../utils/supabaseClient';
@@ -80,7 +81,7 @@ export const MapSearch = ({
       }));
     } catch (error) {
       if ((error as Error).name === 'AbortError') return [];
-      console.error('Error fetching predictions:', error);
+      logger.error('Error fetching predictions:', error);
       return [];
     }
   }, []);

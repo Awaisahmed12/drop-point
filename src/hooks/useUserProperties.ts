@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import type { PropertyWithFileCount } from '../../types';
@@ -55,7 +56,7 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
       }));
 
     } catch (error) {
-      console.error('Error fetching fresh properties:', error);
+      logger.error('Error fetching fresh properties:', error);
       setError(error instanceof Error ? error.message : 'Failed to load properties');
     } finally {
       setLoading(false);
@@ -84,14 +85,14 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
             return;
           }
         } catch (error) {
-          console.error('Error parsing cached properties:', error);
+          logger.error('Error parsing cached properties:', error);
         }
       }
 
       // No valid cache, fetch fresh data
       await fetchFreshProperties();
     } catch (error) {
-      console.error('Error in fetchProperties:', error);
+      logger.error('Error in fetchProperties:', error);
       setError(error instanceof Error ? error.message : 'Failed to load properties');
       setLoading(false);
     }
@@ -105,10 +106,10 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
         .eq('id', propertyId);
 
       if (error) {
-        console.error('Error updating last accessed:', error);
+        logger.error('Error updating last accessed:', error);
       }
     } catch (err) {
-      console.error('Error updating last accessed:', err);
+      logger.error('Error updating last accessed:', err);
     }
   }, []);
 

@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { supabase } from '../utils/supabaseClient';
 import type { PropertyFile } from '../../types';
 import { sanitizeFileName } from '../../utils/fileManagement';
@@ -27,7 +28,7 @@ export class FileService {
       });
 
     if (error) {
-      console.error('[FileService] Error uploading file:', error);
+      logger.error('[FileService] Error uploading file:', error);
       throw error;
     }
 
@@ -72,7 +73,7 @@ export class FileService {
       .single();
 
     if (error) {
-      console.error('[FileService] Error creating file record:', error);
+      logger.error('[FileService] Error creating file record:', error);
       throw error;
     }
 
@@ -98,7 +99,7 @@ export class FileService {
       .remove([file.file_url]);
 
     if (storageError) {
-      console.error('[FileService] Error deleting file from storage:', storageError);
+      logger.error('[FileService] Error deleting file from storage:', storageError);
       // Continue with database deletion even if storage deletion fails
     }
 
@@ -110,7 +111,7 @@ export class FileService {
       .eq('user_id', user.id);
 
     if (dbError) {
-      console.error('[FileService] Error deleting file from database:', dbError);
+      logger.error('[FileService] Error deleting file from database:', dbError);
       throw dbError;
     }
   }
@@ -132,7 +133,7 @@ export class FileService {
       .order('uploaded_at', { ascending: false });
 
     if (error) {
-      console.error('[FileService] Error fetching property files:', error);
+      logger.error('[FileService] Error fetching property files:', error);
       throw error;
     }
 
@@ -165,7 +166,7 @@ export class FileService {
       .move(oldPath, newPath);
 
     if (moveError) {
-      console.error('[FileService] Error moving file in storage:', moveError);
+      logger.error('[FileService] Error moving file in storage:', moveError);
       throw new Error(`Storage error: ${moveError.message}`);
     }
 
@@ -182,7 +183,7 @@ export class FileService {
       .single();
 
     if (dbError) {
-      console.error('[FileService] Error updating file record:', dbError);
+      logger.error('[FileService] Error updating file record:', dbError);
       throw dbError;
     }
 
@@ -221,7 +222,7 @@ export class FileService {
         .copy(oldPath, newPath);
 
       if (copyError) {
-        console.error('[FileService] Error copying file:', copyError);
+        logger.error('[FileService] Error copying file:', copyError);
         throw new Error(`Storage error: ${copyError.message}`);
       }
 
@@ -231,7 +232,7 @@ export class FileService {
         .remove([oldPath]);
 
       if (removeError) {
-        console.warn('[FileService] Warning removing old file:', removeError);
+        logger.warn('[FileService] Warning removing old file:', removeError);
         // Continue anyway
       }
 
@@ -253,7 +254,7 @@ export class FileService {
       .single();
 
     if (dbError) {
-      console.error('[FileService] Error updating file record:', dbError);
+      logger.error('[FileService] Error updating file record:', dbError);
       throw dbError;
     }
 
@@ -296,7 +297,7 @@ export class FileService {
       .copy(oldPath, newPath);
 
     if (copyError) {
-      console.error('[FileService] Error copying file in storage:', copyError);
+      logger.error('[FileService] Error copying file in storage:', copyError);
       throw new Error(`Storage error: ${copyError.message}`);
     }
 
@@ -323,7 +324,7 @@ export class FileService {
     if (dbError) {
       // Storage copy succeeded but DB insert failed — best-effort rollback
       // so we don't leave an orphaned blob lying around.
-      console.error('[FileService] Error creating duplicate record, rolling back storage copy:', dbError);
+      logger.error('[FileService] Error creating duplicate record, rolling back storage copy:', dbError);
       await supabase.storage.from('property-files').remove([newPath]).catch(() => {});
       throw dbError;
     }
@@ -350,7 +351,7 @@ export class FileService {
       .order('uploaded_at', { ascending: false });
 
     if (error) {
-      console.error('[FileService] Error fetching files in folder:', error);
+      logger.error('[FileService] Error fetching files in folder:', error);
       throw error;
     }
 
