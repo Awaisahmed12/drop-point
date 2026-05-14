@@ -4,9 +4,14 @@ import { useRouter } from 'next/router';
 
 interface MobileBottomNavProps {
   onList?: () => void;
+  /** Fired when the user taps the Map tab while already on the Map page.
+   *  The map page uses this to cycle through map types (roadmap / hybrid /
+   *  satellite). Replaces a previous window.dispatchEvent indirection that
+   *  coupled this component to map.tsx via a stringly-typed event name. */
+  onMapTabReclick?: () => void;
 }
 
-export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList }) => {
+export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList, onMapTabReclick }) => {
   const router = useRouter();
 
   useEffect(() => {
@@ -40,8 +45,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList }) => {
           aria-label="Map"
           onClick={(e) => {
             if (router && router.pathname === '/map') {
+              // Already on the map page — don't navigate, let the parent
+              // handle the re-tap (cycle map type, etc.).
               e.preventDefault();
-              window.dispatchEvent(new Event('droppoint-toggle-map-type'));
+              onMapTabReclick?.();
             } else {
               try { sessionStorage.setItem('droppoint-focus-current', '1'); } catch {}
             }

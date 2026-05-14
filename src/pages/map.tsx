@@ -1747,13 +1747,13 @@ function MapPage() {
     return () => window.removeEventListener('droppoint-focus-current-request', handler);
   }, [handleCurrentLocationClick]);
 
-  // Support toggling map type when user taps Map tab while already on the Map page
-  useEffect(() => {
-    const toggleHandler = () => {
-      setMapType((prev) => (prev === 'roadmap' ? 'hybrid' : prev === 'hybrid' ? 'satellite' : 'roadmap'));
-    };
-    window.addEventListener('droppoint-toggle-map-type', toggleHandler);
-    return () => window.removeEventListener('droppoint-toggle-map-type', toggleHandler);
+  // Cycle through map types in the same order MapControls uses. Wired into
+  // MobileBottomNav via the onMapTabReclick prop so re-tapping the Map tab
+  // while already on the Map page changes the map type instead of being a
+  // no-op. Was previously a window.dispatchEvent('droppoint-toggle-map-type')
+  // indirection that coupled the two components by string name.
+  const handleMapTabReclick = useCallback(() => {
+    setMapType((prev) => (prev === 'roadmap' ? 'hybrid' : prev === 'hybrid' ? 'satellite' : 'roadmap'));
   }, [setMapType]);
 
   // Pre-warm the most recently visited properties so the first pin click is instant.
@@ -2259,7 +2259,7 @@ function MapPage() {
         )}
 
         {/* Mobile bottom nav */}
-        <MobileBottomNav onList={() => router.push('/list')} />
+        <MobileBottomNav onList={() => router.push('/list')} onMapTabReclick={handleMapTabReclick} />
 
         {/* Show PropertyInfoCard for both newly dropped and existing pins */}
         {selectedProperty && address && (
