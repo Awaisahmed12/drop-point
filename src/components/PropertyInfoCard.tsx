@@ -10,6 +10,12 @@ interface PropertyInfoCardProps {
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   onClose?: () => void;
+  /** Fires on pointerdown of the close button — before the click event in
+   *  the same gesture. Lets the parent pre-emptively suppress map-level
+   *  click handlers so a click that "leaks through" to Google Maps' native
+   *  listener (which doesn't honor React's stopPropagation) doesn't drop
+   *  a pin under the card. */
+  onCloseStart?: () => void;
   onPropertyUpdate?: (property: Property) => void;
   onPropertySave?: (property: Property) => Promise<void>;
   onHeightChange?: (height: number) => void;
@@ -23,6 +29,7 @@ export const PropertyInfoCard = ({
   onMouseEnter, 
   onMouseLeave,
   onClose,
+  onCloseStart,
   onPropertyUpdate,
   onPropertySave,
   onHeightChange
@@ -138,6 +145,16 @@ export const PropertyInfoCard = ({
           <button
             aria-label="Close"
             className="absolute top-2.5 right-2.5 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 active:scale-90 transition-all duration-150"
+            // Fires first in any click/tap gesture — used to set the parent's
+            // map-click-suppress flag BEFORE the click event reaches Google
+            // Maps' native listener. Without this the synthesized click on
+            // mobile (or a Google listener that runs before our React onClick
+            // in some browser/lib combos) drops a pin underneath the closing
+            // card, immediately re-opening a new card at those coordinates.
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onCloseStart?.();
+            }}
             onClick={(e) => {
               e.stopPropagation();
               onClose();

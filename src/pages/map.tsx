@@ -2269,10 +2269,21 @@ function MapPage() {
             property={selectedProperty}
             onMouseEnter={() => {}}
             onMouseLeave={() => {}}
-            onClose={() => {
-              // Suppress the ghost click that fires on the map ~300ms after a touch dismiss
+            onCloseStart={() => {
+              // pointerdown fires first in the gesture — set the suppress
+              // flag NOW, before any click event (synthesized or otherwise)
+              // can reach Google Maps' native click listener and drop a pin
+              // under the card. 1200ms window is generous enough for slow
+              // mobile devices where the synthesized click can lag.
               suppressMapClickRef.current = true;
-              setTimeout(() => { suppressMapClickRef.current = false; }, 600);
+              setTimeout(() => { suppressMapClickRef.current = false; }, 1200);
+            }}
+            onClose={() => {
+              // Belt-and-suspenders: re-arm the suppress flag here in case
+              // the gesture started with a click (no pointerdown), e.g. via
+              // assistive tech. The setTimeout window resets on each call.
+              suppressMapClickRef.current = true;
+              setTimeout(() => { suppressMapClickRef.current = false; }, 1200);
               setSelectedProperty(null);
               setAddress('');
               setPropertyCardHeight(0);
