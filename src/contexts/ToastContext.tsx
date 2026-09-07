@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { TOAST_SUCCESS_MS, TOAST_ERROR_MS } from '../../constants';
 
 export type ToastType = 'error' | 'success' | 'warning';
 
@@ -14,6 +15,28 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue>({ showToast: () => {} });
 
+const ICONS: Record<ToastType, React.ReactNode> = {
+  error: (
+    <svg className="w-5 h-5 text-danger flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 5h2v7h-2V7zm0 9h2v2h-2v-2z" />
+    </svg>
+  ),
+  success: (
+    <svg className="w-5 h-5 text-success flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1.5 14.5l-4-4 1.41-1.41L10.5 13.67l6.09-6.09L18 9l-7.5 7.5z" />
+    </svg>
+  ),
+  warning: (
+    <svg className="w-5 h-5 text-warning flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2L1 21h22L12 2zm-1 7h2v6h-2V9zm0 8h2v2h-2v-2z" />
+    </svg>
+  ),
+};
+
+/**
+ * Brief notices drop in from the top like an iOS banner: white, blurred,
+ * one line, a glyph for the kind of message, and they leave on their own.
+ */
 export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -22,59 +45,30 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4000);
+    }, type === 'error' ? TOAST_ERROR_MS : TOAST_SUCCESS_MS);
   }, []);
 
-  const dismiss = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  };
-
-  const colorMap: Record<ToastType, string> = {
-    error: 'bg-red-600 text-white',
-    success: 'bg-green-600 text-white',
-    warning: 'bg-amber-500 text-white',
-  };
-
-  const iconMap: Record<ToastType, React.ReactNode> = {
-    error: (
-      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-      </svg>
-    ),
-    success: (
-      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-      </svg>
-    ),
-    warning: (
-      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-      </svg>
-    ),
-  };
+  const dismiss = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {toasts.length > 0 && (
-        <div className="fixed left-1/2 -translate-x-1/2 z-[99999] flex flex-col-reverse gap-2 w-full max-w-sm px-4 pointer-events-none bottom-20 sm:bottom-4">
+        <div
+          className="fixed left-1/2 -translate-x-1/2 z-[99999] flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none"
+          style={{ top: 'calc(var(--safe-top) + 10px)' }}
+          aria-live="polite"
+        >
           {toasts.map(toast => (
-            <div
+            <button
               key={toast.id}
-              className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium pointer-events-auto animate-fade-in ${colorMap[toast.type]}`}
+              type="button"
+              onClick={() => dismiss(toast.id)}
+              className="ios-float flex items-center gap-3 px-4 py-3 rounded-[14px] text-subhead font-medium text-ink text-left pointer-events-auto animate-sheet-up"
             >
-              {iconMap[toast.type]}
+              {ICONS[toast.type]}
               <span className="flex-1">{toast.message}</span>
-              <button
-                onClick={() => dismiss(toast.id)}
-                className="flex-shrink-0 opacity-75 hover:opacity-100 transition-opacity ml-1"
-                aria-label="Dismiss"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+            </button>
           ))}
         </div>
       )}

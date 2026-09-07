@@ -140,7 +140,7 @@ function AdminConfigPage() {
 
   if (adminLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-dvh bg-ground flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading admin panel...</p>
@@ -161,7 +161,7 @@ function AdminConfigPage() {
         <meta name="description" content="Manage application configurations and settings" />
       </Head>
       
-      <div className={`min-h-screen bg-gray-50 ${mobileClasses.fullScreen}`} style={getMobileStyles('page')}>
+      <div className={`min-h-dvh bg-ground ${mobileClasses.fullScreen}`} style={getMobileStyles('page')}>
         <div className="max-w-4xl mx-auto px-4 py-6">
           {/* Header */}
           <div className="mb-8">

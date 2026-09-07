@@ -17,6 +17,7 @@ function setConsent(value: { analytics: boolean }) {
   document.cookie = `droppoint-consent=${encodeURIComponent(JSON.stringify(value))}; Max-Age=${oneYear}; Path=/; SameSite=Lax`;
 }
 
+/** A single card above the tab bar with two clearly named choices. */
 export const CookieConsentBanner: React.FC = () => {
   const [visible, setVisible] = useState(false);
 
@@ -28,40 +29,30 @@ export const CookieConsentBanner: React.FC = () => {
 
   if (!visible) return null;
 
+  const decide = (analytics: boolean) => {
+    setConsent({ analytics });
+    setVisible(false);
+  };
+
   return (
-    <div 
-      className="fixed inset-x-0 bottom-0 z-[1000] px-4 pb-4"
-      style={{
-        paddingBottom: `calc(1rem + env(safe-area-inset-bottom, 0px))`
-      }}
+    <div
+      className="fixed inset-x-0 z-[1000] px-3 sm:px-4 pointer-events-none"
+      style={{ bottom: 'calc(var(--tabbar-total) + 12px)' }}
+      role="region"
+      aria-label="Cookie preferences"
     >
-      <div className="mx-auto max-w-3xl rounded-2xl border border-gray-200 bg-white/95 backdrop-blur shadow-xl p-4 sm:p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="text-sm text-gray-700 leading-relaxed">
-            We use minimal cookies to provide essential functionality and optional analytics to improve the product. See our{' '}
-            <a className="underline hover:text-gray-900" href="/legal/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>{' '}and{' '}
-            <a className="underline hover:text-gray-900" href="/legal/terms" target="_blank" rel="noreferrer">Terms</a>.
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 cursor-pointer"
-              onClick={() => {
-                setConsent({ analytics: false });
-                setVisible(false);
-              }}
-            >
-              Decline
-            </button>
-            <button
-              className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow cursor-pointer"
-              onClick={() => {
-                setConsent({ analytics: true });
-                setVisible(false);
-              }}
-            >
-              Accept
-            </button>
-          </div>
+      <div className="mx-auto max-w-lg ios-float rounded-[16px] p-4 pointer-events-auto animate-sheet-up sm:mb-2">
+        <p className="text-subhead text-ink">
+          DropPoint uses essential cookies to keep you signed in. Allow analytics cookies too? See the{' '}
+          <a className="text-accent" href="/legal/privacy" target="_blank" rel="noreferrer">privacy policy</a>.
+        </p>
+        <div className="flex gap-2 mt-3">
+          <button type="button" className="ios-button ios-button-tinted h-11 text-subhead" onClick={() => decide(false)}>
+            Essential only
+          </button>
+          <button type="button" className="ios-button ios-button-primary h-11 text-subhead" onClick={() => decide(true)}>
+            Allow analytics
+          </button>
         </div>
       </div>
     </div>
@@ -72,5 +63,3 @@ export function hasAnalyticsConsent(): boolean {
   const c = getConsent();
   return Boolean(c?.analytics);
 }
-
-
