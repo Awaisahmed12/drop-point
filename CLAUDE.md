@@ -80,7 +80,7 @@ Files are stored in Supabase Storage. Access is via signed URLs with a 1-hour ex
 
 Materials are Liquid Glass: translucent, blurred, with a specular top edge (`glass`, `glass-dark`, `ios-float`). Anything that floats over content is glass: the tab bar (a capsule inset from the edges), the map search field and controls, the property card, action sheets, toasts, and the sheet's nav bar once content scrolls under it. Corners are large and concentric (sheet 28px, cards 24px, grouped rows 20px, buttons and fields are capsules). The property sheet opens on a hero photo with the name set into it; the nav bar floats over the photo and turns solid on scroll. Every bottom sheet's grabber and nav zone is a real pull-to-dismiss handle (`useSheetDrag`).
 
-Tokens live in `src/styles/globals.css` (Tailwind v4 `@theme`): the iOS grouped palette (`ground`, `surface`, `surface-2`, `ink`, `ink-2`, `ink-3`, `hairline`), one accent (`accent`), `danger`/`success`/`warning`, the HIG type scale (`text-large-title` … `text-caption-2`), and iOS component classes (`ios-group`/`ios-row`, `ios-search`, `ios-segmented`, `ios-button-*`, `ios-navbar`, `ios-sheet`, `ios-tabbar`, `ios-float`, `ios-close`, `ios-press`). Use these instead of raw gray/blue Tailwind colors so every screen reads as one system.
+Tokens live in `src/styles/globals.css` (Tailwind v4 `@theme`): the iOS grouped palette (`ground`, `surface`, `surface-2`, `ink`, `ink-2`, `ink-3`, `hairline`), one accent (`accent`), `danger`/`success`/`warning`, the HIG type scale (`text-large-title` … `text-caption-2`), and iOS component classes (`ios-group`/`ios-group-glass`/`ios-row`, `ios-search`, `ios-segmented`, `ios-button-*`, `ios-navbar`, `ios-sheet`, `ios-tabbar`, `ios-float`, `ios-close`, `ios-press`). Use these instead of raw gray/blue Tailwind colors so every screen reads as one system.
 
 - Type comes from the system stack so iPhones render San Francisco. Large titles are 34pt/700; body is 17pt.
 - Safe areas: pages pad with `var(--safe-top)` and use `pb-tabbar` above the 49pt tab bar (`MobileBottomNav`). The app is installable (`public/manifest.json`, `display: standalone`, translucent status bar).
@@ -97,8 +97,8 @@ Keep the number of simultaneous choices small and grouped:
 - Property card: title, address, one button (Open / Add property). Renaming happens inside the sheet.
 - Property sheet nav bar: close, title, and one "⋯" that opens a grouped action sheet (Switch property, Show as list/grid | Rename, Copy address). The "+" offers exactly Upload files / New folder.
 - File menu groups: Download | Rename, Move to folder, Duplicate | Delete. Folder menu: Rename | Delete.
-- Properties list rows only open the property; no per-row menus.
-- Account is a Settings-style grouped list; profile questions are asked one at a time in an action sheet picker, and save on selection.
+- Properties are photo cards (Street View, satellite fallback) with the name set into a scrim and one file-count pill. Tapping a card only opens the property; no per-card menus. One glass search capsule above the grid.
+- Account is an avatar hero (tap the name to edit it inline) over a wash of the user's color, then glass groups: Storage, About you, Sign out. Profile questions are asked one at a time in an action sheet picker, and save on selection.
 - Do not add controls that have no effect (a previous "Remember me" checkbox was wired to nothing).
 
 ## Git
