@@ -217,7 +217,7 @@ function AccountPage() {
                       }}
                     />
                   </div>
-                  <span className="text-footnote text-ink-2">Free plan. Paid plans are coming soon.</span>
+                  <span className="text-footnote text-ink-2">Free plan.</span>
                 </div>
               </div>
 
