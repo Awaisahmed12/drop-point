@@ -19,6 +19,7 @@
   --color-ink-2: #8e8e93;           /* secondary label */
   --color-ink-3: #c7c7cc;           /* tertiary label, chevrons */
   --color-hairline: #c6c6c8;        /* separators */
+  --color-hover: #f5f5f7;           /* pointer hover on rows */
   --color-accent: #0a7aff;          /* the one accent: pins, primary buttons, links */
   --color-accent-soft: #e5f0ff;
   --color-danger: #ff3b30;
@@ -61,6 +62,30 @@
   --shadow-float: 0 10px 40px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
+/* Dark: the iOS dark grouped palette. The tokens are plain custom properties,
+   so every utility and component class below follows the device setting
+   without a toggle of its own. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-ground: #000000;
+    --color-surface: #1c1c1e;
+    --color-surface-2: #2c2c2e;
+    --color-fill: #7678805c;
+    --color-ink: #f2f2f7;
+    --color-ink-2: #8e8e93;
+    --color-ink-3: #48484a;
+    --color-hairline: #38383a;
+    --color-hover: #2c2c2e;
+    --color-accent: #0a84ff;
+    --color-accent-soft: #0a84ff2e;
+    --color-danger: #ff453a;
+    --color-success: #30d158;
+    --color-warning: #ff9f0a;
+    --shadow-sheet: 0 -1px 0 rgba(255, 255, 255, 0.04), 0 -12px 40px rgba(0, 0, 0, 0.6);
+    --shadow-float: 0 10px 40px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
 /* Native metrics: floating 64pt tab bar, 44pt nav bar, 50pt primary buttons. */
 :root {
   --tabbar-height: 64px;
@@ -75,7 +100,7 @@
 }
 
 html {
-  color-scheme: light;
+  color-scheme: light dark;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -446,11 +471,52 @@ input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appe
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 99px; }
 
+/* Dark materials: glass turns to smoked glass, thumbs and pills lift a step
+   above their bar instead of going white, and shadows deepen. */
+@media (prefers-color-scheme: dark) {
+  .glass, .ios-float {
+    background: rgba(44, 44, 46, 0.62);
+    box-shadow:
+      var(--shadow-float),
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+  .ios-group-glass {
+    background: rgba(44, 44, 46, 0.66);
+    box-shadow:
+      0 8px 30px rgba(0, 0, 0, 0.4),
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+  .ios-group { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(255, 255, 255, 0.06); }
+  .ios-navbar-solid { background: rgba(28, 28, 30, 0.84); }
+  .ios-close {
+    background: rgba(58, 58, 60, 0.8);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4), inset 0 0 0 0.5px rgba(255, 255, 255, 0.16);
+  }
+  .ios-tab[aria-current="page"] {
+    background: rgba(72, 72, 74, 0.9);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3), inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  }
+  .ios-segment[aria-pressed="true"] {
+    background: #636366;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+  }
+  .ios-grabber { background: rgba(235, 235, 245, 0.3); }
+  .ios-search:focus { background: #76788066; }
+  .ios-button-primary { box-shadow: 0 8px 22px rgba(10, 132, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (prefers-color-scheme: dark) {
+    .glass, .ios-float, .ios-group-glass { background: #2c2c2e; }
+  }
+}
 /* Desktop: pointer users still get a cursor and a light hover on rows. */
 @media (hover: hover) {
   button, a, [role="button"], [role="option"], [role="menuitem"], label, summary { cursor: pointer; }
   button:disabled, [disabled] { cursor: not-allowed; }
-  .ios-row-press:hover { background: #f5f5f7; }
+  .ios-row-press:hover { background: var(--color-hover); }
 }
 
 /* Every pointer-driven element is safe from the 300 ms tap delay. */

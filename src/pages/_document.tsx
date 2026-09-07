@@ -41,7 +41,8 @@ export default function Document() {
         <meta name="apple-mobile-web-app-title" content="DropPoint" />
         <meta name="application-name" content="DropPoint" />
         <meta name="format-detection" content="telephone=no" />
-        <meta name="theme-color" content="#f9f9f9" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
       </Head>
       <body className="antialiased">
         <Main />

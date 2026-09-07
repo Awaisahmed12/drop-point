@@ -13,6 +13,8 @@ interface UseSheetDragOptions {
  * finger, springs back on a short pull, and slides off then dismisses on a
  * long or fast one.
  */
+const SLOP = 6; // px of travel before a press becomes a pull
+
 export function useSheetDrag({ onDismiss, threshold = 110 }: UseSheetDragOptions) {
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -20,15 +22,23 @@ export function useSheetDrag({ onDismiss, threshold = 110 }: UseSheetDragOptions
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // A press on a control inside the handle is a tap on that control, not a pull.
+    if ((e.target as HTMLElement).closest?.('button, a, input, textarea, select, [role="button"]')) return;
     startRef.current = { y: e.clientY, t: Date.now() };
-    setDragging(true);
-    e.currentTarget.setPointerCapture?.(e.pointerId);
   }, []);
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (!startRef.current) return;
+    const dy = e.clientY - startRef.current.y;
+    // Capture only once the finger has actually pulled: capturing on the
+    // press itself would retarget the release and swallow clicks.
+    if (!e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      if (dy < SLOP) return;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      setDragging(true);
+    }
     // Resist upward pulls; follow downward ones 1:1.
-    setOffset(Math.max(0, e.clientY - startRef.current.y));
+    setOffset(Math.max(0, dy));
   }, []);
 
   const finish = useCallback((e: React.PointerEvent<HTMLElement>) => {

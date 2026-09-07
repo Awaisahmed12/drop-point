@@ -55,7 +55,7 @@ export default function AuthCallback() {
 
   return (
     <div style={{ display: 'grid', placeItems: 'center', height: '100vh' }}>
-      <div style={{ fontFamily: 'ui-sans-serif, system-ui', color: '#1f2937' }}>
+      <div style={{ fontFamily: 'ui-sans-serif, system-ui' }}>
         {status === 'working' ? 'Finishing sign-in…' : 'Redirecting…'}
       </div>
     </div>
