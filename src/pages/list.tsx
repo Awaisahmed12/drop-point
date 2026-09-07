@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Head from 'next/head';
 import { ListView } from '../components/ListView';
 import { MobileBottomNav } from '../components/MobileBottomNav';
@@ -9,7 +9,7 @@ import type { Property, PropertyFile, PropertyFolder, PropertyWithFileCount } fr
 import { withAuth } from '../components/withAuth';
 import { useUserProperties } from '../hooks/useUserProperties';
 import { usePropertyFileActions } from '../hooks/usePropertyFileActions';
-import { getPropertyDataSync, setPropertyDataCache } from '../hooks/usePropertyPrefetch';
+import { getPropertyDataSync, setPropertyDataCache, prefetchPropertyData } from '../hooks/usePropertyPrefetch';
 import { propertyService } from '../services';
 import { useToast } from '../contexts/ToastContext';
 
@@ -40,6 +40,16 @@ function ListPage() {
     setFolders,
     selectedFolder,
   });
+
+  // Warm the most recent properties (files, hero photo, first thumbnails) so
+  // the first tap opens a finished sheet instead of one that fills in.
+  useEffect(() => {
+    if (propertiesLoading || properties.length === 0) return;
+    const timers = properties.slice(0, 8).map((p, i) =>
+      setTimeout(() => { if (p.id) void prefetchPropertyData(p.id, p); }, 200 + i * 250),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [properties, propertiesLoading]);
 
   const openProperty = useCallback(async (input: Property | PropertyWithFileCount) => {
     const property = toProperty(input);

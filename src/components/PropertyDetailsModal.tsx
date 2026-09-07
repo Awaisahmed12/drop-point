@@ -19,9 +19,9 @@ import { useSheetDrag } from '../hooks/useSheetDrag';
 import { tryWithToast } from '../utils/tryWithToast';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
 import type { PropertyWithFileCount } from '../../types';
-import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
 import { getFileSignedUrl } from '../utils/supabaseClient';
+import { heroImageUrls } from '../hooks/usePropertyPrefetch';
 import { FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 import { ActionSheet, type ActionSheetItem } from './ActionSheet';
 
@@ -1066,11 +1066,10 @@ export const PropertyDetailsModal = ({
   const navSolid = !showHero || scrolledPastHero || renamingProperty;
   const heroLat = snappedLatLng?.lat ?? property.lat;
   const heroLng = snappedLatLng?.lng ?? property.lng;
-  const heroFallbackSrc = `https://maps.googleapis.com/maps/api/staticmap?center=${heroLat},${heroLng}&zoom=17&size=1200x600&maptype=satellite&markers=color:blue%7C${heroLat},${heroLng}&key=${GOOGLE_MAPS_API_KEY}`;
+  const heroUrls = heroImageUrls(heroLat, heroLng);
+  const heroFallbackSrc = heroUrls.satellite;
   // Street View suits a phone's aspect ratio; the satellite map suits a wide desktop sheet.
-  const heroSrc = streetViewEnabled && isMobile
-    ? `https://maps.googleapis.com/maps/api/streetview?size=800x480&location=${heroLat},${heroLng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`
-    : heroFallbackSrc;
+  const heroSrc = streetViewEnabled && isMobile ? heroUrls.streetView : heroFallbackSrc;
 
   const headerSubtitle = showRealAddress
     ? [streetAddress, locationInfo].filter(Boolean).join(', ')

@@ -19,7 +19,7 @@ import { usePropertyData } from '../hooks/usePropertyData';
 import { useSearchState } from '../hooks/useSearchState';
 import { useModalState } from '../hooks/useModalState';
 import { usePropertyFileActions } from '../hooks/usePropertyFileActions';
-import { prefetchPropertyData, getPropertyDataSync, setPropertyDataCache } from '../hooks/usePropertyPrefetch';
+import { prefetchPropertyData, getPropertyDataSync, setPropertyDataCache, warmHeroImage } from '../hooks/usePropertyPrefetch';
 import { useToast } from '../contexts/ToastContext';
 import { propertyService } from '../services';
 import { supabase } from '../utils/supabaseClient';
@@ -211,7 +211,7 @@ function MapPage() {
   useEffect(() => {
     if (!propertiesLoaded || userProperties.length === 0) return;
     userProperties.slice(0, 5).forEach((p, i) => {
-      if (p.id) setTimeout(() => prefetchPropertyData(p.id!), i * 300);
+      if (p.id) setTimeout(() => prefetchPropertyData(p.id!, p), i * 300);
     });
   }, [propertiesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -282,6 +282,8 @@ function MapPage() {
     setAddress(property.address);
     setAddressLoading(false);
     setSnappedLatLng({ lat: property.lat, lng: property.lng });
+    // The card is up; by the time "Open" is tapped the hero photo is already here.
+    warmHeroImage(property.lat, property.lng);
     if (options.openModal) {
       setSelectedProperty(null);
       setShowDetailsModal(true);
@@ -585,7 +587,7 @@ function MapPage() {
                   position={{ lat: property.lat, lng: property.lng }}
                   icon={createPropertyPinIcon(selectedProperty?.id === property.id)}
                   onClick={() => selectProperty(property)}
-                  onMouseOver={() => property.id && prefetchPropertyData(property.id)}
+                  onMouseOver={() => property.id && prefetchPropertyData(property.id, property)}
                   title={property.address}
                 />
               ))}
