@@ -1,16 +1,15 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import coreWebVitals from "eslint-config-next/core-web-vitals";
+import typescript from "eslint-config-next/typescript";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
+// eslint-config-next 16 exports native flat configs; the old FlatCompat
+// shim crashes with "Converting circular structure to JSON", and `next lint`
+// no longer exists, so `npm run lint` invokes eslint directly.
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...coreWebVitals,
+  ...typescript,
+  {
+    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts", "coverage/**"],
+  },
 ];
 
 export default eslintConfig;

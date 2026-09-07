@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 
 import { MoveModal } from './MoveModal';
@@ -23,6 +23,55 @@ import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExte
 import { getFileSignedUrl } from '../utils/supabaseClient';
 import { FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 
+const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']);
+const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']);
+
+// Everything written into a viewer tab is escaped: the tab shares this
+// app's origin, so unescaped file names or text content would run as HTML.
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string));
+
+const VIEWER_CSS = `
+  body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+  .header { background: #f8f9fa; padding: 12px 20px; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+  .filename { font-weight: 600; color: #333; }
+  .download-btn { background: #007bff; color: white; text-decoration: none; padding: 8px 16px; border-radius: 4px; font-size: 14px; }
+  .download-btn:hover { background: #0056b3; }
+  iframe { width: 100%; height: calc(100vh - 50px); border: none; }
+  .content { padding: 20px; font-family: Menlo, Monaco, monospace; white-space: pre-wrap; line-height: 1.5; background: #f8f9fa; margin: 0; }
+  .table-container { padding: 20px; overflow: auto; }
+  table { border-collapse: collapse; width: 100%; background: white; font-size: 12px; }
+  th, td { border: 1px solid #d0d7de; padding: 4px 8px; text-align: left; vertical-align: top; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+  th { background: #f6f8fa; font-weight: 600; position: sticky; top: 0; }
+  tr:nth-child(even) { background: #f6f8fa; }
+  td:hover { white-space: normal; max-width: none; }
+`;
+
+/** Fill a blank tab with a titled, escaped viewer page. */
+function writeViewer(win: Window, title: string, downloadUrl: string, body: string) {
+  win.document.write(
+    `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${VIEWER_CSS}</style></head>` +
+    `<body><div class="header"><span class="filename">${escapeHtml(title)}</span>` +
+    `<a class="download-btn" href="${escapeHtml(downloadUrl)}" target="_blank" rel="noopener">Download</a></div>${body}</body></html>`,
+  );
+  win.document.close();
+}
+
+/** Minimal CSV split: one row per non-blank line, comma-separated, quotes stripped. */
+function parseCsv(content: string): string[][] {
+  return content
+    .split('\n')
+    .filter(line => line.trim())
+    .map(line => line.split(',').map(cell => cell.trim().replace(/"/g, '')));
+}
+
+function renderCsvTable(content: string): string {
+  const [headers = [], ...rows] = parseCsv(content);
+  const th = headers.map(h => `<th>${escapeHtml(h)}</th>`).join('');
+  const tr = rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('');
+  return `<div class="table-container"><table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table></div>`;
+}
+
 interface PropertyDetailsModalProps {
   isOpen: boolean;
   property: Property | null;
@@ -39,22 +88,19 @@ interface PropertyDetailsModalProps {
   selectedFolder: string;
   onFolderChange: (folderId: string) => void;
   
-  // File operations
+  // File operations. Rename and folder creation may throw; the modal turns
+  // the error into an inline message.
   onFileUpload: (files: FileList) => Promise<void>;
   onFileDelete: (file: PropertyFile) => void;
-  onFileRename: (item: PropertyFile | PropertyFolder, newName: string) => void;
+  onFileRename: (item: PropertyFile | PropertyFolder, newName: string) => Promise<void> | void;
   onFileMove?: (file: PropertyFile, targetFolderId: string | null) => Promise<void>;
   onFileCopy?: (file: PropertyFile) => Promise<void>;
-  onFolderCreate: (name: string) => void;
+  onFolderCreate: (name: string) => Promise<void> | void;
   onFolderDelete: (folder: PropertyFolder) => void;
   
   // Pending uploads
   pendingUploads: PendingUpload[];
   onDismiss: (uploadId: string) => void;
-  
-  // Cache functions - for future use
-  getCachedPropertyData?: (address: string) => Promise<{ files: PropertyFile[]; folders: PropertyFolder[] } | null>;
-  cachePropertyData?: (address: string, files: PropertyFile[], folders: PropertyFolder[]) => void;
   
   // Property switching
   onPropertySwitch?: (property: PropertyWithFileCount, files: PropertyFile[], folders: PropertyFolder[]) => void;
@@ -219,8 +265,7 @@ export const PropertyDetailsModal = ({
       }
       if (imagePreview && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
-        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
-        const imageFiles = files.filter(f => imageExts.includes(f.file_name.split('.').pop()?.toLowerCase() || ''));
+        const imageFiles = files.filter(f => IMAGE_EXTENSIONS.has(f.file_name.split('.').pop()?.toLowerCase() || ''));
         const idx = imageFiles.findIndex(f => f.id === imagePreview.file.id);
         if (idx === -1) return;
         const nextIdx = e.key === 'ArrowLeft' ? idx - 1 : idx + 1;
@@ -231,7 +276,7 @@ export const PropertyDetailsModal = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, imagePreview, files]);
+  }, [isOpen, imagePreview, files, loadImagePreview]);
   
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
@@ -277,12 +322,7 @@ export const PropertyDetailsModal = ({
   });
 
   // Use global mobile viewport hook
-  const { 
-    isMobile, 
-    getModalDimensions, 
-    getMobileStyles,
-    mobileClasses 
-  } = useMobileViewport();
+  const { isMobile, getModalDimensions, mobileClasses } = useMobileViewport();
 
   // Configuration hook
   const { streetViewEnabled, propertyImageEnabled } = useConfig();
@@ -298,16 +338,8 @@ export const PropertyDetailsModal = ({
     onLoadingStateChange: setSwitchingProperty,
     onError: (error) => {
       logger.error('Property switch error:', error);
-      // You could add a toast notification here
+      showToast('Could not switch property. Please try again.');
     },
-    propertyCache: (globalThis as { 
-      __droppoint_property_cache?: Record<string, {
-        files: PropertyFile[];
-        folders: PropertyFolder[];
-        lastFetched: number;
-      }> 
-    }).__droppoint_property_cache || {},
-    cacheTimeout: 5 * 60 * 1000
   });
 
   // Convert current property to PropertyWithFileCount format
@@ -483,6 +515,21 @@ export const PropertyDetailsModal = ({
     }
     
     setMenuPosition(prev => ({...prev, [menuId]: position}));
+  };
+
+  // One handler for every kebab button (list/grid, file/folder). Click and
+  // touchend both route here so a tap never fires twice.
+  const menuTriggerProps = (kind: 'file' | 'folder', id: string) => {
+    const toggle = (e: React.SyntheticEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const wasOpen = (kind === 'file' ? fileMenuId : folderMenuId) === id;
+      closeMenus();
+      if (wasOpen) return;
+      (kind === 'file' ? setFileMenuId : setFolderMenuId)(id);
+      calculateMenuPosition(e.currentTarget, id);
+    };
+    return { onClick: toggle, onTouchEnd: toggle };
   };
 
   // Folder validation - memoized to prevent recalculation on every render
@@ -719,363 +766,59 @@ export const PropertyDetailsModal = ({
     };
   }, [fileMenuId, folderMenuId]);
 
-  // Enhanced mobile-first file opening function
+  // Open a file the way the device expects: an in-app viewer on mobile, a
+  // lightbox for images on desktop, otherwise a new tab.
   const openFileInline = async (file: PropertyFile) => {
     try {
-      const fileUrl = await getFileSignedUrl(file.property_id, file.file_name, false);
-      const downloadUrl = await getFileSignedUrl(file.property_id, file.file_name, true);
-      const fileExtension = file.file_name.split('.').pop()?.toLowerCase();
-      
-      // Mobile-first approach
+      const [fileUrl, downloadUrl] = await Promise.all([
+        getFileSignedUrl(file.property_id, file.file_name, false),
+        getFileSignedUrl(file.property_id, file.file_name, true),
+      ]);
+      const ext = file.file_name.split('.').pop()?.toLowerCase() || '';
+
       if (isMobile) {
-        // For mobile, open in modal overlay
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension || '')) {
-          // Images - show directly in mobile viewer
-          setMobileFileViewer({
-            isOpen: true,
-            file,
-            fileUrl,
-            downloadUrl,
-          });
-        } else if (fileExtension === 'pdf') {
-          // PDFs - try to show in mobile viewer, fallback to direct navigation
-          setMobileFileViewer({
-            isOpen: true,
-            file,
-            fileUrl,
-            downloadUrl,
-          });
-        } else if (fileExtension === 'txt') {
-          // Text files - fetch content and show in mobile viewer
+        if (IMAGE_EXTENSIONS.has(ext) || ext === 'pdf') {
+          setMobileFileViewer({ isOpen: true, file, fileUrl, downloadUrl });
+        } else if (ext === 'txt' || ext === 'csv') {
           try {
-            const response = await fetch(fileUrl);
-            const content = await response.text();
-            setMobileFileViewer({
-              isOpen: true,
-              file,
-              fileUrl,
-              downloadUrl,
-              content,
-            });
+            const content = await (await fetch(fileUrl)).text();
+            setMobileFileViewer({ isOpen: true, file, fileUrl, downloadUrl, content });
           } catch {
-            // Fallback to direct download
-            window.location.href = downloadUrl;
-          }
-        } else if (fileExtension === 'csv') {
-          // CSV files - fetch and parse for mobile viewer
-          try {
-            const response = await fetch(fileUrl);
-            const content = await response.text();
-            setMobileFileViewer({
-              isOpen: true,
-              file,
-              fileUrl,
-              downloadUrl,
-              content,
-            });
-          } catch {
-            // Fallback to direct download
             window.location.href = downloadUrl;
           }
         } else {
-          // For other file types on mobile, direct download or attempt to open
-          try {
-            // Try to open in same window first
-            window.location.href = fileUrl;
-          } catch {
-            // Fallback to download
-            window.location.href = downloadUrl;
-          }
+          window.location.href = fileUrl;
         }
         return;
       }
 
-      // Desktop behavior (existing logic)
-      // For PDFs, try to open inline with a viewer
-      if (fileExtension === 'pdf') {
-        // Try to open PDF inline by embedding it
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-          newWindow.document.write(`
-            <html>
-              <head>
-                <title>${file.file_name}</title>
-                <style>
-                  body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-                  .header { 
-                    background: #f8f9fa; 
-                    padding: 12px 20px; 
-                    border-bottom: 1px solid #e9ecef;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                  }
-                  .filename { font-weight: 600; color: #333; }
-                  .download-btn {
-                    background: #007bff;
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 14px;
-                  }
-                  .download-btn:hover { background: #0056b3; }
-                  iframe { width: 100%; height: calc(100vh - 50px); border: none; }
-                </style>
-              </head>
-              <body>
-                <div class="header">
-                  <span class="filename">${file.file_name}</span>
-                  <button class="download-btn" onclick="window.open('${downloadUrl}', '_blank')">Download</button>
-                </div>
-                <iframe src="${fileUrl}" type="application/pdf"></iframe>
-              </body>
-            </html>
-          `);
-          newWindow.document.close();
-        }
-      } 
-      // For images, show in-app lightbox
-      else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension || '')) {
+      if (IMAGE_EXTENSIONS.has(ext)) {
         setImagePreview({ url: fileUrl, file });
+        return;
       }
-      // For other document types, try Google Docs Viewer
-      else if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(fileExtension || '')) {
+
+      // Open the tab synchronously so pop-up blockers treat it as user-initiated.
+      const viewer = window.open('', '_blank');
+      if (!viewer) {
+        showToast('Pop-up blocked. Allow pop-ups to preview files.', 'warning');
+        return;
+      }
+
+      if (ext === 'pdf') {
+        writeViewer(viewer, file.file_name, downloadUrl, `<iframe src="${escapeHtml(fileUrl)}" type="application/pdf"></iframe>`);
+      } else if (OFFICE_EXTENSIONS.has(ext)) {
         const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-          newWindow.document.write(`
-            <html>
-              <head>
-                <title>${file.file_name}</title>
-                <style>
-                  body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-                  .header { 
-                    background: #f8f9fa; 
-                    padding: 12px 20px; 
-                    border-bottom: 1px solid #e9ecef;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                  }
-                  .filename { font-weight: 600; color: #333; }
-                  .download-btn {
-                    background: #007bff;
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 14px;
-                  }
-                  .download-btn:hover { background: #0056b3; }
-                  iframe { width: 100%; height: calc(100vh - 50px); border: none; }
-                </style>
-              </head>
-              <body>
-                <div class="header">
-                  <span class="filename">${file.file_name}</span>
-                  <button class="download-btn" onclick="window.open('${downloadUrl}', '_blank')">Download</button>
-                </div>
-                <iframe src="${viewerUrl}"></iframe>
-              </body>
-            </html>
-          `);
-          newWindow.document.close();
+        writeViewer(viewer, file.file_name, downloadUrl, `<iframe src="${escapeHtml(viewerUrl)}"></iframe>`);
+      } else if (ext === 'csv' || ext === 'txt') {
+        try {
+          const content = await (await fetch(fileUrl)).text();
+          const body = ext === 'csv' ? renderCsvTable(content) : `<pre class="content">${escapeHtml(content)}</pre>`;
+          writeViewer(viewer, file.file_name, downloadUrl, body);
+        } catch {
+          viewer.location.href = fileUrl;
         }
-      }
-      // For CSV files, format as a proper table
-      else if (fileExtension === 'csv') {
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-          // Fetch the content and display it as a table
-          fetch(fileUrl)
-            .then(response => response.text())
-            .then(content => {
-              // Parse CSV content
-              const lines = content.split('\n').filter(line => line.trim());
-              const headers = lines[0]?.split(',').map(h => h.trim().replace(/"/g, '')) || [];
-              const rows = lines.slice(1).map(line => 
-                line.split(',').map(cell => cell.trim().replace(/"/g, ''))
-              );
-
-              const tableHtml = `
-                <table>
-                  <thead>
-                    <tr>
-                      ${headers.map(header => `<th>${header}</th>`).join('')}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${rows.map(row => `
-                      <tr>
-                        ${row.map(cell => `<td>${cell}</td>`).join('')}
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              `;
-
-              newWindow.document.write(`
-                <html>
-                  <head>
-                    <title>${file.file_name}</title>
-                    <style>
-                      body { 
-                        font-family: system-ui, -apple-system, sans-serif; 
-                        padding: 0; 
-                        margin: 0;
-                      }
-                      .header { 
-                        background: #f8f9fa; 
-                        padding: 12px 20px; 
-                        border-bottom: 1px solid #e9ecef;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        position: sticky;
-                        top: 0;
-                        z-index: 100;
-                      }
-                      .filename { font-weight: 600; color: #333; }
-                      .download-btn {
-                        background: #007bff;
-                        color: white;
-                        border: none;
-                        padding: 8px 16px;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 14px;
-                      }
-                      .download-btn:hover { background: #0056b3; }
-                      .table-container {
-                        padding: 20px;
-                        overflow: auto;
-                        margin-bottom: 40px;
-                      }
-                      table { 
-                        border-collapse: collapse; 
-                        width: 100%; 
-                        background: white;
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                        font-size: 11px;
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                      }
-                      th, td { 
-                        border: 1px solid #d0d7de; 
-                        padding: 4px 8px; 
-                        text-align: left;
-                        vertical-align: top;
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        max-width: 200px;
-                      }
-                      th { 
-                        background: #f6f8fa; 
-                        font-weight: 600;
-                        position: sticky;
-                        top: 0;
-                        z-index: 10;
-                        font-size: 11px;
-                        color: #24292f;
-                      }
-                      tr:nth-child(even) { background: #f6f8fa; }
-                      tr:hover { background: #dbeafe; }
-                      td:hover {
-                        white-space: normal;
-                        word-wrap: break-word;
-                        max-width: none;
-                      }
-                    </style>
-                  </head>
-                  <body>
-                    <div class="header">
-                      <span class="filename">${file.file_name}</span>
-                      <button class="download-btn" onclick="window.open('${downloadUrl}', '_blank')">Download</button>
-                    </div>
-                    <div class="table-container">
-                      ${tableHtml}
-                    </div>
-                  </body>
-                </html>
-              `);
-              newWindow.document.close();
-            })
-            .catch(() => {
-              // If fetch fails, just open the URL directly
-              newWindow.location.href = fileUrl;
-            });
-        }
-      }
-      // For TXT files, display with proper formatting
-      else if (fileExtension === 'txt') {
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-          // Fetch the content and display it
-          fetch(fileUrl)
-            .then(response => response.text())
-            .then(content => {
-              newWindow.document.write(`
-                <html>
-                  <head>
-                    <title>${file.file_name}</title>
-                    <style>
-                      body { 
-                        font-family: system-ui, -apple-system, sans-serif; 
-                        padding: 0; 
-                        margin: 0;
-                      }
-                      .header { 
-                        background: #f8f9fa; 
-                        padding: 12px 20px; 
-                        border-bottom: 1px solid #e9ecef;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                      }
-                      .filename { font-weight: 600; color: #333; }
-                      .download-btn {
-                        background: #007bff;
-                        color: white;
-                        border: none;
-                        padding: 8px 16px;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 14px;
-                      }
-                      .download-btn:hover { background: #0056b3; }
-                      .content { 
-                        padding: 20px; 
-                        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; 
-                        white-space: pre-wrap; 
-                        line-height: 1.5;
-                        background: #f8f9fa;
-                        margin: 0;
-                      }
-                    </style>
-                  </head>
-                  <body>
-                    <div class="header">
-                      <span class="filename">${file.file_name}</span>
-                      <button class="download-btn" onclick="window.open('${downloadUrl}', '_blank')">Download</button>
-                    </div>
-                    <pre class="content">${content}</pre>
-                  </body>
-                </html>
-              `);
-              newWindow.document.close();
-            })
-            .catch(() => {
-              // If fetch fails, just open the URL directly
-              newWindow.location.href = fileUrl;
-            });
-        }
-      }
-      // For everything else, try direct open
-      else {
-        window.open(fileUrl, '_blank');
+      } else {
+        viewer.location.href = fileUrl;
       }
     } catch (error) {
       logger.error('Error getting file URL:', error);
@@ -1146,7 +889,7 @@ export const PropertyDetailsModal = ({
         <div className="flex-1 overflow-auto bg-gray-100" style={{
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}>
-          {['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension || '') ? (
+          {IMAGE_EXTENSIONS.has(fileExtension || '') ? (
             // Image viewer
             <div className="flex items-center justify-center min-h-full p-4">
               <Image
@@ -1182,11 +925,7 @@ export const PropertyDetailsModal = ({
             <div className="p-4">
               <div className="bg-white rounded-lg shadow-sm border overflow-auto">
                 {(() => {
-                  const lines = mobileFileViewer.content.split('\n').filter(line => line.trim());
-                  const headers = lines[0]?.split(',').map(h => h.trim().replace(/"/g, '')) || [];
-                  const rows = lines.slice(1).map(line => 
-                    line.split(',').map(cell => cell.trim().replace(/"/g, ''))
-                  );
+                  const [headers = [], ...rows] = parseCsv(mobileFileViewer.content);
 
                   return (
                     <table className="w-full text-sm">
@@ -1709,25 +1448,7 @@ export const PropertyDetailsModal = ({
                               <div className="relative flex items-center justify-end sm:col-span-2">
                                 <button
                                   className="tap-target rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex items-center justify-center flex-shrink-0"
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    closeMenus();
-                                    const newMenuId = folderMenuId === folder.id ? null : folder.id;
-                                    setFolderMenuId(newMenuId);
-                                    if (newMenuId) {
-                                      calculateMenuPosition(e.currentTarget, folder.id);
-                                    }
-                                  }}
-                                  onTouchEnd={e => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    closeMenus();
-                                    const newMenuId = folderMenuId === folder.id ? null : folder.id;
-                                    setFolderMenuId(newMenuId);
-                                    if (newMenuId) {
-                                      calculateMenuPosition(e.currentTarget, folder.id);
-                                    }
-                                  }}
+                                  {...menuTriggerProps('folder', folder.id)}
                                   title="Folder actions"
                                 >
                                   <svg className="w-5 h-5 sm:w-4 sm:h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1838,25 +1559,7 @@ export const PropertyDetailsModal = ({
                                 <span className="hidden sm:inline-block text-xs text-gray-500 mr-2">{formatFileSize(file.file_size)}</span>
                                 <button
                                   className="tap-target rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex items-center justify-center flex-shrink-0"
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    closeMenus();
-                                    const newMenuId = fileMenuId === file.id ? null : file.id;
-                                    setFileMenuId(newMenuId);
-                                    if (newMenuId) {
-                                      calculateMenuPosition(e.currentTarget, file.id);
-                                    }
-                                  }}
-                                  onTouchEnd={e => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    closeMenus();
-                                    const newMenuId = fileMenuId === file.id ? null : file.id;
-                                    setFileMenuId(newMenuId);
-                                    if (newMenuId) {
-                                      calculateMenuPosition(e.currentTarget, file.id);
-                                    }
-                                  }}
+                                  {...menuTriggerProps('file', file.id)}
                                   title="File actions"
                                 >
                                   <svg className="w-5 h-5 sm:w-4 sm:h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -1919,30 +1622,7 @@ export const PropertyDetailsModal = ({
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
                                   className="absolute -top-2 -right-2 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    e.preventDefault(); // Prevent double-tap zoom on mobile
-                                    // Close any open menus first
-                                    closeMenus();
-                                    // Then open this menu if not already open
-                                    const newMenuId = folderMenuId === folder.id ? null : folder.id;
-                                    setFolderMenuId(newMenuId);
-                                    if (newMenuId) {
-                                      calculateMenuPosition(e.currentTarget, folder.id);
-                                    }
-                                  }}
-                                  onTouchEnd={e => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    // Close any open menus first
-                                    closeMenus();
-                                    // Then open this menu if not already open
-                                    const newMenuId = folderMenuId === folder.id ? null : folder.id;
-                                    setFolderMenuId(newMenuId);
-                                    if (newMenuId) {
-                                      calculateMenuPosition(e.currentTarget, folder.id);
-                                    }
-                                  }}
+                                  {...menuTriggerProps('folder', folder.id)}
                                   style={{ 
                                     zIndex: 10,
                                     width: gridMenuButtonSize,
@@ -2048,30 +1728,7 @@ export const PropertyDetailsModal = ({
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
                                   className="absolute -top-2 -right-2 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    e.preventDefault(); // Prevent double-tap zoom on mobile
-                                    // Close any open menus first
-                                    closeMenus();
-                                    // Then open this menu if not already open
-                                    const newMenuId = fileMenuId === file.id ? null : file.id;
-                                    setFileMenuId(newMenuId);
-                                    if (newMenuId) {
-                                      calculateMenuPosition(e.currentTarget, file.id);
-                                    }
-                                  }}
-                                  onTouchEnd={e => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    // Close any open menus first
-                                    closeMenus();
-                                    // Then open this menu if not already open
-                                    const newMenuId = fileMenuId === file.id ? null : file.id;
-                                    setFileMenuId(newMenuId);
-                                    if (newMenuId) {
-                                      calculateMenuPosition(e.currentTarget, file.id);
-                                    }
-                                  }}
+                                  {...menuTriggerProps('file', file.id)}
                                   style={{ 
                                     zIndex: 10,
                                     width: gridMenuButtonSize,
@@ -2484,8 +2141,7 @@ export const PropertyDetailsModal = ({
               * users a clear "end of the line" indicator.
               */}
             {(() => {
-              const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
-              const imageFiles = files.filter(f => imageExts.includes(f.file_name.split('.').pop()?.toLowerCase() || ''));
+              const imageFiles = files.filter(f => IMAGE_EXTENSIONS.has(f.file_name.split('.').pop()?.toLowerCase() || ''));
               const idx = imageFiles.findIndex(f => f.id === imagePreview.file.id);
               const hasPrev = idx > 0;
               const hasNext = idx >= 0 && idx < imageFiles.length - 1;

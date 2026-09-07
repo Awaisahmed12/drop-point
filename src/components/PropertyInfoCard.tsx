@@ -1,14 +1,13 @@
 import { logger } from '../utils/logger';
 import { useState, useRef, useEffect } from 'react';
 import type { Property } from '../../types';
+import { propertyService } from '../services';
 
 interface PropertyInfoCardProps {
   address: string;
   addressLoading: boolean;
   property?: Property | null;
   onSelect: () => void;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
   onClose?: () => void;
   /** Fires on pointerdown of the close button — before the click event in
    *  the same gesture. Lets the parent pre-emptively suppress map-level
@@ -26,8 +25,6 @@ export const PropertyInfoCard = ({
   addressLoading, 
   property,
   onSelect, 
-  onMouseEnter, 
-  onMouseLeave,
   onClose,
   onCloseStart,
   onPropertyUpdate,
@@ -82,20 +79,8 @@ export const PropertyInfoCard = ({
     setIsSaving(true);
     try {
       if (property?.id && onPropertyUpdate) {
-        // Saved property - update in database
-        const { supabase } = await import('../utils/supabaseClient');
-        const { error } = await supabase
-          .from('properties')
-          .update({ label: customName.trim() || null })
-          .eq('id', property.id);
-
-        if (error) {
-          logger.error('Error updating property label:', error);
-          return;
-        }
-
-        // Update the property object
-        const updatedProperty = { ...property, label: customName.trim() || null };
+        // Saved property - persist the label
+        const updatedProperty = await propertyService.updateProperty(property.id, { label: customName.trim() || null });
         onPropertyUpdate(updatedProperty);
       } else {
         // Unsaved property - automatically save it when renamed
@@ -138,8 +123,6 @@ export const PropertyInfoCard = ({
       <div 
         ref={cardRef}
         className="bg-white rounded-2xl shadow-xl p-4 flex flex-col gap-3 border border-gray-200 animate-fade-in relative"
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
       >
         {onClose && !isEditing && (
           <button
@@ -269,12 +252,10 @@ export const PropertyInfoCard = ({
         </div>
         <button
           className="w-full bg-blue-600 text-white py-3 rounded-2xl font-semibold text-[15px] shadow-sm hover:bg-blue-700 active:bg-blue-800 active:scale-[0.98] transition-all disabled:opacity-60 cursor-pointer"
-          disabled={addressLoading || !address || address === 'No address found' || address === 'Error fetching address'}
-          onClick={() => {
-            onSelect();
-          }}
+          disabled={addressLoading || !address}
+          onClick={onSelect}
         >
-          {property?.id ? 'Open' : 'Select Location'}
+          {property?.id ? 'Open' : 'Add Property'}
         </button>
       </div>
     </div>

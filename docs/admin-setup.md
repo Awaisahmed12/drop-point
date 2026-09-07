@@ -28,7 +28,7 @@ WHERE user_id = (
 1. Log in to your account.
 2. Go to `/account`.
 3. Set user type to `Admin` and save.
-4. Open the "Admin Tools" section to access `/admin/config`.
+4. Open the "Admin" section to access `/admin`.
 
 ### Adding new configurations
 
@@ -41,7 +41,7 @@ VALUES ('your_config_key', 'default_value', 'What this config does', 'category')
 
 2. Update types in `types/index.ts`.
 3. Add computed values in `src/contexts/ConfigContext.tsx`.
-4. Add UI in `src/pages/admin/config.tsx`.
+4. Add UI in `src/pages/admin.tsx`.
 
 ### Security
 

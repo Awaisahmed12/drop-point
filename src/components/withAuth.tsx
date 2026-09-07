@@ -16,6 +16,9 @@ export function withAuth<P extends object>(
 
   return function AuthenticatedComponent(props: P) {
     const router = useRouter();
+    // Stay on the spinner until the session check says this page may render;
+    // a page that is about to be redirected away must never mount (it would
+    // kick off data fetches that fail with "not authenticated").
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -25,21 +28,21 @@ export function withAuth<P extends object>(
           const authenticated = !!session;
 
           if (requireAuth && !authenticated) {
-            // User needs to be authenticated but isn't - redirect to login
             router.replace('/');
             return;
-          } else if (!requireAuth && authenticated) {
-            // User is authenticated but shouldn't be on this page (e.g., login page)
+          }
+          if (!requireAuth && authenticated) {
             router.replace('/map');
             return;
           }
+          setIsLoading(false);
         } catch (error) {
           logger.error('Auth check error:', error);
           if (requireAuth) {
             router.replace('/');
+          } else {
+            setIsLoading(false);
           }
-        } finally {
-          setIsLoading(false);
         }
       };
 

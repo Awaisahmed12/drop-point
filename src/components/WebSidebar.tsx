@@ -18,11 +18,11 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState(false);
 
-  // Persist collapsed state
+  // Restore after mount so the server-rendered markup matches the first client render.
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('droppoint-sidebar-collapsed');
-      if (stored === '1') setCollapsed(true);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe read of a persisted preference
+      if (localStorage.getItem('droppoint-sidebar-collapsed') === '1') setCollapsed(true);
     } catch {}
   }, []);
 

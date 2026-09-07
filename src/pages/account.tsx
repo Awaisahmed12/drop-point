@@ -222,7 +222,6 @@ function AccountPage() {
                     onClick={async () => {
                       try {
                         try { sessionStorage.removeItem('droppoint-map-position'); } catch {}
-                        try { sessionStorage.removeItem('droppoint-selected-property'); } catch {}
                         try { sessionStorage.removeItem('droppoint-properties-cache'); } catch {}
                         await supabase.auth.signOut();
                       } finally {
