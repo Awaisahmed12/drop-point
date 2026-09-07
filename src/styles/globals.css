@@ -1,499 +1,367 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   DropPoint design tokens — an iOS system look.
+
+   The app should feel like a native iPhone app when added to the home screen:
+   San Francisco type via the system stack, the iOS grouped palette, hairline
+   separators, inset grouped lists, a translucent tab bar, sheets that rise
+   from the bottom, and one blue accent. Everything else stays quiet.
+   ============================================================================ */
+
+@theme {
+  --color-ground: #f2f2f7;          /* iOS grouped background */
+  --color-surface: #ffffff;         /* cards, sheets, bars */
+  --color-surface-2: #e5e5ea;       /* pressed rows, segmented track, thumbs */
+  --color-fill: #78788033;          /* iOS tertiary fill (search field) */
+  --color-ink: #1c1c1e;             /* primary label */
+  --color-ink-2: #8e8e93;           /* secondary label */
+  --color-ink-3: #c7c7cc;           /* tertiary label, chevrons */
+  --color-hairline: #c6c6c8;        /* separators */
+  --color-accent: #0a7aff;          /* the one accent: pins, primary buttons, links */
+  --color-accent-soft: #e5f0ff;
+  --color-danger: #ff3b30;
+  --color-success: #34c759;
+  --color-warning: #ff9500;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+
+  /* iOS Human Interface Guidelines type scale */
+  --text-large-title: 34px;
+  --text-large-title--line-height: 41px;
+  --text-large-title--letter-spacing: 0.37px;
+  --text-title-1: 28px;
+  --text-title-1--line-height: 34px;
+  --text-title-2: 22px;
+  --text-title-2--line-height: 28px;
+  --text-title-3: 20px;
+  --text-title-3--line-height: 25px;
+  --text-headline: 17px;
+  --text-headline--line-height: 22px;
+  --text-body: 17px;
+  --text-body--line-height: 22px;
+  --text-callout: 16px;
+  --text-callout--line-height: 21px;
+  --text-subhead: 15px;
+  --text-subhead--line-height: 20px;
+  --text-footnote: 13px;
+  --text-footnote--line-height: 18px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption-2: 11px;
+  --text-caption-2--line-height: 13px;
+
+  --radius-row: 10px;               /* grouped list corners */
+  --radius-sheet: 12px;             /* sheet / card corners */
+  --radius-button: 12px;
+
+  --shadow-sheet: 0 -1px 0 rgba(0, 0, 0, 0.04), 0 -8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-float: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+/* Native metrics: iOS tab bar 49pt, nav bar 44pt, 50pt primary buttons. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --tabbar-height: 49px;
+  --navbar-height: 44px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --tabbar-total: calc(var(--tabbar-height) + var(--safe-bottom));
+  --hairline: 0.5px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* (Removed) pulsing animation previously used for live location dot */
-
-/* ================================
-   MOBILE VIEWPORT OPTIMIZATIONS
-   ================================ */
-
-/* Dynamic viewport height support for modern browsers */
-@supports (height: 100dvh) {
-  .mobile-modal {
-    height: 100dvh;
-    max-height: 100dvh;
-  }
-  
-  .mobile-full-height {
-    min-height: 100dvh;
-    height: 100dvh;
-  }
-  
-  .mobile-viewport-fix {
-    height: 100dvh;
-    max-height: 100dvh;
-    position: relative;
-  }
-
-  .mobile-container {
-    min-height: 100dvh;
-  }
-}
-
-/* Fallback for older browsers */
-@supports not (height: 100dvh) {
-  .mobile-modal {
-    height: 100vh;
-    max-height: 100vh;
-  }
-  
-  .mobile-full-height {
-    min-height: 100vh;
-    height: 100vh;
-  }
-  
-  .mobile-viewport-fix {
-    height: 100vh;
-    max-height: 100vh;
-    position: relative;
-  }
-
-  .mobile-container {
-    min-height: 100vh;
-  }
-}
-
-/* Safe area insets for devices with notches/dynamic islands */
-.mobile-safe-area {
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
-}
-
-.mobile-safe-area-top {
-  padding-top: env(safe-area-inset-top, 0px);
-}
-
-.mobile-safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-.mobile-safe-area-sides {
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
-}
-
-/* Mobile-optimized modal positioning */
-.mobile-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  justify-content: center;
-}
-
-/* Desktop: center modals */
-@media (min-width: 769px) {
-  .mobile-modal-overlay {
-    align-items: center;
-  }
-}
-
-/* Mobile: align to top with safe areas */
-@media (max-width: 768px) {
-  .mobile-modal-overlay {
-    align-items: flex-start;
-    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-  }
-
-  .mobile-modal-content {
-    margin-top: 20px;
-    margin-bottom: 20px;
-    margin-left: 10px;
-    margin-right: 10px;
-    max-width: calc(100vw - 20px);
-    max-height: calc(100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 20px));
-  }
-}
-
-/* Prevent zoom on mobile inputs */
-@media screen and (max-width: 768px) {
-  input[type="text"],
-  input[type="search"],
-  input[type="email"],
-  input[type="password"],
-  input[type="tel"],
-  input[type="url"],
-  input[type="number"],
-  textarea,
-  select {
-    font-size: 16px !important; /* Prevents iOS zoom on focus */
-  }
-
-  /* Optimize text size for mobile readability */
-  .mobile-text-optimize {
-    font-size: 16px;
-    line-height: 1.5;
-  }
-}
-
-/* Prevent overscroll bounce on iOS and improve performance */
-body {
+  /* App-like: no rubber-band, no pull-to-refresh, no long-press callouts. */
   overscroll-behavior: none;
-  -webkit-overflow-scrolling: touch;
-  
-  /* Disable pull-to-refresh on mobile */
-  overscroll-behavior-y: contain;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Mobile scroll optimization */
+/* Text can still be selected inside inputs and content areas. */
+input, textarea, [contenteditable], .selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Standalone (home-screen) mode: the page is the app, nothing scrolls under the chrome. */
+@media (display-mode: standalone) {
+  body { overscroll-behavior-y: none; }
+}
+
+/* ----------------------------------------------------------------------------
+   Viewport helpers used by page shells
+   ---------------------------------------------------------------------------- */
+
+.mobile-viewport-fix {
+  height: 100dvh;
+  max-height: 100dvh;
+  position: relative;
+}
+
+.mobile-safe-area {
+  padding-top: var(--safe-top);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
 .mobile-scroll {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
 
-/* Better mobile tap highlighting */
-* {
-  -webkit-tap-highlight-color: transparent;
+/* Space for the tab bar on scrolling pages (mobile only). */
+@media (max-width: 639px) {
+  .pb-tabbar { padding-bottom: calc(var(--tabbar-total) + 16px); }
 }
 
-/* Mobile-specific utilities */
-@media (max-width: 768px) {
-  .mobile-only {
-    display: block !important;
-  }
-  
-  .desktop-only {
-    display: none !important;
-  }
-
-  /* Mobile page container */
-  .mobile-page {
-    height: 100dvh;
-    max-height: 100dvh;
-    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-  }
-
-  /* Mobile content area with safe spacing */
-  .mobile-content {
-    padding-bottom: env(safe-area-inset-bottom, 20px);
-  }
-
-  /* Mobile sticky elements that respect safe areas */
-  .mobile-sticky-top {
-    position: sticky;
-    top: env(safe-area-inset-top, 0px);
-    z-index: 50;
-  }
-
-  .mobile-sticky-bottom {
-    position: sticky;
-    bottom: env(safe-area-inset-bottom, 0px);
-    z-index: 50;
-  }
+/* iOS never zooms an input whose font is at least 16px. */
+@media (max-width: 639px) {
+  input, textarea, select { font-size: 16px !important; }
 }
 
-@media (min-width: 769px) {
-  .mobile-only {
-    display: none !important;
-  }
-  
-  .desktop-only {
-    display: block !important;
-  }
+/* ----------------------------------------------------------------------------
+   iOS components
+   ---------------------------------------------------------------------------- */
+
+/* Large title: the screen's name, left aligned, sits above the content. */
+.ios-large-title {
+  font-size: var(--text-large-title);
+  line-height: var(--text-large-title--line-height);
+  letter-spacing: var(--text-large-title--letter-spacing);
+  font-weight: 700;
+  color: var(--color-ink);
 }
 
-/* ================================
-   PERFORMANCE OPTIMIZATIONS
-   ================================ */
-
-/* GPU acceleration for smooth animations */
-.mobile-accelerated {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  perspective: 1000px;
+/* Inset grouped list. Rows are separated by hairlines that stop at the
+   text edge, like Settings. */
+.ios-group {
+  background: var(--color-surface);
+  border-radius: var(--radius-row);
+  overflow: hidden;
 }
 
-/* Optimize scrolling performance */
-.optimize-scroll {
-  -webkit-overflow-scrolling: touch;
-  overflow-scrolling: touch;
-  transform: translateZ(0);
+.ios-group-label {
+  font-size: var(--text-footnote);
+  line-height: var(--text-footnote--line-height);
+  color: var(--color-ink-2);
+  padding: 0 16px 6px;
 }
 
-/* ================================
-   EXISTING STYLES
-   ================================ */
-
-/* Improved modal positioning */
-.modal-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+.ios-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 40;
-}
-
-@media (max-width: 768px) {
-  .modal-container {
-    align-items: flex-start;
-    padding: 0;
-  }
-}
-
-/* Enhanced typography for property header */
-.property-header {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.property-title {
-  color: #111827;
-}
-
-.property-location {
-  color: #6b7280;
-  text-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.02);
-}
-
-/* Refined close button */
-.close-button {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(229, 231, 235, 0.4);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.close-button:hover {
-  background: rgba(249, 250, 251, 0.9);
-  border-color: rgba(209, 213, 219, 0.6);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transform: translateY(-0.5px);
-}
-
-/* Better modal header styling */
-.modal-header-refined {
-  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
-  border-bottom: 1px solid rgba(229, 231, 235, 0.6);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-}
-
-/* Better scrollbar styling on webkit browsers */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 99px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
-}
-
-/* Animation classes */
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.2s ease-out;
-}
-
-/* ================================
-   GLOBAL CURSOR POINTER RULES
-   ================================ */
-
-/* Apply pointer cursor to all standard clickable elements */
-button,
-a,
-[role="button"],
-[role="link"],
-.cursor-pointer,
-[onClick],
-input[type="button"],
-input[type="submit"],
-input[type="reset"],
-input[type="checkbox"],
-input[type="radio"],
-select,
-label,
-summary {
-  cursor: pointer !important;
-}
-
-/* ================================
-   GHOST-CLICK PREVENTION
-   ================================ */
-
-/*
- * touch-action: manipulation tells the browser to handle panning and pinch-
- * zoom natively but to NOT wait for a double-tap to recognise a tap as a
- * click. This eliminates the 300 ms synthetic-click delay on touch devices,
- * which in turn eliminates the "ghost click" timing window where an element
- * disappears between touchend and the delayed synthetic click landing on
- * whatever is now underneath.
- */
-button,
-a,
-[role="button"],
-input[type="button"],
-input[type="submit"],
-input[type="reset"],
-input[type="checkbox"],
-input[type="radio"],
-select,
-label,
-summary,
-.cursor-pointer {
-  touch-action: manipulation;
-}
-
-/* Apply pointer cursor to elements with click handlers */
-[onclick] {
-  cursor: pointer !important;
-}
-
-/* Apply pointer cursor to common interactive classes */
-.hover\:bg-gray-100,
-.hover\:bg-gray-50,
-.hover\:bg-blue-50,
-.hover\:bg-blue-100,
-.hover\:bg-red-50,
-.hover\:bg-green-50,
-.hover\:text-blue-600,
-.hover\:text-blue-700,
-.hover\:text-gray-700,
-.hover\:shadow,
-.hover\:shadow-sm,
-.hover\:shadow-lg,
-.transition-colors,
-.group:hover {
-  cursor: pointer !important;
-}
-
-/* Specific overrides for our app's clickable patterns */
-.file-list [style*="cursor: pointer"],
-.property-title,
-.property-location,
-.close-button,
-div[onClick],
-span[onClick] {
-  cursor: pointer !important;
-}
-
-/* Ensure disabled elements don't show pointer */
-button:disabled,
-[disabled],
-.cursor-not-allowed,
-.opacity-50:disabled {
-  cursor: not-allowed !important;
-}
-
-/* Text cursor for inputs and text areas */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="search"],
-textarea,
-[contenteditable="true"] {
-  cursor: text !important;
-}
-
-/* ================================
-   TEXT COLOR STANDARDS
-   ================================ */
-
-/* Ensure inputs always have proper text and placeholder colors by default */
-input[type="text"]:not([class*="text-"]),
-input[type="email"]:not([class*="text-"]),
-input[type="password"]:not([class*="text-"]),
-input[type="search"]:not([class*="text-"]),
-input[type="number"]:not([class*="text-"]),
-input[type="tel"]:not([class*="text-"]),
-input[type="url"]:not([class*="text-"]),
-textarea:not([class*="text-"]) {
-  /* Default to high-contrast text if no explicit text color class */
-  color: #111827; /* gray-900 */
-}
-
-/* Ensure placeholders are always visible - WCAG AA compliant */
-input::placeholder,
-textarea::placeholder {
-  color: #6b7280; /* gray-500 - ensures good contrast */
-  opacity: 1;
-}
-
-/* Safety net: Prevent white/light text on light backgrounds */
-input[type="text"][class*="text-white"],
-input[type="email"][class*="text-white"],
-input[type="password"][class*="text-white"],
-input[type="search"][class*="text-white"],
-input[type="number"][class*="text-white"],
-input[type="tel"][class*="text-white"],
-input[type="url"][class*="text-white"],
-textarea[class*="text-white"] {
-  color: #111827 !important; /* Force dark text for accessibility */
-}
-
-/* Prevent light placeholder colors that would be invisible */
-input[class*="placeholder:text-white"]::placeholder,
-input[class*="placeholder:text-gray-100"]::placeholder,
-input[class*="placeholder:text-gray-200"]::placeholder,
-input[class*="placeholder:text-gray-300"]::placeholder,
-textarea[class*="placeholder:text-white"]::placeholder,
-textarea[class*="placeholder:text-gray-100"]::placeholder,
-textarea[class*="placeholder:text-gray-200"]::placeholder,
-textarea[class*="placeholder:text-gray-300"]::placeholder {
-  color: #6b7280 !important; /* gray-500 - ensure visibility */
-  opacity: 1 !important;
-}
-
-/* ---------------------------------------------------------------------------
- * Tap-target utility
- *
- * Enforces a 44x44 minimum interactive area on mobile per Apple HIG / WCAG
- * 2.5.5. Icon buttons (kebab menus, FAB triggers, close buttons) tend to
- * shrink to fit a 16-20px icon; the visible chrome can stay small but the
- * actual hit region needs to be at least 44px wide and tall, or first-tap
- * activation gets unreliable on phones.
- *
- * Use with `flex items-center justify-center` to center the icon inside
- * the enlarged hit area. Desktop pointers don't need this, but enforcing it
- * unconditionally also gives keyboard focus rings a sensible size.
- * --------------------------------------------------------------------------- */
-.tap-target {
-  min-width: 44px;
+  gap: 12px;
   min-height: 44px;
+  padding: 10px 16px;
+  color: var(--color-ink);
+  position: relative;
+  text-align: left;
+  width: 100%;
 }
+
+.ios-row + .ios-row::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 0;
+  top: 0;
+  height: var(--hairline);
+  background: var(--color-hairline);
+}
+
+.ios-row.has-leading + .ios-row.has-leading::before { left: 60px; }
+
+.ios-row-press:active { background: var(--color-surface-2); }
+
+.ios-chevron {
+  color: var(--color-ink-3);
+  flex-shrink: 0;
+}
+
+/* Search field: the gray pill from Mail / Files. */
+.ios-search {
+  background: var(--color-fill);
+  border-radius: 10px;
+  height: 36px;
+  padding-left: 32px;
+  padding-right: 32px;
+  font-size: var(--text-body);
+  color: var(--color-ink);
+  width: 100%;
+  border: 0;
+}
+.ios-search::placeholder { color: var(--color-ink-2); }
+.ios-search:focus { outline: none; background: #7878803f; }
+
+/* Segmented control: gray track, white sliding thumb. */
+.ios-segmented {
+  display: inline-flex;
+  background: var(--color-surface-2);
+  border-radius: 9px;
+  padding: 2px;
+  gap: 2px;
+}
+.ios-segment {
+  font-size: var(--text-footnote);
+  font-weight: 600;
+  line-height: 18px;
+  padding: 6px 14px;
+  border-radius: 7px;
+  color: var(--color-ink);
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+.ios-segment[aria-pressed="true"] {
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+/* Buttons: one filled primary per screen; secondary is tinted. */
+.ios-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+  padding: 0 20px;
+  border-radius: var(--radius-button);
+  font-size: var(--text-headline);
+  font-weight: 600;
+  width: 100%;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.ios-button:active { opacity: 0.8; transform: scale(0.99); }
+.ios-button:disabled { opacity: 0.4; transform: none; }
+.ios-button-primary { background: var(--color-accent); color: #fff; }
+.ios-button-tinted { background: var(--color-accent-soft); color: var(--color-accent); }
+.ios-button-plain { background: transparent; color: var(--color-accent); height: 44px; width: auto; padding: 0 8px; }
+
+/* Text field inside a grouped list. */
+.ios-field {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  font-size: var(--text-body);
+  color: var(--color-ink);
+  background: transparent;
+  border: 0;
+}
+.ios-field::placeholder { color: var(--color-ink-3); }
+.ios-field:focus { outline: none; }
+
+/* Nav bar for sheets: 44pt, title centered, one control per side. */
+.ios-navbar {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  min-height: var(--navbar-height);
+  padding: 6px 8px 4px;
+}
+
+/* Sheets rise from the bottom with a grabber. */
+.ios-sheet {
+  background: var(--color-surface);
+  border-top-left-radius: var(--radius-sheet);
+  border-top-right-radius: var(--radius-sheet);
+  box-shadow: var(--shadow-sheet);
+}
+.ios-grabber {
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--color-ink-3);
+  margin: 6px auto 2px;
+}
+
+/* Circular "close" glyph button (iOS 15+ sheets). */
+.ios-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  color: var(--color-ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ios-close:active { opacity: 0.7; }
+
+/* Floating map controls. */
+.ios-float {
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: var(--shadow-float);
+}
+
+/* Tab bar. */
+.ios-tabbar {
+  background: rgba(249, 249, 249, 0.94);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-top: var(--hairline) solid var(--color-hairline);
+}
+
+/* Interactive states: touch gets press states, not hover. */
+.ios-press { transition: opacity 120ms ease; }
+.ios-press:active { opacity: 0.55; }
+
+/* Minimum 44pt hit area for icon buttons. */
+.tap-target { min-width: 44px; min-height: 44px; }
+
+/* Enter animations: only for things the user just opened. */
+@keyframes sheet-up {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-sheet-up { animation: sheet-up 280ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.animate-fade-in { animation: fade-in 180ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-up, .animate-fade-in { animation: none; }
+  .ios-segment, .ios-button, .ios-press { transition: none; }
+}
+
+/* Keyboard focus is visible on controls; text fields show focus by their own styling. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+:focus:not(:focus-visible),
+input:focus-visible,
+textarea:focus-visible { outline: none; }
+
+/* Our own clear button replaces the browser's search cancel glyph. */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+
+/* Slim scrollbars on desktop. */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 99px; }
+
+/* Desktop: pointer users still get a cursor and a light hover on rows. */
+@media (hover: hover) {
+  button, a, [role="button"], [role="option"], [role="menuitem"], label, summary { cursor: pointer; }
+  button:disabled, [disabled] { cursor: not-allowed; }
+  .ios-row-press:hover { background: #f5f5f7; }
+}
+
+/* Every pointer-driven element is safe from the 300 ms tap delay. */
+button, a, [role="button"], input, label, summary { touch-action: manipulation; }

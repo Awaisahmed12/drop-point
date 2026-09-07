@@ -119,6 +119,8 @@ export const MapSearch = ({
     updateShowDropdown(false);
     onPredictionsChange([]);
     setSelectedIndex(0);
+    // Drop the keyboard so the property card has the screen.
+    inputRef.current?.blur();
     onPlaceSelect(prediction);
     setTimeout(() => { justSelectedRef.current = false; }, 100);
   }, [predictions, onInputChange, updateShowDropdown, onPredictionsChange, onPlaceSelect]);
@@ -193,13 +195,10 @@ export const MapSearch = ({
       id="map-search-listbox"
       role="listbox"
       aria-label="Search results"
-      className="absolute z-30 w-full bg-white rounded-2xl shadow-2xl mt-2 overflow-hidden"
-      style={{ boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)' }}
+      className="absolute z-30 w-full ios-float rounded-[12px] mt-2 overflow-hidden"
     >
       {showSectionLabel && (
-        <div className="px-4 pt-3 pb-1">
-          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Recent</span>
-        </div>
+        <div className="px-4 pt-2.5 pb-1 text-footnote text-ink-2">Recent</div>
       )}
       {predictions.map((prediction, i) => {
         const isOwned = isUserProperty(prediction);
@@ -221,9 +220,7 @@ export const MapSearch = ({
             role="option"
             aria-selected={isSelected}
             id={`map-search-option-${i}`}
-            className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-100 ${
-              isSelected ? 'bg-gray-50' : 'hover:bg-gray-50'
-            }`}
+            className={`flex items-center gap-3 px-4 min-h-[52px] py-2 ${isSelected ? 'bg-surface-2/70' : ''}`}
             onPointerDown={(e) => {
               e.preventDefault();
               selectPrediction(i);
@@ -232,14 +229,14 @@ export const MapSearch = ({
           >
             {/* Icon */}
             <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-              isOwned ? 'bg-blue-100' : 'bg-gray-100'
+              isOwned ? 'bg-accent-soft' : 'bg-surface-2'
             }`}>
               {isOwned ? (
-                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-ink-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                 </svg>
@@ -248,19 +245,15 @@ export const MapSearch = ({
 
             {/* Text */}
             <div className="flex-1 min-w-0">
-              <div className={`text-sm font-medium truncate ${isOwned ? 'text-gray-900' : 'text-gray-800'}`}>
-                {mainText}
-              </div>
+              <div className="text-subhead font-medium truncate text-ink">{mainText}</div>
               {secondaryText && (
-                <div className="text-xs text-gray-500 truncate mt-0.5">{secondaryText}</div>
+                <div className="text-footnote text-ink-2 truncate">{secondaryText}</div>
               )}
             </div>
 
             {/* Badge for saved properties */}
             {isOwned && (
-              <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex-shrink-0">
-                Saved
-              </span>
+              <span className="text-caption font-medium text-accent bg-accent-soft px-2 py-0.5 rounded-full flex-shrink-0">Saved</span>
             )}
           </div>
         );
@@ -269,14 +262,14 @@ export const MapSearch = ({
   ) : null;
 
   return (
-    <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 w-full max-w-xl sm:max-w-2xl px-4">
+    <div className="absolute left-1/2 -translate-x-1/2 z-30 w-full max-w-xl sm:max-w-2xl px-3 sm:px-4" style={{ top: 'calc(var(--safe-top) + 12px)' }}>
       <div className="relative w-full">
         {/* Search bar */}
         <div className="relative flex items-center">
           {/* Search icon */}
           <svg
-            className="absolute left-4 w-5 h-5 text-gray-400 pointer-events-none"
-            fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+            className="absolute left-3.5 z-10 w-[18px] h-[18px] text-ink-2 pointer-events-none"
+            fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
           >
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.35-4.35" />
@@ -291,15 +284,15 @@ export const MapSearch = ({
             onFocus={handleFocus}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            placeholder="Search address or property…"
+            placeholder="Search for an address or property"
             // Placeholders disappear once the user types — explicit aria-label
             // gives screen readers a stable name.
             aria-label="Search address or saved property"
             aria-autocomplete="list"
             aria-expanded={showDropdown && predictions.length > 0}
             aria-controls="map-search-listbox"
-            className="w-full pl-11 pr-10 py-3 rounded-full bg-white text-gray-900 text-sm font-medium placeholder:text-gray-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
-            style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.06)' }}
+            className="ios-float w-full h-11 pl-10 pr-10 rounded-[12px] text-body text-ink placeholder:text-ink-2 focus:outline-none"
+
             autoComplete="off"
           />
 
@@ -307,7 +300,7 @@ export const MapSearch = ({
           {inputValue && (
             <button
               type="button"
-              className="absolute right-3 w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700 active:scale-95 transition-all"
+              className="absolute right-3 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-ink-3 text-white ios-press"
               onClick={handleClear}
               aria-label="Clear search"
             >

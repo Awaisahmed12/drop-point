@@ -74,15 +74,15 @@ function ListPage() {
     }
   }, [showToast]);
 
-  const renameProperty = useCallback(async (property: PropertyWithFileCount, label: string) => {
+  const renameProperty = useCallback(async (property: Property, label: string | null) => {
     if (!property.id) return;
-    await propertyService.updateProperty(property.id, { label: label.trim() || null });
+    const updated = await propertyService.updateProperty(property.id, { label });
+    setSavedProperty(toProperty(updated));
     await refreshProperties();
-    showToast('Property renamed', 'success');
-  }, [refreshProperties, showToast]);
+  }, [refreshProperties]);
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-dvh bg-ground">
       <Head>
         <title>Properties - DropPoint</title>
       </Head>
@@ -97,7 +97,6 @@ function ListPage() {
           loading={propertiesLoading}
           error={propertiesError}
           onPropertySelect={openProperty}
-          onRenameProperty={renameProperty}
         />
       </div>
       <PropertyDetailsModal
@@ -120,6 +119,7 @@ function ListPage() {
         onFolderDelete={fileActions.deleteFolder}
         pendingUploads={fileActions.pendingUploads}
         onDismiss={fileActions.dismissPendingUpload}
+        onPropertyRename={renameProperty}
         onPropertySwitch={(property, newFiles, newFolders) => {
           setSavedProperty(toProperty(property));
           setFiles(newFiles);

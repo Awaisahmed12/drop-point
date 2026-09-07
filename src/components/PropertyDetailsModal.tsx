@@ -22,6 +22,7 @@ import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
 import { getFileSignedUrl } from '../utils/supabaseClient';
 import { FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
+import { ActionSheet, type ActionSheetItem } from './ActionSheet';
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']);
 const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']);
@@ -105,6 +106,8 @@ interface PropertyDetailsModalProps {
   // Property switching
   onPropertySwitch?: (property: PropertyWithFileCount, files: PropertyFile[], folders: PropertyFolder[]) => void;
   onMapMove?: (lat: number, lng: number) => void;
+  /** Rename the open property (null clears the custom name). */
+  onPropertyRename?: (property: Property, label: string | null) => Promise<void>;
 }
 
 export const PropertyDetailsModal = ({ 
@@ -128,7 +131,8 @@ export const PropertyDetailsModal = ({
   pendingUploads,
   onDismiss,
   onPropertySwitch,
-  onMapMove
+  onMapMove,
+  onPropertyRename,
 }: PropertyDetailsModalProps) => {
   const { showToast } = useToast();
 
@@ -147,10 +151,14 @@ export const PropertyDetailsModal = ({
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchQuery, setSearchQuery] = useState('');
-  const [switchingProperty, setSwitchingProperty] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [imagePreview, setImagePreview] = useState<{ url: string; file: PropertyFile } | null>(null);
   const [fabOpen, setFabOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [renamingProperty, setRenamingProperty] = useState(false);
+  const [propertyLabelDraft, setPropertyLabelDraft] = useState('');
+  const renameCancelledRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Internal drag state for moving files between folders. Distinct from the
@@ -322,7 +330,7 @@ export const PropertyDetailsModal = ({
   });
 
   // Use global mobile viewport hook
-  const { isMobile, getModalDimensions, mobileClasses } = useMobileViewport();
+  const { isMobile } = useMobileViewport();
 
   // Configuration hook
   const { streetViewEnabled, propertyImageEnabled } = useConfig();
@@ -335,7 +343,6 @@ export const PropertyDetailsModal = ({
       setSearchQuery('');
       onPropertySwitch?.(property, files, folders);
     },
-    onLoadingStateChange: setSwitchingProperty,
     onError: (error) => {
       logger.error('Property switch error:', error);
       showToast('Could not switch property. Please try again.');
@@ -548,13 +555,7 @@ export const PropertyDetailsModal = ({
   
   
   // Responsive values
-  const titleSize = useResponsiveValue('text-base', 'text-xl');
-  const locationSize = useResponsiveValue('text-xs', 'text-base');
-  const buttonPadding = useResponsiveValue('p-2', 'p-2.5');
-  const iconSize = useResponsiveValue('w-4 h-4', 'w-5 h-5');
   const headerHeight = useResponsiveValue('h-28', 'h-32');
-  const searchPadding = useResponsiveValue('px-4 py-2.5 text-base', 'px-4 py-2 text-sm');
-  const searchIconPos = useResponsiveValue('top-2.5 w-5 h-5', 'top-2.5 w-4 h-4');
   const tableHeaderPadding = useResponsiveValue('py-3', 'py-2');
   const listItemPadding = useResponsiveValue('px-4 py-2.5', 'px-3 py-3');
   const listIconSize = useResponsiveValue(32, 28);
@@ -565,7 +566,7 @@ export const PropertyDetailsModal = ({
   // still respects card padding while getting closer to the WCAG minimum.
   // A long-press gesture on the card body is the proper fix and is tracked
   // alongside multi-select (out of scope for this pass).
-  const gridMenuButtonSize = '36px';
+  const gridMenuButtonSize = '30px';
 
   // Sorting logic - Folders first, then files (standard document management practice)
   const sortedItems = useMemo(() => {
@@ -992,123 +993,126 @@ export const PropertyDetailsModal = ({
     breadcrumbPath.unshift(current);
   }
 
-  const toggleViewMode = () => {
-    const newMode = viewMode === 'list' ? 'grid' : 'list';
-    setViewMode(newMode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('droppoint-view-mode', newMode);
+  const toggleViewMode = () => setViewMode(viewMode === 'list' ? 'grid' : 'list');
+
+  const closeSheet = () => {
+    onClose();
+    setCreatingFolder(false);
+    setSearchQuery('');
+    setRenamingProperty(false);
+  };
+
+  const cancelCreateFolder = () => {
+    setCreatingFolder(false);
+    setNewFolderName('');
+    setFolderErrorPopup(null);
+  };
+
+  const commitPropertyRename = async () => {
+    setRenamingProperty(false);
+    const label = propertyLabelDraft.trim() || null;
+    if (!onPropertyRename || label === (property.label ?? null)) return;
+    try {
+      await onPropertyRename(property, label);
+      showToast(label ? 'Renamed' : 'Name removed', 'success');
+    } catch (error) {
+      logger.error('Rename property failed:', error);
+      showToast('Couldn’t rename this property. Please try again.');
     }
   };
 
+  const headerSubtitle = showRealAddress
+    ? [streetAddress, locationInfo].filter(Boolean).join(', ')
+    : locationInfo;
+
+  // Everything that isn't browsing files lives behind one "more" control.
+  const moreGroups: ActionSheetItem[][] = [
+    [
+      { label: 'Switch property', onSelect: () => setSwitcherOpen(true) },
+      { label: viewMode === 'list' ? 'Show as grid' : 'Show as list', onSelect: toggleViewMode },
+    ],
+    [
+      ...(onPropertyRename
+        ? [{
+            label: property.label ? 'Rename' : 'Add a name',
+            onSelect: () => { setPropertyLabelDraft(property.label || ''); setRenamingProperty(true); },
+          }]
+        : []),
+      {
+        label: 'Copy address',
+        onSelect: () =>
+          navigator.clipboard.writeText(property.address)
+            .then(() => showToast('Address copied', 'success'))
+            .catch(() => showToast('Couldn’t copy the address.')),
+      },
+    ],
+  ];
+
   return (
     <div
-      className={`fixed inset-0 z-40 flex ${mobileClasses.modal} justify-center bg-black/50 backdrop-blur-md transition-all animate-fade-in`}
+      className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40 animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-label={displayName}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) closeSheet();
       }}
       onTouchMove={(e) => {
         // Prevent the map behind from scrolling when touching the backdrop
         if (e.target === e.currentTarget) e.preventDefault();
       }}
     >
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[calc(100vw-20px)] sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl flex flex-col border border-gray-200 relative overflow-hidden"
-           style={{ 
-             borderRadius: '1.5rem', 
-             ...getModalDimensions(),
-           }}>
+      <div
+        className="ios-sheet w-full sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl sm:rounded-[16px] flex flex-col relative overflow-hidden animate-sheet-up"
+        style={isMobile ? { height: 'calc(100dvh - var(--safe-top) - 10px)' } : { height: '88vh', maxHeight: '88vh' }}
+      >
         
-        {/* Header */}
-        <div className="modal-header-refined flex items-center justify-between px-5 py-3 rounded-t-3xl flex-shrink-0">
-          <div className="flex items-center min-w-0 flex-1 mr-4">
-            <div className="flex flex-col min-w-0 flex-1">
-              {/* Custom Name or Street Address - Primary */}
-              <h1 className={`property-title ${titleSize} font-semibold leading-tight mb-0.5`} 
-                  style={{ letterSpacing: '-0.02em' }}
-                  title={displayName}>
-                {displayName}
-              </h1>
-              {/* Real Address (when custom name is used) */}
-              {showRealAddress && (
-                <p className={`property-location ${locationSize} font-medium leading-snug`} 
-                   style={{ letterSpacing: '-0.005em' }}
-                   title={streetAddress}>
-                  {streetAddress}
-                </p>
-              )}
-              {/* Location Info - Secondary */}
-              {locationInfo && !showRealAddress && (
-                <p className={`property-location ${locationSize} font-medium leading-snug`} 
-                   style={{ letterSpacing: '-0.005em' }}
-                   title={locationInfo}>
-                  {locationInfo}
-                </p>
-              )}
-              {/* Location Info (when custom name is shown) */}
-              {locationInfo && showRealAddress && (
-                <p className={`property-location ${locationSize} font-medium leading-snug text-gray-500`} 
-                   style={{ letterSpacing: '-0.005em' }}
-                   title={locationInfo}>
-                  {locationInfo}
-                </p>
-              )}
-            </div>
-            
-            {/* Property Switcher - Right next to address for intuitive property switching */}
-            {currentPropertyWithFileCount && (
-              <div className="ml-3 flex-shrink-0">
-                <PropertySwitcher
-                  currentProperty={currentPropertyWithFileCount}
-                  onPropertySelect={switchToProperty}
-                  disabled={switchingProperty}
-                />
-              </div>
+        {isMobile && <div className="ios-grabber" />}
+        {/* Nav bar: close, title, and the one place for everything else. */}
+        <div className="ios-navbar border-b border-hairline/60 flex-shrink-0">
+          <button type="button" className="ios-close" onClick={closeSheet} aria-label="Close">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+              <path d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <div className="min-w-0 text-center px-1">
+            {renamingProperty ? (
+              <input
+                autoFocus
+                value={propertyLabelDraft}
+                onChange={e => setPropertyLabelDraft(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+                  if (e.key === 'Escape') { renameCancelledRef.current = true; e.currentTarget.blur(); }
+                }}
+                onBlur={() => {
+                  const cancelled = renameCancelledRef.current;
+                  renameCancelledRef.current = false;
+                  if (cancelled) setRenamingProperty(false);
+                  else void commitPropertyRename();
+                }}
+                placeholder={streetAddress || 'Property name'}
+                aria-label="Property name"
+                className="w-full text-center text-headline font-semibold bg-surface-2 rounded-lg px-2 py-1 focus:outline-none"
+              />
+            ) : (
+              <>
+                <h1 className="text-headline font-semibold truncate" title={displayName}>{displayName}</h1>
+                {headerSubtitle && <p className="text-caption text-ink-2 truncate" title={headerSubtitle}>{headerSubtitle}</p>}
+              </>
             )}
           </div>
-          
-          {/* Action buttons with proper spacing */}
-          <div className="flex items-center gap-3">
-            {/* View Toggle Button */}
-            <button
-              className={`${buttonPadding} rounded-full cursor-pointer flex-shrink-0 hover:bg-gray-100 transition-colors`}
-              onClick={toggleViewMode}
-              title={`Switch to ${viewMode === 'list' ? 'grid' : 'list'} view`}
-            >
-              {viewMode === 'list' ? (
-                // Grid icon when in list mode
-                <svg className={`${iconSize} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <rect x="3" y="3" width="7" height="7" />
-                  <rect x="14" y="3" width="7" height="7" />
-                  <rect x="14" y="14" width="7" height="7" />
-                  <rect x="3" y="14" width="7" height="7" />
-                </svg>
-              ) : (
-                // List icon when in grid mode
-                <svg className={`${iconSize} text-gray-500`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <line x1="8" y1="6" x2="21" y2="6" />
-                  <line x1="8" y1="12" x2="21" y2="12" />
-                  <line x1="8" y1="18" x2="21" y2="18" />
-                  <line x1="3" y1="6" x2="3.01" y2="6" />
-                  <line x1="3" y1="12" x2="3.01" y2="12" />
-                  <line x1="3" y1="18" x2="3.01" y2="18" />
-                </svg>
-              )}
-            </button>
-            
-            {/* Close button with better spacing and styling */}
-            <button
-              className={`close-button ${buttonPadding} rounded-full cursor-pointer flex-shrink-0 hover:bg-gray-100 transition-colors`}
-              onClick={() => {
-                onClose();
-                setCreatingFolder(false);
-                setSearchQuery('');
-              }}
-              title="Close"
-            >
-              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+          <button
+            type="button"
+            className="ios-close justify-self-end"
+            onClick={() => setMoreOpen(true)}
+            aria-label="More actions"
+            aria-haspopup="dialog"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
+            </svg>
+          </button>
         </div>
 
         {/* Main Content Area */}
@@ -1121,12 +1125,12 @@ export const PropertyDetailsModal = ({
         >
           {/* Drag-over overlay */}
           {isDragOver && (
-            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-blue-50/95 border-2 border-dashed border-blue-400 rounded-xl pointer-events-none">
-              <svg className="w-14 h-14 text-blue-400 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-accent-soft/95 border-2 border-dashed border-accent rounded-xl pointer-events-none">
+              <svg className="w-14 h-14 text-accent mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
-              <p className="text-base font-semibold text-blue-600">Drop to upload</p>
-              <p className="text-sm text-blue-500 mt-1">Files will be added to the current folder</p>
+              <p className="text-headline font-semibold text-accent">Drop to upload</p>
+              <p className="text-subhead text-accent/80 mt-1">Files will be added to the current folder</p>
             </div>
           )}
           {/* File List Container - Scrollable with satellite image first, then all other content */}
@@ -1138,7 +1142,7 @@ export const PropertyDetailsModal = ({
             {/* Property preview: Street View, Satellite Map, or no image based on configuration */}
             {propertyImageEnabled && (
               streetViewEnabled ? (
-                <div className={`relative w-full ${headerHeight} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
+                <div className={`relative w-full ${headerHeight} bg-surface-2 border-b border-hairline/60 flex-shrink-0`}>
                   <Image
                     key={`property-image-${property?.id || 'new'}-${snappedLatLng?.lat}-${snappedLatLng?.lng}`}
                     src={
@@ -1161,7 +1165,7 @@ export const PropertyDetailsModal = ({
                   />
                 </div>
               ) : (
-                <div className={`relative w-full ${headerHeight} bg-gray-200 border-b border-blue-100 flex-shrink-0`}>
+                <div className={`relative w-full ${headerHeight} bg-surface-2 border-b border-hairline/60 flex-shrink-0`}>
                   <Image
                     key={`property-image-${property?.id || 'new'}-${snappedLatLng?.lat}-${snappedLatLng?.lng}`}
                     src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
@@ -1176,11 +1180,11 @@ export const PropertyDetailsModal = ({
             )}
 
             {/* All other content comes after satellite image */}
-            <div className="bg-white sticky top-0 z-50 border-b border-gray-100">
+            <div className="bg-surface sticky top-0 z-50 border-b border-hairline/60">
               {/* Breadcrumbs - compact unified bar */}
               {(breadcrumbPath.length > 0 || selectedFolder !== 'master') && (
-                <div className="px-4 py-2 bg-white border-b border-gray-100">
-                  <div className="flex items-center gap-2 text-xs text-gray-700 overflow-x-auto">
+                <div className="px-4 py-2 bg-surface border-b border-hairline/60">
+                  <div className="flex items-center gap-2 text-footnote text-ink overflow-x-auto">
                     {selectedFolder !== 'master' && (() => {
                       // Resolve the parent of the currently-selected folder so the
                       // back button can both navigate (click) and be a drop target
@@ -1201,8 +1205,8 @@ export const PropertyDetailsModal = ({
                               void onFileMove(item.file, targetFolderId);
                             },
                           })}
-                          className={`flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium ${
-                            internalDrag.activeTargetId === 'breadcrumb-back' ? 'ring-2 ring-blue-400 rounded bg-blue-50 px-1' : ''
+                          className={`flex items-center gap-1 text-accent font-medium ${
+                            internalDrag.activeTargetId === 'breadcrumb-back' ? 'ring-2 ring-accent rounded bg-accent-soft px-1' : ''
                           }`}
                           onClick={() => {
                             setSearchQuery('');
@@ -1225,8 +1229,8 @@ export const PropertyDetailsModal = ({
                           void onFileMove(item.file, null);
                         },
                       })}
-                      className={`text-gray-500 hover:text-blue-600 flex items-center gap-1 flex-shrink-0 ${
-                        internalDrag.activeTargetId === 'breadcrumb-home' ? 'ring-2 ring-blue-400 rounded bg-blue-50 px-1' : ''
+                      className={`text-ink-2 flex items-center gap-1 flex-shrink-0 ${
+                        internalDrag.activeTargetId === 'breadcrumb-home' ? 'ring-2 ring-accent rounded bg-accent-soft px-1' : ''
                       }`}
                       onClick={() => {
                         setSearchQuery('');
@@ -1238,7 +1242,7 @@ export const PropertyDetailsModal = ({
                     </button>
                     {breadcrumbPath.map((folder) => (
                       <div key={folder.id} className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-gray-400">›</span>
+                        <span className="text-ink-3">›</span>
                         <button
                           {...internalDrag.getDropTargetProps({
                             id: `breadcrumb-${folder.id}`,
@@ -1249,8 +1253,8 @@ export const PropertyDetailsModal = ({
                               void onFileMove(item.file, folder.id);
                             },
                           })}
-                          className={`text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap ${
-                            internalDrag.activeTargetId === `breadcrumb-${folder.id}` ? 'ring-2 ring-blue-400 rounded bg-blue-50 px-1' : ''
+                          className={`text-accent font-medium whitespace-nowrap ${
+                            internalDrag.activeTargetId === `breadcrumb-${folder.id}` ? 'ring-2 ring-accent rounded bg-accent-soft px-1' : ''
                           }`}
                           onClick={() => {
                             setSearchQuery('');
@@ -1276,22 +1280,22 @@ export const PropertyDetailsModal = ({
                   <input
                     ref={searchInputRef}
                     type="text"
-                    placeholder="Search files and folders…"
+                    placeholder="Search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className={`w-full ${searchPadding} bg-gray-100 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-colors pl-10 ${searchQuery ? 'pr-10' : ''} text-gray-900 placeholder-gray-400`}
+                    className="ios-search"
                   />
-                  <svg className={`absolute left-3 ${searchIconPos} text-gray-400`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-2 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <circle cx="11" cy="11" r="8" />
                     <path d="m21 21-4.35-4.35" />
                   </svg>
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className={`absolute right-3 ${searchIconPos} text-gray-400 hover:text-gray-600 transition-colors rounded-full flex items-center justify-center`}
-                      title="Clear search"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-ink-3 text-white flex items-center justify-center"
+                      aria-label="Clear search"
                     >
-                      <svg className="w-full h-full" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
@@ -1300,21 +1304,21 @@ export const PropertyDetailsModal = ({
               </div>
 
               {/* Column Headers - Sticky and always visible */}
-              <div className={`hidden sm:grid grid-cols-12 gap-4 px-3 ${tableHeaderPadding} text-sm border-b border-gray-200 bg-white ${viewMode === 'grid' ? 'sm:hidden' : ''}`}>
+              <div className={`hidden sm:grid grid-cols-12 gap-4 px-3 ${tableHeaderPadding} text-footnote border-b border-hairline/60 bg-surface ${viewMode === 'grid' ? 'sm:hidden' : ''}`}>
                 <button
-                  className="col-span-7 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+                  className="col-span-7 flex items-center gap-1 text-footnote font-medium text-ink-2"
                   onClick={() => toggleSort('name')}
                 >
                   Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </button>
                 <button
-                  className="col-span-3 flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+                  className="col-span-3 flex items-center gap-1 text-footnote font-medium text-ink-2"
                   onClick={() => toggleSort('date')}
                 >
                   Modified {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </button>
                 <button
-                  className="col-span-2 flex items-center justify-end gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+                  className="col-span-2 flex items-center justify-end gap-1 text-footnote font-medium text-ink-2"
                   onClick={() => toggleSort('size')}
                 >
                   Size {sortField === 'size' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -1330,30 +1334,30 @@ export const PropertyDetailsModal = ({
                   <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
                     {selectedFolder === 'master' ? (
                       <>
-                        <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                        <svg className="w-12 h-12 text-ink-3 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                         </svg>
-                        <p className="text-sm font-medium text-gray-500">No files yet</p>
-                        <p className="text-xs text-gray-400 mt-1">Upload files or create folders to get started</p>
+                        <p className="text-subhead font-medium text-ink-2">No files yet</p>
+                        <p className="text-footnote text-ink-2 mt-1">Upload files or create folders to get started</p>
                       </>
                     ) : (
                       <>
-                        <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                        <svg className="w-12 h-12 text-ink-3 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
                         </svg>
-                        <p className="text-sm font-medium text-gray-500">This folder is empty</p>
-                        <p className="text-xs text-gray-400 mt-1">Upload files to add them here</p>
+                        <p className="text-subhead font-medium text-ink-2">This folder is empty</p>
+                        <p className="text-footnote text-ink-2 mt-1">Upload files to add them here</p>
                       </>
                     )}
                   </div>
                 )}
                 {sortedItems.length === 0 && searchQuery && (
                   <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
-                    <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                    <svg className="w-12 h-12 text-ink-3 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                     </svg>
-                    <p className="text-sm font-medium text-gray-500">No results for &ldquo;{searchQuery}&rdquo;</p>
-                    <p className="text-xs text-gray-400 mt-1">Try a different name or check your spelling</p>
+                    <p className="text-subhead font-medium text-ink-2">No results for &ldquo;{searchQuery}&rdquo;</p>
+                    <p className="text-footnote text-ink-2 mt-1">Try a different name or check your spelling</p>
                   </div>
                 )}
 
@@ -1380,8 +1384,8 @@ export const PropertyDetailsModal = ({
                                   void onFileMove(item.file, folder.id);
                                 },
                               })}
-                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5 ${
-                                internalDrag.activeTargetId === `folder-list-${folder.id}` ? 'ring-2 ring-blue-400 bg-blue-50' : ''
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] active:bg-surface-2 rounded-lg mb-0.5 ${
+                                internalDrag.activeTargetId === `folder-list-${folder.id}` ? 'ring-2 ring-accent bg-accent-soft' : ''
                               }`}
                               style={{ cursor: 'pointer' }}
                               onClick={() => {
@@ -1432,26 +1436,26 @@ export const PropertyDetailsModal = ({
                                     />
                                   ) : (
                                     <>
-                                      <div className="text-gray-900 font-medium truncate">
+                                      <div className="text-body font-medium truncate">
                                         {folder.name}
                                       </div>
-                                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 sm:hidden">
+                                      <div className="text-footnote text-ink-2 mt-0.5 flex items-center gap-2 sm:hidden">
                                         <span>{formatDate(folder.created_at)}</span>
                                       </div>
                                     </>
                                   )}
                                 </div>
                               </div>
-                              <div className="hidden sm:block sm:col-span-3 text-xs text-gray-500">
+                              <div className="hidden sm:block sm:col-span-3 text-footnote text-ink-2">
                                 {formatDate(folder.created_at)}
                               </div>
                               <div className="relative flex items-center justify-end sm:col-span-2">
                                 <button
-                                  className="tap-target rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex items-center justify-center flex-shrink-0"
+                                  className="tap-target rounded ml-2 flex items-center justify-center flex-shrink-0"
                                   {...menuTriggerProps('folder', folder.id)}
                                   title="Folder actions"
                                 >
-                                  <svg className="w-5 h-5 sm:w-4 sm:h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <svg className="w-5 h-5 sm:w-4 sm:h-4 text-ink-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -1466,6 +1470,7 @@ export const PropertyDetailsModal = ({
                                   onDelete={onFolderDelete}
                                   menuPosition={menuPosition[folder.id] || {}}
                                   menuRef={folderMenuRef}
+                                  presentation={isMobile ? 'sheet' : 'popover'}
                                 />
                               </div>
                             </div>
@@ -1483,7 +1488,7 @@ export const PropertyDetailsModal = ({
                                 file,
                                 sourceFolderId: file.folder_id,
                               })}
-                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] hover:bg-gray-50 active:bg-gray-100 rounded-lg transition mb-0.5 ${
+                              className={`flex sm:grid sm:grid-cols-12 sm:gap-4 items-center ${listItemPadding} sm:px-3 sm:py-2 min-h-[48px] sm:min-h-[40px] active:bg-surface-2 rounded-lg mb-0.5 ${
                                 internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.file.id === file.id ? 'opacity-40' : ''
                               }`}
                               style={{ cursor: 'pointer' }}
@@ -1540,10 +1545,10 @@ export const PropertyDetailsModal = ({
                                     />
                                   ) : (
                                     <>
-                                      <span className="text-gray-900 font-medium truncate">
+                                      <span className="text-body font-medium truncate">
                                         {getFileNameWithoutExtension(file.file_name)}
                                       </span>
-                                      <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 sm:hidden">
+                                      <div className="text-footnote text-ink-2 mt-0.5 flex items-center gap-2 sm:hidden">
                                         <span>{formatDate(file.modified_at || file.uploaded_at)}</span>
                                         <span>•</span>
                                         <span>{formatFileSize(file.file_size)}</span>
@@ -1552,17 +1557,17 @@ export const PropertyDetailsModal = ({
                                   )}
                                 </div>
                               </div>
-                              <div className="hidden sm:block sm:col-span-3 text-xs text-gray-500">
+                              <div className="hidden sm:block sm:col-span-3 text-footnote text-ink-2">
                                 {formatDate(file.modified_at || file.uploaded_at)}
                               </div>
                               <div className="relative flex items-center justify-end sm:col-span-2">
-                                <span className="hidden sm:inline-block text-xs text-gray-500 mr-2">{formatFileSize(file.file_size)}</span>
+                                <span className="hidden sm:inline-block text-footnote text-ink-2 mr-2">{formatFileSize(file.file_size)}</span>
                                 <button
-                                  className="tap-target rounded hover:bg-gray-200 group-hover:bg-gray-200 ml-2 flex items-center justify-center flex-shrink-0"
+                                  className="tap-target rounded ml-2 flex items-center justify-center flex-shrink-0"
                                   {...menuTriggerProps('file', file.id)}
                                   title="File actions"
                                 >
-                                  <svg className="w-5 h-5 sm:w-4 sm:h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <svg className="w-5 h-5 sm:w-4 sm:h-4 text-ink-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -1582,6 +1587,7 @@ export const PropertyDetailsModal = ({
                                   onDelete={onFileDelete}
                                   menuPosition={menuPosition[file.id] || {}}
                                   menuRef={fileMenuRef}
+                                  presentation={isMobile ? 'sheet' : 'popover'}
                                 />
                               </div>
                             </div>
@@ -1608,8 +1614,8 @@ export const PropertyDetailsModal = ({
                                   void onFileMove(item.file, folder.id);
                                 },
                               })}
-                              className={`flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative ${
-                                internalDrag.activeTargetId === `folder-grid-${folder.id}` ? 'ring-2 ring-blue-400 bg-blue-50' : ''
+                              className={`flex flex-col items-center p-3 rounded-xl active:bg-surface-2 active:scale-[0.97] transition-transform group relative ${
+                                internalDrag.activeTargetId === `folder-grid-${folder.id}` ? 'ring-2 ring-accent bg-accent-soft' : ''
                               }`}
                               onClick={() => {
                                 // Clear search when entering a folder
@@ -1621,7 +1627,7 @@ export const PropertyDetailsModal = ({
                                 <HeroFolderIcon style={{ width: gridIconSize, height: gridIconSize, color: '#fbbf24' }} />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className="absolute -top-2 -right-2 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                  className="absolute -top-2 -right-4 rounded-full bg-surface-2/90 text-ink-2 flex items-center justify-center touch-manipulation"
                                   {...menuTriggerProps('folder', folder.id)}
                                   style={{ 
                                     zIndex: 10,
@@ -1634,7 +1640,7 @@ export const PropertyDetailsModal = ({
                                   }}
                                   aria-label="Folder actions"
                                 >
-                                  <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-ink" fill="currentColor" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -1649,6 +1655,7 @@ export const PropertyDetailsModal = ({
                                   onDelete={onFolderDelete}
                                   menuPosition={menuPosition[folder.id] || {}}
                                   menuRef={folderMenuRef}
+                                  presentation={isMobile ? 'sheet' : 'popover'}
                                 />
                               </div>
                               <div className="mt-2 text-center w-full">
@@ -1674,10 +1681,10 @@ export const PropertyDetailsModal = ({
                                   />
                                 ) : (
                                   <>
-                                    <div className="font-medium text-gray-900 truncate text-xs sm:text-sm leading-tight">
+                                    <div className="font-medium text-ink truncate text-caption sm:text-footnote leading-tight">
                                       {folder.name}
                                     </div>
-                                    <div className="text-xs text-gray-500 mt-0.5">
+                                    <div className="text-caption text-ink-2 mt-0.5">
                                       {formatDate(folder.created_at)}
                                     </div>
                                   </>
@@ -1697,7 +1704,7 @@ export const PropertyDetailsModal = ({
                                 file,
                                 sourceFolderId: file.folder_id,
                               })}
-                              className={`flex flex-col items-center p-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 active:scale-[0.97] transition-all cursor-pointer group relative ${
+                              className={`flex flex-col items-center p-3 rounded-xl active:bg-surface-2 active:scale-[0.97] transition-transform group relative ${
                                 internalDrag.draggedItem?.kind === 'file' && internalDrag.draggedItem.file.id === file.id ? 'opacity-40' : ''
                               }`}
                               onClick={async (e) => {
@@ -1727,7 +1734,7 @@ export const PropertyDetailsModal = ({
                                 />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className="absolute -top-2 -right-2 rounded-full bg-white/95 backdrop-blur-sm shadow-lg border border-black/10 transition-all duration-200 flex items-center justify-center hover:bg-gray-50 hover:shadow-xl touch-manipulation opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                  className="absolute -top-2 -right-4 rounded-full bg-surface-2/90 text-ink-2 flex items-center justify-center touch-manipulation"
                                   {...menuTriggerProps('file', file.id)}
                                   style={{ 
                                     zIndex: 10,
@@ -1740,7 +1747,7 @@ export const PropertyDetailsModal = ({
                                   }}
                                   aria-label="File actions"
                                 >
-                                  <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-ink" fill="currentColor" viewBox="0 0 24 24">
                                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                                   </svg>
                                 </button>
@@ -1760,6 +1767,7 @@ export const PropertyDetailsModal = ({
                                   onDelete={onFileDelete}
                                   menuPosition={menuPosition[file.id] || {}}
                                   menuRef={fileMenuRef}
+                                  presentation={isMobile ? 'sheet' : 'popover'}
                                 />
                               </div>
                               <div className="mt-2 text-center w-full">
@@ -1786,10 +1794,10 @@ export const PropertyDetailsModal = ({
                                   />
                                 ) : (
                                   <>
-                                    <div className="font-medium text-gray-900 truncate text-xs sm:text-sm leading-tight">
+                                    <div className="font-medium text-ink truncate text-caption sm:text-footnote leading-tight">
                                       {getFileNameWithoutExtension(file.file_name)}
                                     </div>
-                                    <div className="text-xs text-gray-500 mt-0.5 space-y-0.5">
+                                    <div className="text-caption text-ink-2 mt-0.5 space-y-0.5">
                                       <div>{formatFileSize(file.file_size)}</div>
                                       <div>{formatDate(file.modified_at || file.uploaded_at)}</div>
                                     </div>
@@ -2028,79 +2036,36 @@ export const PropertyDetailsModal = ({
           }
         `}</style>
 
-        {/* FAB — always visible, floats over content, never pushed off-screen */}
+        {/* One "+" offering the two ways to add something. */}
         <div
-          className="absolute z-30 flex flex-col items-end gap-2"
-          style={{
-            bottom: `calc(env(safe-area-inset-bottom, 0px) + 16px)`,
-            right: '16px',
-          }}
-          // Prevent any touch/click leaking to the file list or map below
+          className="absolute z-30"
+          style={{ bottom: 'calc(var(--safe-bottom) + 16px)', right: '16px' }}
           onClick={e => e.stopPropagation()}
           onTouchStart={e => e.stopPropagation()}
           onTouchEnd={e => e.stopPropagation()}
         >
-          {/* Expanded options */}
-          {fabOpen && (
-            <>
-              {/* Backdrop to close */}
-              <div
-                className="fixed inset-0 z-[-1]"
-                onClick={() => setFabOpen(false)}
-                onTouchEnd={e => { e.preventDefault(); setFabOpen(false); }}
-              />
-              {/* New Folder option */}
-              <button
-                className="flex items-center gap-2.5 bg-white text-gray-700 text-sm font-medium pl-4 pr-5 py-2.5 rounded-2xl shadow-lg hover:bg-gray-50 active:scale-[0.97] transition-all animate-fade-in"
-                style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
-                onClick={() => { setCreatingFolder(true); setFabOpen(false); }}
-                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); setCreatingFolder(true); setFabOpen(false); }}
-              >
-                <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                </div>
-                New Folder
-              </button>
-              {/* Upload option */}
-              <button
-                className="flex items-center gap-2.5 bg-white text-gray-700 text-sm font-medium pl-4 pr-5 py-2.5 rounded-2xl shadow-lg hover:bg-gray-50 active:scale-[0.97] transition-all animate-fade-in"
-                style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
-                onClick={() => { document.getElementById('file-upload-input')?.click(); setFabOpen(false); }}
-                onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); document.getElementById('file-upload-input')?.click(); setFabOpen(false); }}
-              >
-                <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                  </svg>
-                </div>
-                Upload Files
-              </button>
-            </>
-          )}
-
-          {/* Main FAB button */}
           <button
-            className={`w-13 h-13 flex items-center justify-center rounded-full text-white transition-all duration-200 active:scale-90 ${
-              fabOpen ? 'bg-gray-700 rotate-45' : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-            style={{
-              width: '52px',
-              height: '52px',
-              boxShadow: fabOpen
-                ? '0 4px 16px rgba(0,0,0,0.25)'
-                : '0 4px 16px rgba(37,99,235,0.4)',
-            }}
-            onClick={() => setFabOpen(v => !v)}
-            onTouchEnd={e => { e.preventDefault(); e.stopPropagation(); setFabOpen(v => !v); }}
-            aria-label={fabOpen ? 'Close actions' : 'New folder or upload'}
+            type="button"
+            className="w-[52px] h-[52px] rounded-full bg-accent text-white flex items-center justify-center ios-press"
+            style={{ boxShadow: '0 4px 16px rgba(10, 122, 255, 0.4)' }}
+            onClick={() => setFabOpen(true)}
+            aria-label="Add files or a folder"
+            aria-haspopup="dialog"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
           </button>
         </div>
+        <ActionSheet
+          open={fabOpen}
+          onClose={() => setFabOpen(false)}
+          title={selectedFolder === 'master' ? 'Add to this property' : `Add to “${folders.find(f => f.id === selectedFolder)?.name ?? 'folder'}”`}
+          groups={[[
+            { label: 'Upload files', onSelect: () => document.getElementById('file-upload-input')?.click() },
+            { label: 'New folder', onSelect: () => setCreatingFolder(true) },
+          ]]}
+        />
 
         {/* Image Lightbox */}
         {imagePreview && (
@@ -2186,77 +2151,80 @@ export const PropertyDetailsModal = ({
           </div>
         )}
 
-        {/* Folder Creation Modal */}
+        {/* New folder: an alert with a single field. */}
         {creatingFolder && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
-            onClick={() => { setCreatingFolder(false); setNewFolderName(''); setFolderErrorPopup(null); }}
-            onTouchEnd={e => { e.preventDefault(); setCreatingFolder(false); setNewFolderName(''); setFolderErrorPopup(null); }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-fade-in"
+            onClick={cancelCreateFolder}
+            onTouchEnd={e => { e.preventDefault(); cancelCreateFolder(); }}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl p-6 w-11/12 max-w-xs flex flex-col gap-4 border border-blue-100 relative"
+              className="bg-surface/95 backdrop-blur-xl rounded-[14px] w-[270px] overflow-hidden animate-sheet-up"
+              role="dialog"
+              aria-modal="true"
+              aria-label="New folder"
               onClick={e => e.stopPropagation()}
               onTouchEnd={e => e.stopPropagation()}
             >
-              <div className="text-lg font-bold text-gray-900 mb-2">Create New Folder</div>
-              <input
-                ref={folderInputRef}
-                type="text"
-                className="rounded-lg border border-blue-200 px-3 py-2 text-base text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="New folder name"
-                value={newFolderName}
-                onChange={e => {
-                  if (isCreatingFolder) return;
-                  const val = e.target.value;
-                  // Immediate state update for input responsiveness
-                  setNewFolderName(val);
-                  // Validation update can be batched (memoized anyway)
-                  const error = folderNameError(val);
-                  setFolderErrorPopup(error);
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && isFolderNameValid && !isCreatingFolder) {
-                    e.preventDefault();
-                    handleCreateFolder();
-                  }
-                  if (e.key === 'Escape' && !isCreatingFolder) {
-                    e.preventDefault();
-                    setCreatingFolder(false);
-                    setNewFolderName('');
-                    setFolderErrorPopup(null);
-                  }
-                }}
-                autoFocus
-                disabled={isCreatingFolder}
-              />
-              {folderErrorPopup && (
-                <div className="text-red-500 text-xs mt-1 w-full bg-red-50 border border-red-200 rounded px-2 py-1">
-                  {folderErrorPopup}
-                </div>
-              )}
-              <div className="flex gap-2 mt-2">
+              <div className="px-4 pt-5 pb-3 text-center">
+                <div className="text-headline font-semibold">New folder</div>
+                <div className="text-footnote text-ink-2 mt-1">Enter a name for this folder.</div>
+                <input
+                  ref={folderInputRef}
+                  type="text"
+                  className="mt-3 w-full h-8 rounded-md border border-hairline bg-surface px-2 text-subhead text-ink focus:outline-none focus:border-accent"
+                  placeholder="Name"
+                  value={newFolderName}
+                  onChange={e => {
+                    if (isCreatingFolder) return;
+                    setNewFolderName(e.target.value);
+                    setFolderErrorPopup(folderNameError(e.target.value));
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && isFolderNameValid && !isCreatingFolder) {
+                      e.preventDefault();
+                      handleCreateFolder();
+                    }
+                    if (e.key === 'Escape' && !isCreatingFolder) {
+                      e.preventDefault();
+                      cancelCreateFolder();
+                    }
+                  }}
+                  autoFocus
+                  disabled={isCreatingFolder}
+                  aria-invalid={Boolean(folderErrorPopup)}
+                />
+                {folderErrorPopup && (
+                  <div className="text-caption text-danger mt-2" role="alert">{folderErrorPopup}</div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 border-t border-hairline/60 divide-x divide-hairline/60">
+                <button type="button" className="h-11 text-body text-accent ios-press" onClick={cancelCreateFolder} disabled={isCreatingFolder}>
+                  Cancel
+                </button>
                 <button
-                  className={`flex-1 bg-blue-600 text-white rounded-lg px-3 py-2 font-semibold text-base transition-all ${(!isFolderNameValid || isCreatingFolder) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+                  type="button"
+                  className="h-11 text-body font-semibold text-accent ios-press disabled:opacity-40"
                   onClick={handleCreateFolder}
                   disabled={!isFolderNameValid || isCreatingFolder}
                 >
-                  {isCreatingFolder ? 'Creating...' : 'Create'}
+                  {isCreatingFolder ? 'Creating…' : 'Create'}
                 </button>
-                <button
-                  className="flex-1 bg-gray-100 text-gray-700 rounded-lg px-3 py-2 font-semibold text-base hover:bg-gray-200"
-                  onClick={() => {
-                    setCreatingFolder(false);
-                    setNewFolderName('');
-                    setFolderErrorPopup(null);
-                    setIsCreatingFolder(false);
-                  }}
-                  disabled={isCreatingFolder}
-                >Cancel</button>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      <ActionSheet open={moreOpen} onClose={() => setMoreOpen(false)} title={property.address} groups={moreGroups} />
+      {currentPropertyWithFileCount && (
+        <PropertySwitcher
+          currentProperty={currentPropertyWithFileCount}
+          onPropertySelect={switchToProperty}
+          open={switcherOpen}
+          onClose={() => setSwitcherOpen(false)}
+        />
+      )}
 
       {/* Move Modal */}
       {showMoveModal && moveFileTarget && (

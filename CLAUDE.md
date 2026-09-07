@@ -76,13 +76,27 @@ The two API routes (`/api/autocomplete`, `/api/reverse-geocode`) are thin proxie
 
 Files are stored in Supabase Storage. Access is via signed URLs with a 1-hour expiry (generated in `src/utils/supabaseClient.ts`). Anything written into a file-viewer tab must go through `escapeHtml` in `PropertyDetailsModal` because that tab shares the app's origin.
 
+### Design System: an iPhone app that happens to be a web app
+
+Tokens live in `src/styles/globals.css` (Tailwind v4 `@theme`): the iOS grouped palette (`ground`, `surface`, `surface-2`, `ink`, `ink-2`, `ink-3`, `hairline`), one accent (`accent`), `danger`/`success`/`warning`, the HIG type scale (`text-large-title` … `text-caption-2`), and iOS component classes (`ios-group`/`ios-row`, `ios-search`, `ios-segmented`, `ios-button-*`, `ios-navbar`, `ios-sheet`, `ios-tabbar`, `ios-float`, `ios-close`, `ios-press`). Use these instead of raw gray/blue Tailwind colors so every screen reads as one system.
+
+- Type comes from the system stack so iPhones render San Francisco. Large titles are 34pt/700; body is 17pt.
+- Safe areas: pages pad with `var(--safe-top)` and use `pb-tabbar` above the 49pt tab bar (`MobileBottomNav`). The app is installable (`public/manifest.json`, `display: standalone`, translucent status bar).
+- Sheets rise from the bottom on phones (`ios-sheet` + `ios-grabber`) and center on desktop. Secondary actions are `ActionSheet`s on touch and anchored menus on pointer devices (`presentation` prop on `FileMenu`/`FolderMenu`).
+- Touch gets press states (`ios-press`, `ios-row-press`), never hover-only affordances.
+- Desktop keeps the `WebSidebar` shell but uses the same components and tokens.
+
 ### UX Principle: Hick's Law
 
 Keep the number of simultaneous choices small and grouped:
 
-- Map type is a binary Map / Satellite toggle (satellite is Google's `hybrid`, so labels stay visible). Do not reintroduce a third mode.
-- The file menu is grouped: primary (Download), organize (Rename, Move, Duplicate), destructive (Delete).
-- Search results and pin drops both land on one card with one primary action (Open / Add Property).
+- One filled primary button per screen. At most three visible controls per bar.
+- Map: search, a Map / Satellite segmented control, and a location button. No zoom buttons (pinch, scroll, double-tap). Satellite is Google's `hybrid` so labels stay visible; do not reintroduce a third mode.
+- Property card: title, address, one button (Open / Add property). Renaming happens inside the sheet.
+- Property sheet nav bar: close, title, and one "⋯" that opens a grouped action sheet (Switch property, Show as list/grid | Rename, Copy address). The "+" offers exactly Upload files / New folder.
+- File menu groups: Download | Rename, Move to folder, Duplicate | Delete. Folder menu: Rename | Delete.
+- Properties list rows only open the property; no per-row menus.
+- Account is a Settings-style grouped list; profile questions are asked one at a time in an action sheet picker, and save on selection.
 - Do not add controls that have no effect (a previous "Remember me" checkbox was wired to nothing).
 
 ## Git

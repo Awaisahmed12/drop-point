@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import { useRouter } from 'next/router';
@@ -127,7 +127,6 @@ function MapPage() {
     addressLoading, setAddressLoading, snappedLatLng, setSnappedLatLng,
   } = useModalState();
 
-  const [propertyCardHeight, setPropertyCardHeight] = useState(0);
   const lastClickTimeRef = useRef(0);
   // Suppresses the ghost click Google Maps receives after touch-dismissing the info card.
   const suppressMapClickRef = useRef(false);
@@ -459,20 +458,6 @@ function MapPage() {
     });
   }, [map, mapCenter, zoom, panTo, setSelectedProperty, setAddress, setInputValue, showToast]);
 
-  const handleZoomIn = useCallback(() => {
-    if (!map) return;
-    const next = Math.min((map.getZoom() ?? zoom) + 1, 21);
-    map.setZoom(next);
-    setZoom(next);
-  }, [map, zoom, setZoom]);
-
-  const handleZoomOut = useCallback(() => {
-    if (!map) return;
-    const next = Math.max((map.getZoom() ?? zoom) - 1, 1);
-    map.setZoom(next);
-    setZoom(next);
-  }, [map, zoom, setZoom]);
-
   // Re-tapping the active Map tab on mobile flips Map / Satellite.
   const handleMapTabReclick = useCallback(() => {
     setMapType(prev => (prev === 'roadmap' ? 'hybrid' : 'roadmap'));
@@ -486,7 +471,6 @@ function MapPage() {
   const dismissInfoCard = useCallback(() => {
     setSelectedProperty(null);
     setAddress('');
-    setPropertyCardHeight(0);
   }, [setSelectedProperty, setAddress]);
 
   const armMapClickSuppression = useCallback(() => {
@@ -515,35 +499,16 @@ function MapPage() {
     setFoldersLoading, setFilesLoading, setSelectedFolder, setShowDetailsModal,
   ]);
 
-  const handlePropertySave = useCallback(async (propertyToSave: Property) => {
-    try {
-      const created = await propertyService.createProperty({
-        address: propertyToSave.address,
-        lat: propertyToSave.lat,
-        lng: propertyToSave.lng,
-        label: propertyToSave.label,
-        notes: propertyToSave.notes,
-      });
-      if (!created.id) throw new Error('Property could not be saved.');
-      // Brand new property: nothing to load, but make sure nothing stale shows.
-      setPropertyDataCache(created.id, [], []);
-      setFolders([]);
-      setPropertyFiles([]);
-      setSelectedFolder('master');
-      setSelectedProperty(created);
-      setSavedProperty(created);
-      setUserProperties(prev => [...prev, created]);
-    } catch (error) {
-      logger.error('Error saving property:', error);
-      showToast('Failed to save property. Please try again.');
+  /** Rename from inside the sheet. An unsaved pin just carries the label until it's persisted. */
+  const handlePropertyRename = useCallback(async (property: Property, label: string | null) => {
+    if (!property.id) {
+      setSavedProperty(prev => (prev ? { ...prev, label } : prev));
+      return;
     }
-  }, [setFolders, setPropertyFiles, setSelectedFolder, setSelectedProperty, setSavedProperty, setUserProperties, showToast]);
-
-  const handlePropertyUpdate = useCallback((updated: Property) => {
-    setSelectedProperty(updated);
+    const updated = await propertyService.updateProperty(property.id, { label });
     setSavedProperty(updated);
     setUserProperties(prev => prev.map(p => (p.id === updated.id ? updated : p)));
-  }, [setSelectedProperty, setSavedProperty, setUserProperties]);
+  }, [setSavedProperty, setUserProperties]);
 
   const showInfoCard = Boolean(selectedProperty && address);
 
@@ -562,12 +527,12 @@ function MapPage() {
       />
       <div className={`flex-1 relative overflow-hidden ${mobileClasses.fullScreen}`} style={getMobileStyles('page')}>
         {!isLoaded || !initialCenterResolved ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-50">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-gray-400">Loading map…</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-ground">
+            <div className="w-8 h-8 border-[3px] border-surface-2 border-t-accent rounded-full animate-spin" />
+            <p className="text-subhead text-ink-2">Loading map…</p>
           </div>
         ) : loadError ? (
-          <div className="absolute inset-0 flex items-center justify-center text-red-600">Failed to load map.</div>
+          <div className="absolute inset-0 flex items-center justify-center text-body text-danger px-6 text-center">The map couldn’t load. Check your connection and try again.</div>
         ) : (
           <div
             className="w-full h-full"
@@ -652,14 +617,8 @@ function MapPage() {
             <MapControls
               mapType={mapType}
               onMapTypeChange={setMapType}
-              showDropdown={showDropdown}
               onCurrentLocationClick={handleCurrentLocationClick}
-              showPropertyInfoCard={showInfoCard}
-              isPropertyModalOpen={showDetailsModal}
-              onZoomIn={handleZoomIn}
-              onZoomOut={handleZoomOut}
-              propertyCardHeight={showInfoCard ? propertyCardHeight : 0}
-              selectedProperty={selectedProperty}
+              hidden={showDropdown || showInfoCard || showDetailsModal}
             />
           </>
         )}
@@ -676,23 +635,17 @@ function MapPage() {
               armMapClickSuppression();
               dismissInfoCard();
             }}
-            onPropertyUpdate={handlePropertyUpdate}
-            onPropertySave={handlePropertySave}
-            onHeightChange={setPropertyCardHeight}
             onSelect={handleInfoCardSelect}
           />
         )}
 
         <ErrorBoundary
           fallback={
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white rounded-xl p-6 max-w-md mx-4">
-                <h2 className="text-xl font-semibold mb-2">Error Loading Property</h2>
-                <p className="text-gray-600 mb-4">There was an error loading the property details. Please try again.</p>
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+              <div className="bg-surface rounded-[16px] p-6 max-w-sm mx-4">
+                <h2 className="text-headline font-semibold mb-1">Couldn’t open this property</h2>
+                <p className="text-subhead text-ink-2 mb-4">Something went wrong loading its files. Close and try again.</p>
+                <button type="button" onClick={() => setShowDetailsModal(false)} className="ios-button ios-button-primary">
                   Close
                 </button>
               </div>
@@ -719,6 +672,7 @@ function MapPage() {
             onFolderDelete={fileActions.deleteFolder}
             pendingUploads={fileActions.pendingUploads}
             onDismiss={fileActions.dismissPendingUpload}
+            onPropertyRename={handlePropertyRename}
             onPropertySwitch={(property, files, switchedFolders) => {
               setSavedProperty(property);
               setPropertyFiles(files);

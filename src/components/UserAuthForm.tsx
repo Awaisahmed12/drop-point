@@ -1,468 +1,266 @@
 import { logger } from '../utils/logger';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../utils/supabaseClient';
 import Image from 'next/image';
+import { supabase } from '../utils/supabaseClient';
 import { EyeIcon } from './EyeIcon';
-import { useMobileViewport } from '../hooks/useMobileViewport';
 import { POST_LOGIN_SPINNER_MS } from '../../constants';
 
 const getSiteUrl = (): string => {
   const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  if (envUrl && typeof envUrl === 'string') return envUrl.replace(/\/$/, '');
+  if (envUrl) return envUrl.replace(/\/$/, '');
   if (typeof window !== 'undefined') return window.location.origin.replace(/\/$/, '');
   return '';
 };
 
+/** Human-readable list of what a password still needs, empty when it's fine. */
+const missingPasswordRules = (pwd: string): string[] => {
+  const missing: string[] = [];
+  if (pwd.length < 8) missing.push('8+ characters');
+  if (!/[A-Z]/.test(pwd)) missing.push('an uppercase letter');
+  if (!/[a-z]/.test(pwd)) missing.push('a lowercase letter');
+  if (!/\d/.test(pwd)) missing.push('a number');
+  if (!/[^A-Za-z0-9]/.test(pwd)) missing.push('a symbol');
+  return missing;
+};
+
+const joinList = (items: string[]) =>
+  items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+
+/**
+ * Sign in / create account. One grouped form, one filled button, one link to
+ * switch modes. Nothing on the screen that doesn't move the user forward.
+ */
 export default function UserAuthForm() {
   const router = useRouter();
-  const { getMobileStyles, mobileClasses } = useMobileViewport();
   const [isSignUp, setIsSignUp] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showWelcome, setShowWelcome] = useState(false);
-  
-  // For signup - capture essential info upfront
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  
-  // Real-time password validation with debounce
-  const [showPasswordMismatch, setShowPasswordMismatch] = useState(false);
-  const [passwordRequirements, setPasswordRequirements] = useState({
-    length: false,
-    uppercase: false,
-    lowercase: false,
-    number: false,
-    special: false
-  });
-  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // const passwordsMismatch = isSignUp && confirmPassword && password !== confirmPassword;
+  const missing = isSignUp && password ? missingPasswordRules(password) : [];
+  const mismatch = isSignUp && confirmPassword.length > 0 && password !== confirmPassword;
+  const canSubmit = isSignUp
+    ? Boolean(email && firstName.trim() && lastName.trim() && password && confirmPassword) && missing.length === 0 && !mismatch
+    : Boolean(email && password);
 
-  // Password requirements validation
-  const validatePasswordRequirements = (pwd: string) => {
-    return {
-      length: pwd.length >= 8,
-      uppercase: /[A-Z]/.test(pwd),
-      lowercase: /[a-z]/.test(pwd),
-      number: /\d/.test(pwd),
-      special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)
-    };
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setFirstName('');
+    setLastName('');
+    setError(null);
+    setShowPassword(false);
   };
-
-  const isPasswordValid = Object.values(passwordRequirements).every(req => req);
-  const isFormValid = isSignUp ? 
-    (email && firstName.trim() && lastName.trim() && password && confirmPassword && 
-     isPasswordValid && password === confirmPassword) :
-    (email && password);
-
-  // Debounced password validation
-  useEffect(() => {
-    if (!isSignUp || !confirmPassword) {
-      setShowPasswordMismatch(false);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setShowPasswordMismatch(password !== confirmPassword);
-    }, 300); // 300ms delay
-
-    return () => clearTimeout(timer);
-  }, [password, confirmPassword, isSignUp]);
-
-  // Debounced password requirements validation
-  useEffect(() => {
-    if (!isSignUp || !password) {
-      setShowPasswordRequirements(false);
-      setPasswordRequirements({
-        length: false,
-        uppercase: false,
-        lowercase: false,
-        number: false,
-        special: false
-      });
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      const requirements = validatePasswordRequirements(password);
-      setPasswordRequirements(requirements);
-      setShowPasswordRequirements(true);
-    }, 300); // 300ms delay
-
-    return () => clearTimeout(timer);
-  }, [password, isSignUp]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canSubmit || loading) return;
     setLoading(true);
     setError(null);
-    setMessage(null);
-    
-    if (isSignUp) {
-      if (!email || !password || !firstName.trim() || !lastName.trim()) {
-        setError('Please fill in all fields.');
-        setLoading(false);
-        return;
-      }
-      if (!isPasswordValid) {
-        setError('Password does not meet requirements.');
-        setLoading(false);
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError('Passwords do not match.');
-        setLoading(false);
-        return;
-      }
-    } else {
-      if (!email || !password) {
-        setError('Please enter both email and password.');
-        setLoading(false);
-        return;
-      }
-    }
 
     try {
       if (isSignUp) {
         const siteUrl = getSiteUrl();
-        const { error } = await supabase.auth.signUp({
+        const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
-          options: { 
+          options: {
             emailRedirectTo: siteUrl ? `${siteUrl}/auth/callback` : undefined,
-            data: {
-              first_name: firstName.trim(),
-              last_name: lastName.trim()
-            }
-          }
+            data: { first_name: firstName.trim(), last_name: lastName.trim() },
+          },
         });
-        if (error) throw error;
-        setMessage('Check your email for a confirmation link.');
-        setShowWelcome(true);
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        
-        // Check if this is first login (no profile yet)
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('first_name')
-          .eq('user_id', data.user.id)
-          .single();
-        
-        if (!profile?.first_name) {
-          // First time user - create basic profile from auth metadata
-          try {
-            const { error: profileError } = await supabase
-              .from('user_profiles')
-              .upsert({
-                user_id: data.user.id,
-                first_name: data.user.user_metadata?.first_name || firstName.trim(),
-                last_name: data.user.user_metadata?.last_name || lastName.trim(),
-                phone_number: null,
-                contact_preference: 'email',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              });
-
-            if (profileError) {
-              logger.error('Error saving profile:', profileError);
-            }
-          } catch (profileErr) {
-            logger.error('Error creating profile:', profileErr);
-          }
-        }
-        
-        // Always redirect to map after successful login. The 1.2s pause is
-        // intentional UX — it shows the "Welcome back!" spinner branch
-        // (see isLoggingIn render block) before navigating. Using await
-        // here (instead of a fire-and-forget setTimeout) is what keeps the
-        // spinner visible the whole time and prevents the form from
-        // reappearing in the gap with a re-enabled submit button.
-        setIsLoggingIn(true);
-        await new Promise<void>((resolve) => setTimeout(resolve, POST_LOGIN_SPINNER_MS));
-        await router.push('/map');
-        // Navigation has been kicked off; let the unmounting component
-        // skip the finally state-clears below to avoid flashing the form.
+        if (signUpError) throw signUpError;
+        setSentTo(email);
         return;
       }
-    } catch (err: unknown) {
-      let errorMsg = 'Something went wrong.';
-      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
-        errorMsg = (err as { message?: string }).message as string;
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+
+      // First sign-in: seed the profile row from the sign-up metadata.
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('first_name')
+        .eq('user_id', data.user.id)
+        .single();
+      if (!profile?.first_name) {
+        const { error: profileError } = await supabase.from('user_profiles').upsert({
+          user_id: data.user.id,
+          first_name: data.user.user_metadata?.first_name || null,
+          last_name: data.user.user_metadata?.last_name || null,
+          phone_number: null,
+          contact_preference: 'email',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+        if (profileError) logger.error('Error saving profile:', profileError);
       }
-      setError(errorMsg);
+
+      // Hold the welcome state briefly so the transition reads as "you're in".
+      setIsLoggingIn(true);
+      await new Promise<void>(resolve => setTimeout(resolve, POST_LOGIN_SPINNER_MS));
+      await router.push('/map');
+      return;
+    } catch (err: unknown) {
+      const message = err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string'
+        ? (err as { message: string }).message
+        : 'Something went wrong. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
       setIsLoggingIn(false);
     }
   };
 
-  // Show welcome message after signup
-  if (showWelcome) {
+  const logo = <Image src="/logo.png" alt="" width={72} height={72} className="w-[72px] h-[72px] object-contain" priority />;
+
+  if (sentTo) {
     return (
-      <div className="w-full max-w-md bg-white/80 rounded-3xl shadow-2xl p-8 flex flex-col gap-6 border border-blue-100 animate-fade-in backdrop-blur-sm">
-        <div className="flex flex-col items-center gap-3">
-          <Image src="/logo.png" alt="DropPoint Logo" width={80} height={80} className="w-20 h-20 object-contain mb-2" priority />
-          <h1 className="text-2xl font-bold text-blue-700">Welcome to DropPoint!</h1>
-          <p className="text-sm text-gray-600 text-center">We&apos;ve sent a confirmation link to your email</p>
+      <div className="w-full max-w-sm flex flex-col items-center text-center gap-5">
+        {logo}
+        <div>
+          <h1 className="text-title-1 font-bold">Check your email</h1>
+          <p className="text-subhead text-ink-2 mt-2">
+            We sent a confirmation link to <span className="text-ink font-medium">{sentTo}</span>. Open it to activate your account, then sign in.
+          </p>
         </div>
-
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <div className="text-sm text-blue-800">
-              <div className="font-semibold mb-2">Next steps:</div>
-              <ol className="list-decimal list-inside space-y-1 text-blue-700">
-                <li>Check your email for the confirmation link</li>
-                <li>Click the link to verify your account</li>
-                <li>Come back here to log in and start using DropPoint</li>
-              </ol>
-            </div>
-          </div>
-        </div>
-
         <button
-          onClick={() => {
-            setShowWelcome(false);
-            setIsSignUp(false);
-            setEmail('');
-            setPassword('');
-            setConfirmPassword('');
-            setFirstName('');
-            setLastName('');
-            setError(null);
-            setMessage(null);
-            setShowPasswordMismatch(false);
-            setShowPasswordRequirements(false);
-            setPasswordRequirements({
-              length: false,
-              uppercase: false,
-              lowercase: false,
-              number: false,
-              special: false
-            });
-            setIsLoggingIn(false);
-          }}
-          className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all"
+          type="button"
+          className="ios-button ios-button-primary"
+          onClick={() => { setSentTo(null); setIsSignUp(false); resetForm(); }}
         >
-          Back to Login
+          Back to sign in
         </button>
       </div>
     );
   }
 
-  // Show premium loading spinner during login
   if (isLoggingIn) {
     return (
-      <div className="w-full max-w-md bg-white/80 rounded-3xl shadow-2xl p-8 flex flex-col gap-6 border border-blue-100 animate-fade-in backdrop-blur-sm">
-        <div className="flex flex-col items-center gap-4">
-          <Image src="/logo.png" alt="DropPoint Logo" width={80} height={80} className="w-20 h-20 object-contain" priority />
-          
-          {/* Premium Spinner */}
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-blue-100 rounded-full animate-spin border-t-blue-600"></div>
-            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent rounded-full animate-pulse border-t-blue-400"></div>
-          </div>
-          
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-blue-700 mb-2">Welcome back!</h2>
-            <p className="text-sm text-gray-600">Taking you to your properties...</p>
-          </div>
+      <div className="w-full max-w-sm flex flex-col items-center text-center gap-5">
+        {logo}
+        <div className="w-8 h-8 border-[3px] border-surface-2 border-t-accent rounded-full animate-spin" />
+        <div>
+          <h1 className="text-title-2 font-bold">Welcome back</h1>
+          <p className="text-subhead text-ink-2 mt-1">Opening your map…</p>
         </div>
       </div>
     );
   }
 
+  const fieldClass = 'ios-field';
+
   return (
-    <div className="w-full max-w-md bg-white/80 rounded-3xl shadow-2xl p-8 flex flex-col gap-8 border border-blue-100 animate-fade-in backdrop-blur-sm">
+    <div className="w-full max-w-sm flex flex-col gap-6">
       <div className="flex flex-col items-center gap-3">
-        {/* Logo image, no circle, no shadow, larger */}
-        <Image src="/logo.png" alt="DropPoint Logo" width={80} height={80} className="w-20 h-20 object-contain mb-2" priority />
-        <h1 className="text-3xl font-extrabold text-blue-700">{isSignUp ? 'Sign Up' : 'Log In'}</h1>
-        <div className="text-base text-gray-500 font-medium">{isSignUp ? 'for DropPoint' : 'to DropPoint'}</div>
+        {logo}
+        <h1 className="ios-large-title">{isSignUp ? 'Create account' : 'DropPoint'}</h1>
+        {!isSignUp && <p className="text-subhead text-ink-2 -mt-1">Your property documents, on a map.</p>}
       </div>
-      <form className="flex flex-col gap-5" onSubmit={handleAuth}>
-        {/* Name fields - only shown during signup */}
-        {isSignUp && (
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text"
-              placeholder="First Name"
-              className={`w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow ${mobileClasses.input}`}
-              style={getMobileStyles('input')}
-              value={firstName}
-              onChange={e => setFirstName(e.target.value)}
-              autoComplete="given-name"
-              required
-            />
-            <input
-              type="text"
-              placeholder="Last Name"
-              className={`w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow ${mobileClasses.input}`}
-              style={getMobileStyles('input')}
-              value={lastName}
-              onChange={e => setLastName(e.target.value)}
-              autoComplete="family-name"
-              required
-            />
-          </div>
-        )}
-        
-        {/* Email field - always shown */}
-        <input
-          type="email"
-          placeholder="Email Address"
-          className={`w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow ${mobileClasses.input}`}
-          style={getMobileStyles('input')}
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          autoComplete="email"
-          required
-        />
-        
-        <div className="relative">
-          <input
-            type={showPassword ? 'text' : 'password'}
-            placeholder="Password"
-            className={`w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow pr-10 ${mobileClasses.input}`}
-            style={getMobileStyles('input')}
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            autoComplete={isSignUp ? 'new-password' : 'current-password'}
-            required
-          />
-          <button
-            type="button"
-            className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none cursor-pointer ${mobileClasses.touchTarget}`}
-            onClick={() => {
-              setShowPassword((v) => !v);
-            }}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-          >
-            <EyeIcon open={showPassword} />
-          </button>
-        </div>
-        
-        {/* Password requirements - only shown during signup */}
-        {isSignUp && showPasswordRequirements && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2 animate-fade-in">
-            <div className="text-xs font-semibold text-gray-700 mb-2">Password Requirements:</div>
-            <div className="space-y-1">
-              <div className={`flex items-center gap-2 text-xs ${passwordRequirements.length ? 'text-green-600' : 'text-red-500'}`}>
-                <span className={`w-2 h-2 rounded-full ${passwordRequirements.length ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                At least 8 characters
-              </div>
-              <div className={`flex items-center gap-2 text-xs ${passwordRequirements.uppercase ? 'text-green-600' : 'text-red-500'}`}>
-                <span className={`w-2 h-2 rounded-full ${passwordRequirements.uppercase ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                One uppercase letter
-              </div>
-              <div className={`flex items-center gap-2 text-xs ${passwordRequirements.lowercase ? 'text-green-600' : 'text-red-500'}`}>
-                <span className={`w-2 h-2 rounded-full ${passwordRequirements.lowercase ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                One lowercase letter
-              </div>
-              <div className={`flex items-center gap-2 text-xs ${passwordRequirements.number ? 'text-green-600' : 'text-red-500'}`}>
-                <span className={`w-2 h-2 rounded-full ${passwordRequirements.number ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                One number
-              </div>
-              <div className={`flex items-center gap-2 text-xs ${passwordRequirements.special ? 'text-green-600' : 'text-red-500'}`}>
-                <span className={`w-2 h-2 rounded-full ${passwordRequirements.special ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                One special character
-              </div>
+
+      <form className="flex flex-col gap-4" onSubmit={handleAuth} noValidate>
+        <div className="ios-group">
+          {isSignUp && (
+            <div className="grid grid-cols-2 divide-x divide-hairline/60">
+              <input
+                type="text"
+                placeholder="First name"
+                className={fieldClass}
+                value={firstName}
+                onChange={e => setFirstName(e.target.value)}
+                autoComplete="given-name"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Last name"
+                className={fieldClass}
+                value={lastName}
+                onChange={e => setLastName(e.target.value)}
+                autoComplete="family-name"
+                required
+              />
             </div>
-          </div>
-        )}
-        
-        {isSignUp && (
-          <div className="relative">
+          )}
+          <div className={isSignUp ? 'border-t border-hairline/60' : ''}>
             <input
-              type={showConfirmPassword ? 'text' : 'password'}
-              placeholder="Confirm Password"
-              className={`w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold placeholder:font-semibold placeholder:text-gray-400 text-gray-900 text-base bg-white/90 shadow pr-10 ${mobileClasses.input}`}
-              style={getMobileStyles('input')}
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              autoComplete="new-password"
+              type="email"
+              placeholder="Email"
+              className={fieldClass}
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              autoComplete="email"
+              inputMode="email"
+              autoCapitalize="none"
+              required
+            />
+          </div>
+          <div className="relative border-t border-hairline/60">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              className={`${fieldClass} pr-12`}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoComplete={isSignUp ? 'new-password' : 'current-password'}
               required
             />
             <button
               type="button"
-              className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none cursor-pointer ${mobileClasses.touchTarget}`}
-              onClick={() => {
-                setShowConfirmPassword((v) => !v);
-              }}
-              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-2 top-1/2 -translate-y-1/2 tap-target flex items-center justify-center text-ink-2 ios-press"
+              onClick={() => setShowPassword(v => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
             >
-              <EyeIcon open={showConfirmPassword} />
+              <EyeIcon open={showPassword} />
             </button>
-            {showPasswordMismatch && (
-              <div className="text-red-600 text-xs mt-1 text-center animate-fade-in">Passwords do not match.</div>
-            )}
           </div>
+          {isSignUp && (
+            <div className="border-t border-hairline/60">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Confirm password"
+                className={fieldClass}
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+            </div>
+          )}
+        </div>
+
+        {isSignUp && (missing.length > 0 || mismatch) && (
+          <p className={`text-footnote px-4 -mt-1 ${mismatch ? 'text-danger' : 'text-ink-2'}`} aria-live="polite">
+            {mismatch ? 'Passwords don’t match.' : `Password needs ${joinList(missing)}.`}
+          </p>
         )}
-        
-        <button
-          type="submit"
-          className={`w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer ${mobileClasses.touchTarget}`}
-          disabled={loading || isLoggingIn || (isSignUp && !isFormValid)}
-        >
-          {loading ? (isSignUp ? 'Signing Up...' : 'Logging In...') : (isSignUp ? 'Sign Up' : 'Log In')}
+
+        {error && (
+          <p className="text-footnote text-danger px-4 -mt-1" role="alert">{error}</p>
+        )}
+
+        <button type="submit" className="ios-button ios-button-primary" disabled={loading || !canSubmit}>
+          {loading ? (isSignUp ? 'Creating account…' : 'Signing in…') : (isSignUp ? 'Create account' : 'Sign in')}
         </button>
-        
       </form>
-      
-      {/* Error and message display */}
-      {error && (
-        <div className="text-red-600 text-sm text-center bg-red-50 border border-red-200 rounded-lg p-3">
-          {error}
-        </div>
-      )}
-      {message && (
-        <div className="text-green-600 text-sm text-center bg-green-50 border border-green-200 rounded-lg p-3">
-          {message}
-        </div>
-      )}
-      
-      <div className="text-center">
-        <button
-          type="button"
-          className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
-          onClick={() => {
-            setIsSignUp(!isSignUp);
-            // Clear form when switching modes
-            setEmail('');
-            setPassword('');
-            setConfirmPassword('');
-            setFirstName('');
-            setLastName('');
-            setError(null);
-            setMessage(null);
-            setShowPasswordMismatch(false);
-            setShowPasswordRequirements(false);
-            setPasswordRequirements({
-              length: false,
-              uppercase: false,
-              lowercase: false,
-              number: false,
-              special: false
-            });
-            setIsLoggingIn(false);
-          }}
-        >
-          {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
-        </button>
-      </div>
+
+      <button
+        type="button"
+        className="text-subhead text-accent text-center ios-press"
+        onClick={() => { setIsSignUp(v => !v); resetForm(); }}
+      >
+        {isSignUp ? 'Have an account? Sign in' : 'New here? Create an account'}
+      </button>
     </div>
   );
 }
-
-// Add fade-in animation to Tailwind (if not already in your config):
-// .animate-fade-in { animation: fadeIn 0.3s ease; }
-// @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } } 

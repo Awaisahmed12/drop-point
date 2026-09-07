@@ -1,0 +1,14 @@
+{
+  "name": "DropPoint",
+  "short_name": "DropPoint",
+  "description": "Property documents, organized on a map.",
+  "start_url": "/map",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f2f7",
+  "theme_color": "#f9f9f9",
+  "icons": [
+    { "src": "/logo.png", "sizes": "505x482", "type": "image/png", "purpose": "any" }
+  ]
+}
