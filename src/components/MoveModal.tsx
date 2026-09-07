@@ -102,10 +102,10 @@ export const MoveModal: React.FC<MoveModalProps> = ({
                 : 'cursor-pointer hover:shadow-sm'
             } ${
               isSelected 
-                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md' 
+                ? 'bg-gradient-to-r from-accent to-accent text-white shadow-md' 
                 : isHovered 
-                  ? 'bg-blue-50 border border-blue-200' 
-                  : 'hover:bg-gray-50'
+                  ? 'bg-accent-soft border border-accent/40' 
+                  : 'hover:bg-surface-2'
             }`}
             style={{ paddingLeft: `${12 + depth * 20}px` }}
             onClick={() => !isInvalid && setSelected(node.id)}
@@ -122,8 +122,8 @@ export const MoveModal: React.FC<MoveModalProps> = ({
                   }}
                   className={`w-5 h-5 flex items-center justify-center rounded transition-all duration-200 ${
                     isSelected 
-                      ? 'text-white hover:bg-white/20' 
-                      : 'text-gray-400 hover:text-blue-600 hover:bg-blue-100'
+                      ? 'text-white hover:bg-surface/20' 
+                      : 'text-ink-3 hover:text-accent hover:bg-accent-soft'
                   }`}
                 >
                   {isExpanded ? (
@@ -144,8 +144,8 @@ export const MoveModal: React.FC<MoveModalProps> = ({
                   isSelected 
                     ? 'text-white' 
                     : isInvalid 
-                      ? 'text-gray-300'
-                      : 'text-amber-500'
+                      ? 'text-ink-3'
+                      : 'text-warning'
                 }`} 
               />
             </div>
@@ -155,8 +155,8 @@ export const MoveModal: React.FC<MoveModalProps> = ({
               isSelected 
                 ? 'text-white' 
                 : isInvalid 
-                  ? 'text-gray-400'
-                  : 'text-gray-700'
+                  ? 'text-ink-3'
+                  : 'text-ink'
             }`}>
               {node.name}
             </div>
@@ -164,7 +164,7 @@ export const MoveModal: React.FC<MoveModalProps> = ({
             {/* Selection Indicator */}
             {isSelected && (
               <div className="w-6 h-6 flex items-center justify-center mr-2">
-                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                <div className="w-2 h-2 bg-surface rounded-full animate-pulse" />
               </div>
             )}
           </div>
@@ -190,21 +190,21 @@ export const MoveModal: React.FC<MoveModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onCancel}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col border border-gray-200 overflow-hidden transform transition-all duration-300 animate-scale-in"
+        className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col border border-hairline overflow-hidden transform transition-all duration-300 animate-scale-in"
         onClick={e => e.stopPropagation()}
         style={{ maxHeight: '80vh' }}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center">
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <div className="px-6 py-4 border-b border-hairline bg-gradient-to-r from-ground to-surface">
+          <h2 className="text-xl font-bold text-ink flex items-center">
+            <div className="w-8 h-8 bg-accent-soft rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
               </svg>
             </div>
             Choose Destination
           </h2>
-          <p className="text-sm text-gray-500 mt-1 ml-11">
+          <p className="text-sm text-ink-2 mt-1 ml-11">
             Select where to move your {currentItemType}
           </p>
         </div>
@@ -216,10 +216,10 @@ export const MoveModal: React.FC<MoveModalProps> = ({
             <div 
               className={`flex items-center group transition-all duration-200 rounded-lg mx-1 mb-2 cursor-pointer hover:shadow-sm ${
                 selected === null 
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md' 
+                  ? 'bg-gradient-to-r from-accent to-accent text-white shadow-md' 
                   : hoveredId === 'root'
-                    ? 'bg-blue-50 border border-blue-200' 
-                    : 'hover:bg-gray-50'
+                    ? 'bg-accent-soft border border-accent/40' 
+                    : 'hover:bg-surface-2'
               }`}
               onClick={() => setSelected(null)}
               onMouseEnter={() => setHoveredId('root')}
@@ -228,18 +228,18 @@ export const MoveModal: React.FC<MoveModalProps> = ({
               <div className="w-6 h-6 ml-3 mr-4">
                 <HomeIcon 
                   className={`w-5 h-5 transition-colors duration-200 ${
-                    selected === null ? 'text-white' : 'text-blue-600'
+                    selected === null ? 'text-white' : 'text-accent'
                   }`} 
                 />
               </div>
               <div className={`flex-1 py-3 pr-3 font-semibold transition-colors duration-200 ${
-                selected === null ? 'text-white' : 'text-gray-700'
+                selected === null ? 'text-white' : 'text-ink'
               }`}>
                 Root Folder
               </div>
               {selected === null && (
                 <div className="w-6 h-6 flex items-center justify-center mr-2">
-                  <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                  <div className="w-2 h-2 bg-surface rounded-full animate-pulse" />
                 </div>
               )}
             </div>
@@ -250,8 +250,8 @@ export const MoveModal: React.FC<MoveModalProps> = ({
                 {renderTree(tree)}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-400">
-                <FolderIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <div className="text-center py-8 text-ink-3">
+                <FolderIcon className="w-12 h-12 mx-auto mb-3 text-ink-3" />
                 <p className="font-medium">No folders created yet</p>
                 <p className="text-sm">Create a folder to organize your files</p>
               </div>
@@ -260,9 +260,9 @@ export const MoveModal: React.FC<MoveModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
+        <div className="px-6 py-4 border-t border-hairline bg-ground flex gap-3">
           <button
-            className="flex-1 bg-gray-200 text-gray-700 rounded-xl px-4 py-3 font-semibold text-base transition-all duration-200 hover:bg-gray-300 hover:shadow-sm active:scale-95"
+            className="flex-1 bg-surface-2 text-ink rounded-xl px-4 py-3 font-semibold text-base transition-all duration-200 hover:bg-ink-3 hover:shadow-sm active:scale-95"
             onClick={() => {
               onCancel();
             }}
@@ -273,8 +273,8 @@ export const MoveModal: React.FC<MoveModalProps> = ({
           <button
             className={`flex-1 rounded-xl px-4 py-3 font-semibold text-base transition-all duration-200 active:scale-95 ${
               moveDisabled 
-                ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
-                : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl'
+                ? 'bg-surface-2 text-ink-3 cursor-not-allowed' 
+                : 'bg-gradient-to-r from-accent to-accent text-white hover:from-accent hover:to-accent shadow-lg hover:shadow-xl'
             }`}
             onClick={() => {
               const target = selected === undefined ? null : selected;

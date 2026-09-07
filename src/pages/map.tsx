@@ -571,6 +571,7 @@ function MapPage() {
                 streetViewControl: false,
                 clickableIcons: false,
                 disableDefaultUI: true,
+                colorScheme: 'FOLLOW_SYSTEM',
                 styles: [
                   { featureType: 'poi', stylers: [{ visibility: 'off' }] },
                   { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },

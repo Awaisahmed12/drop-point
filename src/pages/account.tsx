@@ -208,7 +208,7 @@ function AccountPage() {
                     <span className="text-headline font-semibold">Storage</span>
                     <span className="text-subhead text-ink-2 whitespace-nowrap">{formatBytes(usageBytes)} of {FREE_TIER_GB} GB</span>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-black/8 overflow-hidden">
+                  <div className="w-full h-2 rounded-full bg-ink/10 overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{

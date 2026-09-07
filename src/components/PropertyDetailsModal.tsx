@@ -47,6 +47,16 @@ const VIEWER_CSS = `
   th { background: #f6f8fa; font-weight: 600; position: sticky; top: 0; }
   tr:nth-child(even) { background: #f6f8fa; }
   td:hover { white-space: normal; max-width: none; }
+  :root { color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #000; color: #f2f2f7; }
+    .header { background: #1c1c1e; border-color: #38383a; }
+    .filename { color: #f2f2f7; }
+    .content { background: #000; }
+    table { background: #1c1c1e; }
+    th, td { border-color: #38383a; }
+    th, tr:nth-child(even) { background: #2c2c2e; }
+  }
 `;
 
 /** Fill a blank tab with a titled, escaped viewer page. */
@@ -160,6 +170,8 @@ export const PropertyDetailsModal = ({
   const [renamingProperty, setRenamingProperty] = useState(false);
   const [propertyLabelDraft, setPropertyLabelDraft] = useState('');
   const renameCancelledRef = useRef(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const fabButtonRef = useRef<HTMLButtonElement>(null);
   // The nav bar floats over the hero photo and turns solid once content scrolls under it.
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
   const sheetDrag = useSheetDrag({
@@ -860,17 +872,17 @@ export const PropertyDetailsModal = ({
         maxHeight: '100dvh'
       }}>
         {/* Header */}
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-200 flex-shrink-0">
+        <div className="bg-surface px-4 py-3 flex items-center justify-between border-b border-hairline flex-shrink-0">
           <div className="flex items-center min-w-0 flex-1">
             <FileIcon
               type={fileExtension || 'file'}
               size={24}
             />
             <div className="ml-3 min-w-0 flex-1">
-              <h3 className="font-semibold text-gray-900 truncate text-sm">
+              <h3 className="font-semibold text-ink truncate text-sm">
                 {getFileNameWithoutExtension(file.file_name)}
               </h3>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-2">
                 {formatFileSize(file.file_size)} • {formatDate(file.modified_at || file.uploaded_at)}
               </p>
             </div>
@@ -878,7 +890,7 @@ export const PropertyDetailsModal = ({
           <div className="flex items-center gap-2 ml-4">
             <button
               onClick={() => window.open(mobileFileViewer.downloadUrl, '_blank')}
-              className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+              className="p-2 rounded-lg bg-accent-soft text-accent hover:bg-accent-soft transition-colors"
               title="Download"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -887,7 +899,7 @@ export const PropertyDetailsModal = ({
             </button>
             <button
               onClick={closeMobileViewer}
-              className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+              className="p-2 rounded-lg bg-surface-2 text-ink-2 hover:bg-surface-2 transition-colors"
               title="Close"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -898,7 +910,7 @@ export const PropertyDetailsModal = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto bg-gray-100" style={{
+        <div className="flex-1 overflow-auto bg-surface-2" style={{
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}>
           {IMAGE_EXTENSIONS.has(fileExtension || '') ? (
@@ -928,23 +940,23 @@ export const PropertyDetailsModal = ({
           ) : fileExtension === 'txt' && mobileFileViewer.content ? (
             // Text viewer
             <div className="p-4">
-              <pre className="bg-white rounded-lg p-4 text-sm font-mono whitespace-pre-wrap break-words shadow-sm border">
+              <pre className="bg-surface rounded-lg p-4 text-sm font-mono whitespace-pre-wrap break-words shadow-sm border">
                 {mobileFileViewer.content}
               </pre>
             </div>
           ) : fileExtension === 'csv' && mobileFileViewer.content ? (
             // CSV viewer
             <div className="p-4">
-              <div className="bg-white rounded-lg shadow-sm border overflow-auto">
+              <div className="bg-surface rounded-lg shadow-sm border overflow-auto">
                 {(() => {
                   const [headers = [], ...rows] = parseCsv(mobileFileViewer.content);
 
                   return (
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-ground">
                         <tr>
                           {headers.map((header, i) => (
-                            <th key={i} className="px-3 py-2 text-left font-semibold text-gray-700 border-b">
+                            <th key={i} className="px-3 py-2 text-left font-semibold text-ink border-b">
                               {header}
                             </th>
                           ))}
@@ -952,9 +964,9 @@ export const PropertyDetailsModal = ({
                       </thead>
                       <tbody>
                         {rows.map((row, i) => (
-                          <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <tr key={i} className={i % 2 === 0 ? 'bg-surface' : 'bg-ground'}>
                             {row.map((cell, j) => (
-                              <td key={j} className="px-3 py-2 border-b border-gray-200">
+                              <td key={j} className="px-3 py-2 border-b border-hairline">
                                 {cell}
                               </td>
                             ))}
@@ -977,12 +989,12 @@ export const PropertyDetailsModal = ({
                 <h3 className="mt-4 text-lg font-semibold text-white">
                   {file.file_name}
                 </h3>
-                <p className="mt-2 text-gray-300">
+                <p className="mt-2 text-ink-3">
                   Preview not available for this file type
                 </p>
                 <button
                   onClick={() => window.open(mobileFileViewer.downloadUrl, '_blank')}
-                  className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                  className="mt-4 bg-accent text-white px-6 py-3 rounded-lg font-semibold hover:bg-accent/90 transition-colors"
                 >
                   Download File
                 </button>
@@ -1133,9 +1145,10 @@ export const PropertyDetailsModal = ({
           <button
             type="button"
             className={`ios-close justify-self-end ${navSolid ? '' : 'ios-close-on-photo'}`}
+            ref={moreButtonRef}
             onClick={() => setMoreOpen(true)}
             aria-label="More actions"
-            aria-haspopup="dialog"
+            aria-haspopup={isMobile ? 'dialog' : 'menu'}
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
@@ -1292,7 +1305,7 @@ export const PropertyDetailsModal = ({
               )}
               
               {/* Search Bar - Always visible with enhanced mobile positioning */}
-              <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-2.5' : 'py-3'} sm:py-3 bg-white`} style={{
+              <div className={`px-4 ${breadcrumbPath.length > 0 ? 'py-2.5' : 'py-3'} sm:py-3 bg-surface`} style={{
                 // Ensure search bar is always above mobile browser chrome
                 position: 'sticky',
                 top: breadcrumbPath.length > 0 ? '0' : '0',
@@ -1855,21 +1868,21 @@ export const PropertyDetailsModal = ({
           <div className="fixed z-[9999] left-4 right-4 sm:left-auto sm:right-4 sm:w-96" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
             {/* Summary toast for multiple uploads */}
             {pendingUploads.length > 1 && (
-              <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-4 mb-3 transform transition-all duration-300 ease-out">
+              <div className="bg-surface/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-hairline/40 p-4 mb-3 transform transition-all duration-300 ease-out">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+                    <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center mr-3">
                       <svg className="w-4 h-4 text-white animate-pulse" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-ink">
                         Uploading {pendingUploads.filter(p => p.status === 'uploading').length} files
                       </p>
-                      <div className="w-48 bg-gray-200 rounded-full h-1.5 mt-1">
+                      <div className="w-48 bg-surface-2 rounded-full h-1.5 mt-1">
                         <div 
-                          className="bg-blue-500 h-1.5 rounded-full transition-all duration-300 ease-out"
+                          className="bg-accent h-1.5 rounded-full transition-all duration-300 ease-out"
                           style={{ 
                             width: `${pendingUploads.reduce((acc, upload) => acc + upload.progress, 0) / pendingUploads.length}%` 
                           }}
@@ -1888,10 +1901,10 @@ export const PropertyDetailsModal = ({
                         }
                       });
                     }}
-                    className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                    className="p-1 rounded-full hover:bg-surface-2 transition-colors"
                     title="Clear"
                   >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-ink-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -1904,11 +1917,11 @@ export const PropertyDetailsModal = ({
               {pendingUploads.slice(0, 4).map((upload) => (
                 <div 
                   key={upload.id}
-                  className={`bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-white/20 p-3 transform transition-all duration-500 ease-out ${
+                  className={`bg-surface/95 backdrop-blur-xl rounded-xl shadow-lg border border-hairline/40 p-3 transform transition-all duration-500 ease-out ${
                     upload.status === 'success' 
-                      ? 'bg-green-50/95 border-green-200/30' 
+                      ? 'bg-success/15 border-success/30' 
                       : upload.status === 'error'
-                      ? 'bg-red-50/95 border-red-200/30'
+                      ? 'bg-danger/15 border-danger/30'
                       : ''
                   }`}
                   style={{
@@ -1921,23 +1934,23 @@ export const PropertyDetailsModal = ({
                     {/* File Icon */}
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${
                       upload.status === 'uploading' 
-                        ? 'bg-blue-100' 
+                        ? 'bg-accent-soft' 
                         : upload.status === 'success'
-                        ? 'bg-green-100'
+                        ? 'bg-success/15'
                         : upload.status === 'error'
-                        ? 'bg-red-100'
-                        : 'bg-gray-100'
+                        ? 'bg-danger/15'
+                        : 'bg-surface-2'
                     }`}>
                       {upload.status === 'uploading' && (
-                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                       )}
                       {upload.status === 'success' && (
-                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-success" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       )}
                       {upload.status === 'error' && (
-                        <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-danger" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       )}
@@ -1945,29 +1958,29 @@ export const PropertyDetailsModal = ({
                     
                     {/* File Info */}
                     <div className="flex-1 min-w-0 mr-2">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-sm font-medium text-ink truncate">
                         {upload.name}
                       </p>
                       {upload.status === 'uploading' && (
                         <div className="flex items-center mt-1">
-                          <div className="flex-1 bg-gray-200 rounded-full h-1 mr-2">
+                          <div className="flex-1 bg-surface-2 rounded-full h-1 mr-2">
                             <div 
-                              className="bg-blue-500 h-1 rounded-full transition-all duration-300 ease-out"
+                              className="bg-accent h-1 rounded-full transition-all duration-300 ease-out"
                               style={{ width: `${upload.progress}%` }}
                             />
                           </div>
-                          <span className="text-xs text-gray-500 font-medium">
+                          <span className="text-xs text-ink-2 font-medium">
                             {upload.progress}%
                           </span>
                         </div>
                       )}
                       {upload.status === 'success' && (
-                        <p className="text-xs text-green-600 font-medium mt-0.5">
+                        <p className="text-xs text-success font-medium mt-0.5">
                           Uploaded successfully
                         </p>
                       )}
                       {upload.status === 'error' && (
-                        <p className="text-xs text-red-600 font-medium mt-0.5">
+                        <p className="text-xs text-danger font-medium mt-0.5">
                           {upload.error || 'Upload failed'}
                         </p>
                       )}
@@ -1978,10 +1991,10 @@ export const PropertyDetailsModal = ({
                       {upload.status === 'uploading' && (
                         <button
                           onClick={upload.cancel}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors group"
+                          className="p-1.5 rounded-lg hover:bg-surface-2 transition-colors group"
                           title="Cancel"
                         >
-                          <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-red-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <svg className="w-3.5 h-3.5 text-ink-3 group-hover:text-danger" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
@@ -1989,10 +2002,10 @@ export const PropertyDetailsModal = ({
                       {upload.status === 'error' && (
                         <button
                           onClick={upload.retry}
-                          className="p-1.5 rounded-lg hover:bg-blue-50 transition-colors group"
+                          className="p-1.5 rounded-lg hover:bg-accent-soft transition-colors group"
                           title="Retry"
                         >
-                          <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <svg className="w-3.5 h-3.5 text-ink-3 group-hover:text-accent" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                           </svg>
                         </button>
@@ -2000,10 +2013,10 @@ export const PropertyDetailsModal = ({
                       {upload.status !== 'uploading' && (
                         <button
                           onClick={() => onDismiss(upload.id)}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors group"
+                          className="p-1.5 rounded-lg hover:bg-surface-2 transition-colors group"
                           title="Dismiss"
                         >
-                          <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <svg className="w-3.5 h-3.5 text-ink-3 group-hover:text-ink-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
@@ -2015,8 +2028,8 @@ export const PropertyDetailsModal = ({
               
               {/* Show more indicator */}
               {pendingUploads.length > 4 && (
-                <div className="bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-white/20 p-2 text-center">
-                  <p className="text-xs text-gray-500">
+                <div className="bg-surface/95 backdrop-blur-xl rounded-xl shadow-lg border border-hairline/40 p-2 text-center">
+                  <p className="text-xs text-ink-2">
                     +{pendingUploads.length - 4} more files uploading...
                   </p>
                 </div>
@@ -2070,9 +2083,10 @@ export const PropertyDetailsModal = ({
             type="button"
             className="w-[52px] h-[52px] rounded-full bg-accent text-white flex items-center justify-center ios-press"
             style={{ boxShadow: '0 4px 16px rgba(10, 122, 255, 0.4)' }}
+            ref={fabButtonRef}
             onClick={() => setFabOpen(true)}
             aria-label="Add files or a folder"
-            aria-haspopup="dialog"
+            aria-haspopup={isMobile ? 'dialog' : 'menu'}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -2082,6 +2096,8 @@ export const PropertyDetailsModal = ({
         <ActionSheet
           open={fabOpen}
           onClose={() => setFabOpen(false)}
+          presentation={isMobile ? 'sheet' : 'popover'}
+          anchorRef={fabButtonRef}
           title={selectedFolder === 'master' ? 'Add to this property' : `Add to “${folders.find(f => f.id === selectedFolder)?.name ?? 'folder'}”`}
           groups={[[
             { label: 'Upload files', onSelect: () => document.getElementById('file-upload-input')?.click() },
@@ -2238,7 +2254,7 @@ export const PropertyDetailsModal = ({
         )}
       </div>
 
-      <ActionSheet open={moreOpen} onClose={() => setMoreOpen(false)} title={property.address} groups={moreGroups} />
+      <ActionSheet open={moreOpen} onClose={() => setMoreOpen(false)} title={property.address} groups={moreGroups} presentation={isMobile ? 'sheet' : 'popover'} anchorRef={moreButtonRef} />
       {currentPropertyWithFileCount && (
         <PropertySwitcher
           currentProperty={currentPropertyWithFileCount}

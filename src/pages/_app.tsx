@@ -20,7 +20,7 @@ export default function App({ Component, pageProps }: AppProps) {
         progress.style.left = '0';
         progress.style.height = '2px';
         progress.style.width = '0%';
-        progress.style.background = '#2563eb';
+        progress.style.background = 'var(--color-accent)';
         progress.style.zIndex = '99999';
         progress.style.transition = 'width 200ms ease';
         document.body.appendChild(progress);
