@@ -149,6 +149,24 @@ export const PropertyDetailsModal = ({
 
   // State for UI interactions
   const [creatingFolder, setCreatingFolder] = useState(false);
+  // iOS doesn't shrink the layout viewport for the keyboard, so a centered
+  // alert ends up behind it. Track the visual viewport while the alert is up.
+  const [visibleViewport, setVisibleViewport] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    if (!creatingFolder) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setVisibleViewport({ top: vv.offsetTop, height: vv.height });
+    const frame = requestAnimationFrame(update);
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      cancelAnimationFrame(frame);
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      setVisibleViewport(null);
+    };
+  }, [creatingFolder]);
   const [newFolderName, setNewFolderName] = useState('');
   const [folderErrorPopup, setFolderErrorPopup] = useState<string | null>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -1083,7 +1101,7 @@ export const PropertyDetailsModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40 animate-fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-label={displayName}
@@ -2192,7 +2210,8 @@ export const PropertyDetailsModal = ({
         {/* New folder: an alert with a single field. */}
         {creatingFolder && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-fade-in"
+            className="fixed inset-x-0 z-50 flex items-center justify-center bg-black/40 animate-fade-in"
+            style={visibleViewport ? { top: visibleViewport.top, height: visibleViewport.height } : { top: 0, bottom: 0 }}
             onClick={cancelCreateFolder}
             onTouchEnd={e => { e.preventDefault(); cancelCreateFolder(); }}
           >
