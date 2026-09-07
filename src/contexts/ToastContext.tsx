@@ -64,7 +64,7 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
               key={toast.id}
               type="button"
               onClick={() => dismiss(toast.id)}
-              className="ios-float flex items-center gap-3 px-4 py-3 rounded-[14px] text-subhead font-medium text-ink text-left pointer-events-auto animate-sheet-up"
+              className="glass flex items-center gap-3 px-4 py-3 rounded-full text-subhead font-medium text-ink text-left pointer-events-auto animate-sheet-up"
             >
               {ICONS[toast.type]}
               <span className="flex-1">{toast.message}</span>

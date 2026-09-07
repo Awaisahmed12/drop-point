@@ -53,19 +53,19 @@ export const ActionSheet: React.FC<ActionSheetProps> = ({ open, onClose, title, 
         style={{ paddingBottom: 'calc(var(--safe-bottom) + 8px)' }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="rounded-[14px] overflow-hidden bg-surface/95 backdrop-blur-xl">
+        <div className="glass rounded-[26px] overflow-hidden">
           {title && (
             <div className="px-4 py-3 text-center text-footnote text-ink-2 border-b border-hairline/60">
               {title}
             </div>
           )}
           {groups.map((group, gi) => (
-            <div key={gi} className={gi > 0 ? 'border-t-[6px] border-ground' : ''}>
+            <div key={gi} className={gi > 0 ? 'border-t-[6px] border-black/5' : ''}>
               {group.map((item, ii) => (
                 <button
                   key={item.label}
                   type="button"
-                  className={`flex items-center justify-center gap-2.5 w-full h-[56px] text-[20px] font-normal active:bg-surface-2 ${
+                  className={`flex items-center justify-center gap-2.5 w-full h-[56px] text-[19px] font-normal active:bg-black/5 ${
                     ii > 0 ? 'border-t border-hairline/60' : ''
                   } ${item.tone === 'danger' ? 'text-danger' : 'text-accent'}`}
                   onClick={() => run(item)}
@@ -84,7 +84,7 @@ export const ActionSheet: React.FC<ActionSheetProps> = ({ open, onClose, title, 
         </div>
         <button
           type="button"
-          className="mt-2 w-full h-[56px] rounded-[14px] bg-surface text-[20px] font-semibold text-accent active:bg-surface-2"
+          className="glass mt-2 w-full h-[56px] rounded-full text-[19px] font-semibold text-accent active:bg-black/5"
           onClick={onClose}
         >
           {cancelLabel}

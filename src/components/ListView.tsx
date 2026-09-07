@@ -128,7 +128,7 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
                   type="button"
                   key={property.id}
                   onClick={() => onPropertySelect(property)}
-                  className="text-left bg-surface rounded-[14px] overflow-hidden ios-press"
+                  className="text-left bg-surface rounded-[24px] overflow-hidden ios-press shadow-[0_1px_2px_rgba(0,0,0,0.04),0_0_0_0.5px_rgba(0,0,0,0.04)]"
                 >
                   <div className="relative h-40 bg-surface-2">
                     <Image
@@ -163,7 +163,7 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
                   onClick={() => onPropertySelect(property)}
                   className="ios-row ios-row-press has-leading py-2.5"
                 >
-                  <div className="relative w-14 h-14 rounded-[10px] overflow-hidden bg-surface-2 flex-shrink-0">
+                  <div className="relative w-14 h-14 rounded-[14px] overflow-hidden bg-surface-2 flex-shrink-0">
                     <Image
                       src={streetViewUrl(property, '160x160')}
                       alt=""

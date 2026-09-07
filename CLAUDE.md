@@ -76,7 +76,9 @@ The two API routes (`/api/autocomplete`, `/api/reverse-geocode`) are thin proxie
 
 Files are stored in Supabase Storage. Access is via signed URLs with a 1-hour expiry (generated in `src/utils/supabaseClient.ts`). Anything written into a file-viewer tab must go through `escapeHtml` in `PropertyDetailsModal` because that tab shares the app's origin.
 
-### Design System: an iPhone app that happens to be a web app
+### Design System: a 2026 iPhone app that happens to be a web app
+
+Materials are Liquid Glass: translucent, blurred, with a specular top edge (`glass`, `glass-dark`, `ios-float`). Anything that floats over content is glass: the tab bar (a capsule inset from the edges), the map search field and controls, the property card, action sheets, toasts, and the sheet's nav bar once content scrolls under it. Corners are large and concentric (sheet 28px, cards 24px, grouped rows 20px, buttons and fields are capsules). The property sheet opens on a hero photo with the name set into it; the nav bar floats over the photo and turns solid on scroll. Every bottom sheet's grabber and nav zone is a real pull-to-dismiss handle (`useSheetDrag`).
 
 Tokens live in `src/styles/globals.css` (Tailwind v4 `@theme`): the iOS grouped palette (`ground`, `surface`, `surface-2`, `ink`, `ink-2`, `ink-3`, `hairline`), one accent (`accent`), `danger`/`success`/`warning`, the HIG type scale (`text-large-title` … `text-caption-2`), and iOS component classes (`ios-group`/`ios-row`, `ios-search`, `ios-segmented`, `ios-button-*`, `ios-navbar`, `ios-sheet`, `ios-tabbar`, `ios-float`, `ios-close`, `ios-press`). Use these instead of raw gray/blue Tailwind colors so every screen reads as one system.
 

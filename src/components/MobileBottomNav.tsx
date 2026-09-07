@@ -17,8 +17,8 @@ const TABS = [
 ] as const;
 
 /**
- * iOS tab bar: 49pt, translucent, three destinations. The active tab uses the
- * filled glyph; the others are outlined. Sits above the home indicator.
+ * Floating glass tab bar: a capsule that hovers above the home indicator
+ * with three destinations. The selected tab sits on a white pill.
  */
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList, onMapTabReclick }) => {
   const router = useRouter();
@@ -31,25 +31,24 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList, onMapT
 
   return (
     <nav
-      className="sm:hidden fixed bottom-0 inset-x-0 z-40 ios-tabbar"
-      style={{ paddingBottom: 'var(--safe-bottom)' }}
+      className="sm:hidden fixed z-40 left-5 right-5"
+      style={{ bottom: 'calc(var(--safe-bottom) + var(--tabbar-gap))' }}
       aria-label="Primary"
     >
-      <div className="grid grid-cols-3 h-[49px]">
+      <div className="glass ios-tabbar grid grid-cols-3" style={{ height: 'var(--tabbar-height)' }}>
         {TABS.map(({ href, label, Outline, Solid }) => {
           const active = router.pathname === href;
           const Icon = active ? Solid : Outline;
-          const className = `flex flex-col items-center justify-center gap-[3px] ios-press ${active ? 'text-accent' : 'text-ink-2'}`;
           const content = (
             <>
-              <Icon className="w-[26px] h-[26px]" aria-hidden="true" />
-              <span className="text-[10px] font-medium leading-3">{label}</span>
+              <Icon className="w-[24px] h-[24px]" aria-hidden="true" />
+              <span className="text-[11px] font-semibold leading-3">{label}</span>
             </>
           );
 
           if (href === '/list' && onList) {
             return (
-              <button key={href} type="button" className={className} onClick={onList} aria-current={active ? 'page' : undefined}>
+              <button key={href} type="button" className="ios-tab ios-press" onClick={onList} aria-current={active ? 'page' : undefined}>
                 {content}
               </button>
             );
@@ -60,7 +59,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onList, onMapT
               key={href}
               href={href}
               prefetch
-              className={className}
+              className="ios-tab ios-press"
               aria-current={active ? 'page' : undefined}
               onClick={e => {
                 if (href === '/map') {

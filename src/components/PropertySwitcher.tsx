@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useUserProperties } from '../hooks/useUserProperties';
+import { useSheetDrag } from '../hooks/useSheetDrag';
 import type { PropertyWithFileCount } from '../../types';
 
 interface PropertySwitcherProps {
@@ -24,6 +25,7 @@ const parseAddress = (fullAddress: string) => {
 export const PropertySwitcher = ({ currentProperty, onPropertySelect, open, onClose }: PropertySwitcherProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const { properties, loading } = useUserProperties();
+  const sheetDrag = useSheetDrag({ onDismiss: () => { onClose(); setSearchQuery(''); } });
 
   useEffect(() => {
     if (!open) return;
@@ -58,10 +60,11 @@ export const PropertySwitcher = ({ currentProperty, onPropertySelect, open, onCl
       onClick={() => { onClose(); setSearchQuery(''); }}
     >
       <div
-        className="ios-sheet sm:rounded-[16px] w-full sm:max-w-md flex flex-col overflow-hidden animate-sheet-up"
-        style={{ maxHeight: 'min(80dvh, 640px)', height: '80dvh' }}
+        className="ios-sheet sm:rounded-[28px] w-full sm:max-w-md flex flex-col overflow-hidden animate-sheet-up"
+        style={{ maxHeight: 'min(80dvh, 640px)', height: '80dvh', ...sheetDrag.sheetStyle }}
         onClick={e => e.stopPropagation()}
       >
+        <div {...sheetDrag.handleProps}>
         <div className="ios-grabber sm:hidden" />
         <div className="ios-navbar">
           <span />
@@ -69,6 +72,7 @@ export const PropertySwitcher = ({ currentProperty, onPropertySelect, open, onCl
           <button type="button" className="ios-button-plain text-body font-semibold justify-self-end" onClick={() => { onClose(); setSearchQuery(''); }}>
             Done
           </button>
+        </div>
         </div>
         <div className="relative px-4 pb-3">
           <MagnifyingGlassIcon className="absolute left-6.5 top-1/2 -translate-y-1/2 -mt-1.5 w-4.5 h-4.5 text-ink-2 pointer-events-none" strokeWidth={2.5} />
