@@ -28,8 +28,8 @@ function getAvatarColor(str: string): string {
 }
 
 /**
- * Settings-style account screen: inset grouped lists, one value per row,
- * pickers as action sheets, sign out on its own at the bottom.
+ * Account: an avatar hero on a wash of the user's color, then glass groups.
+ * One value per row, pickers as action sheets, sign out on its own at the end.
  */
 function AccountPage() {
   const { showToast } = useToast();
@@ -120,6 +120,7 @@ function AccountPage() {
   const initials = displayName
     ? displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : (email?.[0] ?? '?').toUpperCase();
+  const avatarColor = getAvatarColor(displayName || email || '?');
 
   const valueRow = (key: ProfileKey) => (
     <button key={key} type="button" className="ios-row ios-row-press" onClick={() => setPicker(key)}>
@@ -135,14 +136,16 @@ function AccountPage() {
         <title>Account - DropPoint</title>
       </Head>
       <WebSidebar />
-      <div className="flex-1 overflow-auto">
+      <div
+        className="flex-1 overflow-auto"
+        style={{ background: `radial-gradient(120% 42% at 50% 0%, ${avatarColor}33 0%, ${avatarColor}12 45%, transparent 75%)` }}
+      >
         <div className="max-w-xl mx-auto px-4 pb-tabbar" style={{ paddingTop: 'calc(var(--safe-top) + 16px)' }}>
-          <h1 className="ios-large-title mb-4">Account</h1>
-
           {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="ios-group p-4 animate-pulse">
+            <div className="space-y-4 pt-10">
+              <div className="w-24 h-24 rounded-full bg-surface-2 mx-auto animate-pulse" />
+              {[1, 2].map(i => (
+                <div key={i} className="ios-group-glass p-4 animate-pulse">
                   <div className="h-4 bg-surface-2 rounded w-1/3 mb-3" />
                   <div className="h-3 bg-surface-2 rounded w-2/3" />
                 </div>
@@ -150,26 +153,27 @@ function AccountPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Identity */}
-              <div className="ios-group">
+              {/* Hero: who you are. Tap it to edit your name. */}
+              <div className="flex flex-col items-center text-center pt-6 pb-2">
+                <div
+                  className="w-24 h-24 rounded-full flex items-center justify-center text-white text-[34px] font-semibold select-none"
+                  style={{
+                    background: `linear-gradient(145deg, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0) 55%), ${avatarColor}`,
+                    boxShadow: `0 14px 36px ${avatarColor}55, inset 0 1px 0 rgba(255,255,255,0.6)`,
+                  }}
+                  aria-hidden="true"
+                >
+                  {initials}
+                </div>
                 {!isEditingName ? (
-                  <button type="button" className="ios-row ios-row-press" onClick={() => setIsEditingName(true)}>
-                    <div
-                      className="w-14 h-14 rounded-full flex items-center justify-center text-white text-title-3 font-semibold flex-shrink-0 select-none"
-                      style={{ backgroundColor: getAvatarColor(displayName || email || '?') }}
-                    >
-                      {initials}
+                  <button type="button" className="mt-4 ios-press" onClick={() => setIsEditingName(true)} aria-label="Edit your name">
+                    <div className="text-title-1 font-bold">
+                      {displayName || <span className="text-ink-2 font-normal">Add your name</span>}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-title-3 font-semibold truncate">
-                        {displayName || <span className="text-ink-2 font-normal">Add your name</span>}
-                      </div>
-                      <div className="text-subhead text-ink-2 truncate">{email}</div>
-                    </div>
-                    <ChevronRightIcon className="ios-chevron w-4 h-4" strokeWidth={2.5} />
+                    <div className="text-subhead text-ink-2 mt-0.5">{email}</div>
                   </button>
                 ) : (
-                  <div>
+                  <div className="ios-group-glass w-full mt-4 text-left">
                     <input
                       value={firstName}
                       onChange={e => setFirstName(e.target.value)}
@@ -198,36 +202,36 @@ function AccountPage() {
               </div>
 
               {/* Storage */}
-              <div>
-                <div className="ios-group-label">Storage</div>
-                <div className="ios-group">
-                  <div className="ios-row flex-col items-stretch gap-2 py-3">
-                    <div className="flex items-baseline justify-between gap-4">
-                      <span className="text-body">{formatBytes(usageBytes)} used</span>
-                      <span className="text-subhead text-ink-2 whitespace-nowrap">of {FREE_TIER_GB} GB</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-surface-2 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: pct >= 90 ? '#ff3b30' : pct >= 70 ? '#ff9500' : '#0a7aff' }}
-                      />
-                    </div>
+              <div className="ios-group-glass">
+                <div className="ios-row flex-col items-stretch gap-2.5 py-4">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="text-headline font-semibold">Storage</span>
+                    <span className="text-subhead text-ink-2 whitespace-nowrap">{formatBytes(usageBytes)} of {FREE_TIER_GB} GB</span>
                   </div>
+                  <div className="w-full h-2 rounded-full bg-black/8 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.max(pct, 1)}%`,
+                        background: pct >= 90 ? '#ff3b30' : pct >= 70 ? '#ff9500' : 'linear-gradient(90deg, #2b8cff, #0a7aff)',
+                      }}
+                    />
+                  </div>
+                  <span className="text-footnote text-ink-2">Free plan. Paid plans are coming soon.</span>
                 </div>
-                <p className="text-footnote text-ink-2 px-4 pt-2">Paid plans are coming soon.</p>
               </div>
 
               {/* About you */}
               <div>
                 <div className="ios-group-label">About you</div>
-                <div className="ios-group">
+                <div className="ios-group-glass">
                   {(Object.keys(PROFILE_QUESTIONS) as ProfileKey[]).map(valueRow)}
                 </div>
                 <p className="text-footnote text-ink-2 px-4 pt-2">Optional. Helps us build the right things for you.</p>
               </div>
 
               {profile.userType === 'Admin' && (
-                <div className="ios-group">
+                <div className="ios-group-glass">
                   <Link href="/admin" className="ios-row ios-row-press">
                     <span className="flex-1 text-body">Admin configuration</span>
                     <ChevronRightIcon className="ios-chevron w-4 h-4" strokeWidth={2.5} />
@@ -235,7 +239,7 @@ function AccountPage() {
                 </div>
               )}
 
-              <div className="ios-group">
+              <div className="ios-group-glass">
                 <button type="button" className="ios-row ios-row-press justify-center text-body text-danger" onClick={signOut}>
                   Sign out
                 </button>

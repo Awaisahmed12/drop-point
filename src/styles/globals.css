@@ -165,6 +165,22 @@ input, textarea, [contenteditable], .selectable {
   .glass-dark { background: rgba(20, 20, 24, 0.7); }
 }
 
+/* Glass grouped list, for pages with a color wash behind them. */
+.ios-group-glass {
+  border-radius: var(--radius-row);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.66);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  backdrop-filter: blur(28px) saturate(190%);
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.08),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ios-group-glass { background: rgba(255, 255, 255, 0.96); }
+}
+
 /* Scrim so white text stays legible over a photo. */
 .hero-scrim {
   background: linear-gradient(to top, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.28) 45%, rgba(0, 0, 0, 0) 100%);
