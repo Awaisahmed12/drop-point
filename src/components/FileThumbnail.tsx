@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileIcon } from './FileIcon';
-import { supabase } from '../utils/supabaseClient';
-import { THUMBNAIL_BATCH_WINDOW_MS, THUMBNAIL_BATCH_MAX, SIGNED_URL_EXPIRY_SEC } from '../../constants';
+import { peekThumbnailUrl, requestThumbnailUrl, dropThumbnailUrl, isPreviewableImage } from '../hooks/usePropertyPrefetch';
 
 interface FileThumbnailProps {
   fileName: string;
@@ -10,84 +9,32 @@ interface FileThumbnailProps {
   className?: string;
 }
 
-// Only raster image types get actual previews — docs, PDFs etc. keep their icons
-const PREVIEW_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'bmp', 'svg']);
-
-// Module-level URL cache: survives re-renders and property switches for the session lifetime.
-// Values: string = signed URL, false = fetch failed/unavailable
-const urlCache = new Map<string, string | false>();
-
-// Batch queue: accumulate requests from IntersectionObserver callbacks across all mounted
-// components, then flush them all in a single createSignedUrls() call.
-const pendingQueue: Array<{ key: string; resolve: (url: string | false) => void }> = [];
-let flushTimer: ReturnType<typeof setTimeout> | null = null;
-
-function scheduleFlush() {
-  if (flushTimer !== null) return;
-  flushTimer = setTimeout(flushQueue, THUMBNAIL_BATCH_WINDOW_MS);
-}
-
-async function flushQueue() {
-  flushTimer = null;
-  if (pendingQueue.length === 0) return;
-
-  const batch = pendingQueue.splice(0, THUMBNAIL_BATCH_MAX);
-  if (pendingQueue.length > 0) scheduleFlush(); // schedule next batch if more remain
-
-  const paths = batch.map(item => item.key); // key = "propertyId/fileName"
-
-  try {
-    const { data, error } = await supabase.storage
-      .from('property-files')
-      .createSignedUrls(paths, SIGNED_URL_EXPIRY_SEC); // single HTTP request for all N URLs
-
-    if (error || !data) {
-      batch.forEach(item => { urlCache.set(item.key, false); item.resolve(false); });
-      return;
-    }
-
-    batch.forEach((item, i) => {
-      const url = data[i]?.signedUrl ?? false;
-      urlCache.set(item.key, url);
-      item.resolve(url);
-    });
-  } catch {
-    batch.forEach(item => { urlCache.set(item.key, false); item.resolve(false); });
-  }
-}
-
-function requestThumbnail(propertyId: string, fileName: string): Promise<string | false> {
-  const key = `${propertyId}/${fileName}`;
-  if (urlCache.has(key)) return Promise.resolve(urlCache.get(key)!);
-  return new Promise(resolve => {
-    pendingQueue.push({ key, resolve });
-    scheduleFlush();
-  });
-}
+// Signed URLs are cached, batched and pre-warmed in usePropertyPrefetch so a
+// property that was prefetched (or opened before) shows its pictures at once.
 
 export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' }: FileThumbnailProps) => {
   const ext = fileName.split('.').pop()?.toLowerCase() || '';
-  const isPreviewable = PREVIEW_EXTENSIONS.has(ext);
+  const isPreviewable = isPreviewableImage(fileName);
 
   // Synchronous cache check: if this file was seen before, start with the URL already set.
   // This makes re-opening the same property feel instant — no loading at all.
-  const cachedValue = isPreviewable ? urlCache.get(`${propertyId}/${fileName}`) : undefined;
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(
-    typeof cachedValue === 'string' ? cachedValue : null
+    () => (isPreviewable ? peekThumbnailUrl(propertyId, fileName) : null)
   );
   const [imgLoaded, setImgLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const requested = useRef(false);
+  const retried = useRef(false);
 
   useEffect(() => {
     if (!isPreviewable || requested.current) return;
 
     // Already resolved (possibly between render and effect): no observer needed.
-    if (urlCache.has(`${propertyId}/${fileName}`)) {
+    const cached = peekThumbnailUrl(propertyId, fileName);
+    if (cached) {
       requested.current = true;
-      requestThumbnail(propertyId, fileName).then(url => {
-        if (typeof url === 'string') setThumbnailUrl(url);
-      });
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- cache hit, no request
+      setThumbnailUrl(cached);
       return;
     }
 
@@ -101,7 +48,7 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
         if (!entries[0].isIntersecting || requested.current) return;
         requested.current = true;
         observer.disconnect();
-        requestThumbnail(propertyId, fileName).then(url => {
+        requestThumbnailUrl(propertyId, fileName).then(url => {
           if (typeof url === 'string') setThumbnailUrl(url);
         });
       },
@@ -147,7 +94,16 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
             transition: 'opacity 0.15s ease',
           }}
           onLoad={() => setImgLoaded(true)}
-          onError={() => setThumbnailUrl(null)} // fall back to icon on error
+          onError={() => {
+            // A signed URL can expire between visits: re-sign once, then fall back to the icon.
+            setThumbnailUrl(null);
+            dropThumbnailUrl(propertyId, fileName);
+            if (retried.current) return;
+            retried.current = true;
+            requestThumbnailUrl(propertyId, fileName).then(url => {
+              if (typeof url === 'string') setThumbnailUrl(url);
+            });
+          }}
         />
       )}
     </div>

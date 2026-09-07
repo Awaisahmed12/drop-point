@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import type { Property } from '../../types';
+import { prefetchPropertyData } from '../hooks/usePropertyPrefetch';
 
 interface WebSidebarProps {
   properties?: Property[];
@@ -169,6 +170,7 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
                   <button
                     key={property.id}
                     onClick={() => onPropertySelect?.(property)}
+                    onMouseEnter={() => { if (property.id) void prefetchPropertyData(property.id, property); }}
                     className={`w-full text-left px-2.5 py-2 rounded-lg mb-0.5 group ${
                       isSelected ? 'bg-accent-soft text-accent' : 'text-ink ios-row-press'
                     }`}

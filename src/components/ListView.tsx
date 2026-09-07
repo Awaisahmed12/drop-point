@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
+import { prefetchPropertyData } from '../hooks/usePropertyPrefetch';
 import type { PropertyWithFileCount } from '../../types';
 
 interface ListViewProps {
@@ -125,7 +126,7 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
 
       {stateView ?? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {sortedProperties.map(property => {
+          {sortedProperties.map((property, index) => {
             const { street, rest } = parseAddress(property.address);
             const title = property.label || street || property.address;
             const subtitle = [property.label ? street : null, rest].filter(Boolean).join(', ');
@@ -134,6 +135,8 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
                 type="button"
                 key={property.id}
                 onClick={() => onPropertySelect(property)}
+                onPointerDown={() => { if (property.id) void prefetchPropertyData(property.id, property); }}
+                onMouseEnter={() => { if (property.id) void prefetchPropertyData(property.id, property); }}
                 className="relative text-left h-48 sm:h-56 rounded-[24px] overflow-hidden bg-surface-2 ios-press shadow-[0_10px_30px_rgba(0,0,0,0.10)]"
               >
                 <Image
@@ -142,6 +145,7 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
                   fill
                   className="object-cover"
                   unoptimized
+                  priority={index < 4}
                   onError={e => swapToFallback(e, staticMapUrl(property))}
                 />
                 <div className="hero-scrim absolute inset-x-0 bottom-0 h-[75%]" />

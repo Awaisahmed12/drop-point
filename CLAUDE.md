@@ -52,13 +52,15 @@ Pages compose single-responsibility hooks rather than using a global store:
 | `usePropertyState` | The user's properties, the pin under consideration, the open property |
 | `usePropertyData` | Files, folders, and current folder for the open property |
 | `usePropertyFileActions` | Upload, rename, move, duplicate, delete, create folder — shared by the map and list pages |
-| `usePropertyPrefetch` | Module-level, id-keyed cache of files/folders (5 min TTL); the single cache for property data |
+| `usePropertyPrefetch` | Module-level, id-keyed cache of files/folders (5 min TTL) plus signed thumbnail URLs (batched, 55 min) and image warming (hero photo + first thumbnails); the single cache for property data |
 | `usePropertySwitcher` | Switching the open modal to another property |
 | `useUserProperties` | Property list with file counts for list/sidebar/switcher views |
 | `useSearchState` / `useModalState` | Search input and modal/address state on the map page |
 | `useMobileViewport` | Responsive/touch styling |
 
 Every mutation in `usePropertyFileActions` invalidates the prefetch cache for that property so re-opening it never shows stale files.
+
+Prefetch runs ahead of the tap: the map warms the most recent pins on load and on marker hover, and warms the hero when a pin is selected; the Properties page warms its first eight cards on load and any card on press/hover; the desktop sidebar warms on hover. `warmImage` respects Data Saver. Thumbnail URLs that expire re-sign once on image error instead of falling back to the icon.
 
 ### Service Layer
 
