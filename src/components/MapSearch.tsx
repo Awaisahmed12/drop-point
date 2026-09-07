@@ -195,7 +195,7 @@ export const MapSearch = ({
       id="map-search-listbox"
       role="listbox"
       aria-label="Search results"
-      className="absolute z-30 w-full ios-float rounded-[12px] mt-2 overflow-hidden"
+      className="absolute z-30 w-full ios-float rounded-[24px] mt-2 overflow-hidden"
     >
       {showSectionLabel && (
         <div className="px-4 pt-2.5 pb-1 text-footnote text-ink-2">Recent</div>
@@ -291,7 +291,7 @@ export const MapSearch = ({
             aria-autocomplete="list"
             aria-expanded={showDropdown && predictions.length > 0}
             aria-controls="map-search-listbox"
-            className="ios-float w-full h-11 pl-10 pr-10 rounded-[12px] text-body text-ink placeholder:text-ink-2 focus:outline-none"
+            className="ios-float w-full h-12 pl-11 pr-11 rounded-full text-body text-ink placeholder:text-ink-2 focus:outline-none"
 
             autoComplete="off"
           />

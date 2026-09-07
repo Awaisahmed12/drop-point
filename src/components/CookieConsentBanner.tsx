@@ -41,7 +41,7 @@ export const CookieConsentBanner: React.FC = () => {
       role="region"
       aria-label="Cookie preferences"
     >
-      <div className="mx-auto max-w-lg ios-float rounded-[16px] p-4 pointer-events-auto animate-sheet-up sm:mb-2">
+      <div className="mx-auto max-w-lg glass rounded-[26px] p-4 pointer-events-auto animate-sheet-up sm:mb-2">
         <p className="text-subhead text-ink">
           DropPoint uses essential cookies to keep you signed in. Allow analytics cookies too? See the{' '}
           <a className="text-accent" href="/legal/privacy" target="_blank" rel="noreferrer">privacy policy</a>.

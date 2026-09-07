@@ -15,6 +15,7 @@ import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
 import { useToast } from '../contexts/ToastContext';
 import { useInternalDrag } from '../hooks/useInternalDrag';
+import { useSheetDrag } from '../hooks/useSheetDrag';
 import { tryWithToast } from '../utils/tryWithToast';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
 import type { PropertyWithFileCount } from '../../types';
@@ -159,6 +160,16 @@ export const PropertyDetailsModal = ({
   const [renamingProperty, setRenamingProperty] = useState(false);
   const [propertyLabelDraft, setPropertyLabelDraft] = useState('');
   const renameCancelledRef = useRef(false);
+  // The nav bar floats over the hero photo and turns solid once content scrolls under it.
+  const [scrolledPastHero, setScrolledPastHero] = useState(false);
+  const sheetDrag = useSheetDrag({
+    onDismiss: () => {
+      onClose();
+      setCreatingFolder(false);
+      setSearchQuery('');
+      setRenamingProperty(false);
+    },
+  });
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Internal drag state for moving files between folders. Distinct from the
@@ -555,7 +566,7 @@ export const PropertyDetailsModal = ({
   
   
   // Responsive values
-  const headerHeight = useResponsiveValue('h-28', 'h-32');
+  const heroHeight = useResponsiveValue(240, 200);
   const tableHeaderPadding = useResponsiveValue('py-3', 'py-2');
   const listItemPadding = useResponsiveValue('px-4 py-2.5', 'px-3 py-3');
   const listIconSize = useResponsiveValue(32, 28);
@@ -1021,6 +1032,16 @@ export const PropertyDetailsModal = ({
     }
   };
 
+  const showHero = propertyImageEnabled;
+  const navSolid = !showHero || scrolledPastHero || renamingProperty;
+  const heroLat = snappedLatLng?.lat ?? property.lat;
+  const heroLng = snappedLatLng?.lng ?? property.lng;
+  const heroFallbackSrc = `https://maps.googleapis.com/maps/api/staticmap?center=${heroLat},${heroLng}&zoom=17&size=1200x600&maptype=satellite&markers=color:blue%7C${heroLat},${heroLng}&key=${GOOGLE_MAPS_API_KEY}`;
+  // Street View suits a phone's aspect ratio; the satellite map suits a wide desktop sheet.
+  const heroSrc = streetViewEnabled && isMobile
+    ? `https://maps.googleapis.com/maps/api/streetview?size=800x480&location=${heroLat},${heroLng}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`
+    : heroFallbackSrc;
+
   const headerSubtitle = showRealAddress
     ? [streetAddress, locationInfo].filter(Boolean).join(', ')
     : locationInfo;
@@ -1063,14 +1084,21 @@ export const PropertyDetailsModal = ({
       }}
     >
       <div
-        className="ios-sheet w-full sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl sm:rounded-[16px] flex flex-col relative overflow-hidden animate-sheet-up"
-        style={isMobile ? { height: 'calc(100dvh - var(--safe-top) - 10px)' } : { height: '88vh', maxHeight: '88vh' }}
+        className="ios-sheet w-full sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl sm:rounded-[28px] flex flex-col relative overflow-hidden animate-sheet-up"
+        style={{
+          ...(isMobile ? { height: 'calc(100dvh - var(--safe-top) - 10px)' } : { height: '88vh', maxHeight: '88vh' }),
+          ...sheetDrag.sheetStyle,
+          ['--sheet-chrome' as string]: isMobile ? '66px' : '56px',
+        }}
       >
-        
-        {isMobile && <div className="ios-grabber" />}
-        {/* Nav bar: close, title, and the one place for everything else. */}
-        <div className="ios-navbar border-b border-hairline/60 flex-shrink-0">
-          <button type="button" className="ios-close" onClick={closeSheet} aria-label="Close">
+        {/* Chrome: grabber + nav bar. Floats over the hero; pull it down to dismiss. */}
+        <div
+          className={`absolute inset-x-0 top-0 z-30 ${navSolid ? 'ios-navbar-solid' : ''}`}
+          {...sheetDrag.handleProps}
+        >
+          {isMobile && <div className={`ios-grabber ${navSolid ? '' : 'ios-grabber-on-photo'}`} />}
+          <div className="ios-navbar">
+          <button type="button" className={`ios-close ${navSolid ? '' : 'ios-close-on-photo'}`} onClick={closeSheet} aria-label="Close">
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
               <path d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -1095,16 +1123,16 @@ export const PropertyDetailsModal = ({
                 aria-label="Property name"
                 className="w-full text-center text-headline font-semibold bg-surface-2 rounded-lg px-2 py-1 focus:outline-none"
               />
-            ) : (
+            ) : navSolid ? (
               <>
                 <h1 className="text-headline font-semibold truncate" title={displayName}>{displayName}</h1>
                 {headerSubtitle && <p className="text-caption text-ink-2 truncate" title={headerSubtitle}>{headerSubtitle}</p>}
               </>
-            )}
+            ) : null}
           </div>
           <button
             type="button"
-            className="ios-close justify-self-end"
+            className={`ios-close justify-self-end ${navSolid ? '' : 'ios-close-on-photo'}`}
             onClick={() => setMoreOpen(true)}
             aria-label="More actions"
             aria-haspopup="dialog"
@@ -1113,6 +1141,7 @@ export const PropertyDetailsModal = ({
               <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
             </svg>
           </button>
+          </div>
         </div>
 
         {/* Main Content Area */}
@@ -1134,53 +1163,46 @@ export const PropertyDetailsModal = ({
             </div>
           )}
           {/* File List Container - Scrollable with satellite image first, then all other content */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden file-list mobile-scroll" style={{
-            minHeight: '200px',
-            touchAction: 'pan-y',
-            overscrollBehavior: 'contain',
-          }}>
-            {/* Property preview: Street View, Satellite Map, or no image based on configuration */}
-            {propertyImageEnabled && (
-              streetViewEnabled ? (
-                <div className={`relative w-full ${headerHeight} bg-surface-2 border-b border-hairline/60 flex-shrink-0`}>
-                  <Image
-                    key={`property-image-${property?.id || 'new'}-${snappedLatLng?.lat}-${snappedLatLng?.lng}`}
-                    src={
-                      // Use Street View on mobile where aspect fits; use satellite map on desktop to avoid skinny distortion
-                      isMobile
-                        ? `https://maps.googleapis.com/maps/api/streetview?size=800x400&location=${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&fov=80&pitch=0&key=${GOOGLE_MAPS_API_KEY}`
-                        : `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&key=${GOOGLE_MAPS_API_KEY}`
-                    }
-                    alt="Property preview"
-                    layout="fill"
-                    objectFit="cover"
-                    priority
-                    unoptimized
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      if (target && target.src.indexOf('streetview') !== -1) {
-                        target.src = `https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&zoom=17&size=800x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&key=${GOOGLE_MAPS_API_KEY}`;
-                      }
-                    }}
-                  />
+          <div
+            className="flex-1 overflow-y-auto overflow-x-hidden file-list mobile-scroll"
+            style={{
+              minHeight: '200px',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'contain',
+              paddingTop: showHero ? 0 : 'var(--sheet-chrome)',
+            }}
+            onScroll={e => setScrolledPastHero(e.currentTarget.scrollTop > heroHeight - 72)}
+          >
+            {/* Hero: the property photo with the name set into it. Pulling it also dismisses. */}
+            {showHero && (
+              <div
+                className="relative w-full bg-surface-2 flex-shrink-0 select-none"
+                {...sheetDrag.handleProps}
+                style={{ ...sheetDrag.handleProps.style, height: heroHeight }}
+              >
+                <Image
+                  key={`property-image-${property?.id || 'new'}-${heroLat}-${heroLng}`}
+                  src={heroSrc}
+                  alt=""
+                  fill
+                  className="object-cover"
+                  priority
+                  unoptimized
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (target && target.src.indexOf('streetview') !== -1) target.src = heroFallbackSrc;
+                  }}
+                />
+                <div className="hero-scrim absolute inset-x-0 bottom-0 h-[72%] pointer-events-none" />
+                <div className="absolute inset-x-0 bottom-0 px-5 pb-4 text-white pointer-events-none">
+                  <h1 className="text-title-1 font-bold leading-tight" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{displayName}</h1>
+                  {headerSubtitle && <p className="text-subhead text-white/85 mt-0.5">{headerSubtitle}</p>}
                 </div>
-              ) : (
-                <div className={`relative w-full ${headerHeight} bg-surface-2 border-b border-hairline/60 flex-shrink-0`}>
-                  <Image
-                    key={`property-image-${property?.id || 'new'}-${snappedLatLng?.lat}-${snappedLatLng?.lng}`}
-                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&zoom=17&size=1200x400&maptype=satellite&markers=color:blue%7C${(snappedLatLng?.lat ?? property?.lat)},${(snappedLatLng?.lng ?? property?.lng)}&key=${GOOGLE_MAPS_API_KEY}`}
-                    alt="Property satellite view"
-                    layout="fill"
-                    objectFit="cover"
-                    priority
-                    unoptimized
-                  />
-                </div>
-              )
+              </div>
             )}
 
-            {/* All other content comes after satellite image */}
-            <div className="bg-surface sticky top-0 z-50 border-b border-hairline/60">
+            {/* Breadcrumbs + search stick just under the nav bar. */}
+            <div className="bg-surface/92 backdrop-blur-xl sticky z-20 border-b border-hairline/60" style={{ top: showHero ? 'var(--sheet-chrome)' : 0 }}>
               {/* Breadcrumbs - compact unified bar */}
               {(breadcrumbPath.length > 0 || selectedFolder !== 'master') && (
                 <div className="px-4 py-2 bg-surface border-b border-hairline/60">
@@ -1623,11 +1645,11 @@ export const PropertyDetailsModal = ({
                                 onFolderChange(folder.id);
                               }}
                             >
-                              <div className="relative">
+                              <div>
                                 <HeroFolderIcon style={{ width: gridIconSize, height: gridIconSize, color: '#fbbf24' }} />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className="absolute -top-2 -right-4 rounded-full bg-surface-2/90 text-ink-2 flex items-center justify-center touch-manipulation"
+                                  className="absolute top-1 right-1 rounded-full glass text-ink-2 flex items-center justify-center touch-manipulation"
                                   {...menuTriggerProps('folder', folder.id)}
                                   style={{ 
                                     zIndex: 10,
@@ -1726,7 +1748,7 @@ export const PropertyDetailsModal = ({
                                 }
                               }}
                             >
-                              <div className="relative">
+                              <div>
                                 <FileThumbnail
                                   fileName={file.file_name}
                                   propertyId={file.property_id}
@@ -1734,7 +1756,7 @@ export const PropertyDetailsModal = ({
                                 />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className="absolute -top-2 -right-4 rounded-full bg-surface-2/90 text-ink-2 flex items-center justify-center touch-manipulation"
+                                  className="absolute top-1 right-1 rounded-full glass text-ink-2 flex items-center justify-center touch-manipulation"
                                   {...menuTriggerProps('file', file.id)}
                                   style={{ 
                                     zIndex: 10,
@@ -2159,7 +2181,7 @@ export const PropertyDetailsModal = ({
             onTouchEnd={e => { e.preventDefault(); cancelCreateFolder(); }}
           >
             <div
-              className="bg-surface/95 backdrop-blur-xl rounded-[14px] w-[270px] overflow-hidden animate-sheet-up"
+              className="glass rounded-[24px] w-[280px] overflow-hidden animate-sheet-up"
               role="dialog"
               aria-modal="true"
               aria-label="New folder"

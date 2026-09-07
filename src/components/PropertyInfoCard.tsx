@@ -36,7 +36,7 @@ export const PropertyInfoCard = ({ address, addressLoading, property, onSelect, 
       onTouchStart={e => e.stopPropagation()}
       onTouchEnd={e => e.stopPropagation()}
     >
-      <div className="ios-float bg-surface rounded-[16px] p-4 pt-3 flex flex-col gap-3 animate-sheet-up sm:mb-3">
+      <div className="glass rounded-[26px] p-4 pt-3 flex flex-col gap-3 animate-sheet-up sm:mb-3">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0 pt-1">
             {addressLoading ? (
@@ -46,7 +46,6 @@ export const PropertyInfoCard = ({ address, addressLoading, property, onSelect, 
               </div>
             ) : (
               <>
-                <div className="text-caption text-ink-2 mb-0.5">{isNew ? 'New location' : 'Saved property'}</div>
                 <h3 className="text-headline font-semibold text-ink break-words">{title}</h3>
                 {subtitle && <p className="text-subhead text-ink-2 mt-0.5">{subtitle}</p>}
               </>

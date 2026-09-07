@@ -3,10 +3,11 @@
 /* ============================================================================
    DropPoint design tokens — an iOS system look.
 
-   The app should feel like a native iPhone app when added to the home screen:
-   San Francisco type via the system stack, the iOS grouped palette, hairline
-   separators, inset grouped lists, a translucent tab bar, sheets that rise
-   from the bottom, and one blue accent. Everything else stays quiet.
+   The app should feel like a current (2026) iPhone app when added to the home
+   screen: San Francisco type via the system stack, the iOS grouped palette,
+   and Liquid-Glass materials — translucent, blurred capsules that float over
+   content, a pill-shaped tab bar, large concentric corner radii, and headers
+   that hover over imagery. One blue accent. Everything else stays quiet.
    ============================================================================ */
 
 @theme {
@@ -51,23 +52,25 @@
   --text-caption-2: 11px;
   --text-caption-2--line-height: 13px;
 
-  --radius-row: 10px;               /* grouped list corners */
-  --radius-sheet: 12px;             /* sheet / card corners */
-  --radius-button: 12px;
+  --radius-row: 20px;               /* grouped list corners */
+  --radius-sheet: 28px;             /* sheet corners (concentric with rows) */
+  --radius-card: 24px;
+  --radius-button: 999px;           /* capsules */
 
-  --shadow-sheet: 0 -1px 0 rgba(0, 0, 0, 0.04), 0 -8px 32px rgba(0, 0, 0, 0.12);
-  --shadow-float: 0 2px 10px rgba(0, 0, 0, 0.18);
+  --shadow-sheet: 0 -1px 0 rgba(0, 0, 0, 0.04), 0 -12px 40px rgba(0, 0, 0, 0.14);
+  --shadow-float: 0 10px 40px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
-/* Native metrics: iOS tab bar 49pt, nav bar 44pt, 50pt primary buttons. */
+/* Native metrics: floating 64pt tab bar, 44pt nav bar, 50pt primary buttons. */
 :root {
-  --tabbar-height: 49px;
+  --tabbar-height: 64px;
+  --tabbar-gap: 10px;
   --navbar-height: 44px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
-  --tabbar-total: calc(var(--tabbar-height) + var(--safe-bottom));
+  --tabbar-total: calc(var(--tabbar-height) + var(--tabbar-gap) + var(--safe-bottom));
   --hairline: 0.5px;
 }
 
@@ -133,6 +136,41 @@ input, textarea, [contenteditable], .selectable {
 }
 
 /* ----------------------------------------------------------------------------
+   Materials
+   ---------------------------------------------------------------------------- */
+
+/* Liquid Glass: frosted, saturated, with a specular top edge and a soft drop.
+   Use for anything that floats over content: bars, capsules, cards, sheets. */
+.glass {
+  background: rgba(255, 255, 255, 0.64);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  backdrop-filter: blur(28px) saturate(190%);
+  box-shadow:
+    var(--shadow-float),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* Glass over photography: darker tint, white content. */
+.glass-dark {
+  background: rgba(20, 20, 24, 0.38);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  color: #fff;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: rgba(255, 255, 255, 0.96); }
+  .glass-dark { background: rgba(20, 20, 24, 0.7); }
+}
+
+/* Scrim so white text stays legible over a photo. */
+.hero-scrim {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.28) 45%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* ----------------------------------------------------------------------------
    iOS components
    ---------------------------------------------------------------------------- */
 
@@ -146,11 +184,12 @@ input, textarea, [contenteditable], .selectable {
 }
 
 /* Inset grouped list. Rows are separated by hairlines that stop at the
-   text edge, like Settings. */
+   text edge, like Settings; the group itself sits slightly proud of the ground. */
 .ios-group {
   background: var(--color-surface);
   border-radius: var(--radius-row);
   overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
 }
 
 .ios-group-label {
@@ -191,13 +230,13 @@ input, textarea, [contenteditable], .selectable {
   flex-shrink: 0;
 }
 
-/* Search field: the gray pill from Mail / Files. */
+/* Search field: a capsule. */
 .ios-search {
   background: var(--color-fill);
-  border-radius: 10px;
-  height: 36px;
-  padding-left: 32px;
-  padding-right: 32px;
+  border-radius: 999px;
+  height: 40px;
+  padding-left: 36px;
+  padding-right: 36px;
   font-size: var(--text-body);
   color: var(--color-ink);
   width: 100%;
@@ -206,26 +245,25 @@ input, textarea, [contenteditable], .selectable {
 .ios-search::placeholder { color: var(--color-ink-2); }
 .ios-search:focus { outline: none; background: #7878803f; }
 
-/* Segmented control: gray track, white sliding thumb. */
+/* Segmented control: a glass capsule with a white sliding thumb. */
 .ios-segmented {
   display: inline-flex;
-  background: var(--color-surface-2);
-  border-radius: 9px;
-  padding: 2px;
+  border-radius: 999px;
+  padding: 3px;
   gap: 2px;
 }
 .ios-segment {
   font-size: var(--text-footnote);
   font-weight: 600;
   line-height: 18px;
-  padding: 6px 14px;
-  border-radius: 7px;
+  padding: 7px 16px;
+  border-radius: 999px;
   color: var(--color-ink);
-  transition: background 150ms ease, box-shadow 150ms ease;
+  transition: background 180ms ease, box-shadow 180ms ease;
 }
 .ios-segment[aria-pressed="true"] {
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
 }
 
 /* Buttons: one filled primary per screen; secondary is tinted. */
@@ -243,7 +281,11 @@ input, textarea, [contenteditable], .selectable {
 }
 .ios-button:active { opacity: 0.8; transform: scale(0.99); }
 .ios-button:disabled { opacity: 0.4; transform: none; }
-.ios-button-primary { background: var(--color-accent); color: #fff; }
+.ios-button-primary {
+  background: linear-gradient(180deg, #2b8cff 0%, var(--color-accent) 100%);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(10, 122, 255, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
 .ios-button-tinted { background: var(--color-accent-soft); color: var(--color-accent); }
 .ios-button-plain { background: transparent; color: var(--color-accent); height: 44px; width: auto; padding: 0 8px; }
 
@@ -260,16 +302,24 @@ input, textarea, [contenteditable], .selectable {
 .ios-field::placeholder { color: var(--color-ink-3); }
 .ios-field:focus { outline: none; }
 
-/* Nav bar for sheets: 44pt, title centered, one control per side. */
+/* Nav bar for sheets: 44pt, title centered, one control per side. It floats
+   over the hero photo and only becomes glass once content scrolls under it. */
 .ios-navbar {
   display: grid;
   grid-template-columns: 44px 1fr 44px;
   align-items: center;
   min-height: var(--navbar-height);
-  padding: 6px 8px 4px;
+  padding: 6px 10px 6px;
+  transition: background 200ms ease, box-shadow 200ms ease;
+}
+.ios-navbar-solid {
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: 0 0.5px 0 var(--color-hairline);
 }
 
-/* Sheets rise from the bottom with a grabber. */
+/* Sheets rise from the bottom with a grabber you can pull. */
 .ios-sheet {
   background: var(--color-surface);
   border-top-left-radius: var(--radius-sheet);
@@ -280,37 +330,61 @@ input, textarea, [contenteditable], .selectable {
   width: 36px;
   height: 5px;
   border-radius: 3px;
-  background: var(--color-ink-3);
+  background: rgba(60, 60, 67, 0.3);
   margin: 6px auto 2px;
 }
+.ios-grabber-on-photo { background: rgba(255, 255, 255, 0.7); }
 
-/* Circular "close" glyph button (iOS 15+ sheets). */
+/* Circular glass glyph button: close, more, dismiss. */
 .ios-close {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
-  background: var(--color-surface-2);
-  color: var(--color-ink-2);
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  color: var(--color-ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12), inset 0 0 0 0.5px rgba(255, 255, 255, 0.9);
 }
 .ios-close:active { opacity: 0.7; }
+.ios-close-on-photo { background: rgba(255, 255, 255, 0.28); color: #fff; box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.4); }
 
-/* Floating map controls. */
+/* Floating controls are glass. */
 .ios-float {
-  background: rgba(255, 255, 255, 0.92);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  box-shadow: var(--shadow-float);
+  background: rgba(255, 255, 255, 0.64);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  backdrop-filter: blur(28px) saturate(190%);
+  box-shadow:
+    var(--shadow-float),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ios-float { background: rgba(255, 255, 255, 0.96); }
 }
 
-/* Tab bar. */
+/* Tab bar: a floating glass capsule; the selected tab carries a white pill. */
 .ios-tabbar {
-  background: rgba(249, 249, 249, 0.94);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  border-top: var(--hairline) solid var(--color-hairline);
+  border-radius: 999px;
+  padding: 6px;
+}
+.ios-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 999px;
+  color: var(--color-ink-2);
+  transition: background 200ms ease, color 200ms ease, box-shadow 200ms ease;
+}
+.ios-tab[aria-current="page"] {
+  color: var(--color-accent);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1), inset 0 0 0 0.5px rgba(255, 255, 255, 1);
 }
 
 /* Interactive states: touch gets press states, not hover. */
