@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Centralized logger so we can flip dev-vs-production behavior in one place
  * instead of grepping the codebase for `console.*` calls.

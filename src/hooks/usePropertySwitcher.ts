@@ -1,117 +1,59 @@
 import { logger } from '../utils/logger';
 import { useCallback } from 'react';
 import { supabase } from '../utils/supabaseClient';
-import { PROPERTY_CACHE_TTL_MS } from '../../constants';
-import type { PropertyFile, PropertyFolder } from '../../types';
-import type { PropertyWithFileCount } from '../../types';
+import type { PropertyFile, PropertyFolder, PropertyWithFileCount } from '../../types';
+import { propertyService } from '../services';
+import { getPropertyDataSync, setPropertyDataCache } from './usePropertyPrefetch';
 
 interface UsePropertySwitcherProps {
   onMapMove?: (lat: number, lng: number) => void;
   onPropertyDataLoad?: (property: PropertyWithFileCount, files: PropertyFile[], folders: PropertyFolder[]) => void;
   onLoadingStateChange?: (loading: boolean) => void;
   onError?: (error: string) => void;
-  propertyCache?: Record<string, {
-    files: PropertyFile[];
-    folders: PropertyFolder[];
-    lastFetched: number;
-  }>;
-  cacheTimeout?: number;
 }
 
-interface UsePropertySwitcherReturn {
-  switchToProperty: (property: PropertyWithFileCount) => Promise<void>;
-}
-
+/**
+ * Switches the open modal to another property: pans the map, serves files
+ * and folders from the shared prefetch cache when fresh, otherwise fetches
+ * them, and bumps the property's updated_at so "recent" ordering stays
+ * meaningful.
+ */
 export const usePropertySwitcher = ({
   onMapMove,
   onPropertyDataLoad,
   onLoadingStateChange,
   onError,
-  propertyCache = {},
-  cacheTimeout = PROPERTY_CACHE_TTL_MS
-}: UsePropertySwitcherProps): UsePropertySwitcherReturn => {
-
+}: UsePropertySwitcherProps) => {
   const switchToProperty = useCallback(async (property: PropertyWithFileCount) => {
+    if (!property.id) return;
     try {
       onLoadingStateChange?.(true);
+      onMapMove?.(property.lat, property.lng);
 
-      // Move map to property location immediately
-      if (onMapMove) {
-        onMapMove(property.lat, property.lng);
+      const cached = getPropertyDataSync(property.id);
+      let files: PropertyFile[];
+      let folders: PropertyFolder[];
+      if (cached) {
+        ({ files, folders } = cached);
+      } else {
+        ({ files, folders } = await propertyService.getPropertyData(property.id));
+        setPropertyDataCache(property.id, files, folders);
       }
 
-      // Check cache first for instant data loading
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
+      onPropertyDataLoad?.(property, files, folders);
 
-      if (!property.id) {
-        throw new Error('Property ID is required');
-      }
-
-      const cacheKey = `${user.id}-${property.address}`;
-      const cached = propertyCache[cacheKey];
-      
-      if (cached && (Date.now() - cached.lastFetched) < cacheTimeout) {
-        // Use cached data immediately
-        if (onPropertyDataLoad) {
-          onPropertyDataLoad(property, cached.files, cached.folders);
-        }
-
-        // Update last accessed in background (fire-and-forget with silent error handling)
-        void supabase
-          .from('properties')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', property.id);
-
-        return;
-      }
-
-      // No cache - fetch fresh data
-
-      // Fetch folders and files for the property
-      const [folderResult, filesResult] = await Promise.all([
-        supabase
-          .from('property_folders')
-          .select('*')
-          .eq('property_id', property.id)
-          .eq('user_id', user.id)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('property_files')
-          .select('*')
-          .eq('property_id', property.id)
-          .order('uploaded_at', { ascending: false })
-      ]);
-
-      if (folderResult.error) {
-        throw folderResult.error;
-      }
-
-      if (filesResult.error) {
-        throw filesResult.error;
-      }
-
-      // Update last accessed timestamp
-      await supabase
+      // Fire-and-forget recency bump.
+      void supabase
         .from('properties')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', property.id);
-
-      // Call the data load callback with fresh data
-      if (onPropertyDataLoad) {
-        onPropertyDataLoad(property, filesResult.data || [], folderResult.data || []);
-      }
-
     } catch (error) {
       logger.error('Error switching to property:', error);
       onError?.(error instanceof Error ? error.message : 'Failed to switch property');
     } finally {
       onLoadingStateChange?.(false);
     }
-  }, [onMapMove, onPropertyDataLoad, onLoadingStateChange, onError, propertyCache, cacheTimeout]);
+  }, [onMapMove, onPropertyDataLoad, onLoadingStateChange, onError]);
 
   return { switchToProperty };
-}; 
+};

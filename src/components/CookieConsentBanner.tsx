@@ -21,8 +21,9 @@ export const CookieConsentBanner: React.FC = () => {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const existing = getConsent();
-    setVisible(!existing);
+    // Read after mount: the cookie isn't available during server rendering.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe read
+    setVisible(!getConsent());
   }, []);
 
   if (!visible) return null;

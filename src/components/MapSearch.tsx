@@ -1,9 +1,8 @@
 import { logger } from '../utils/logger';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { Prediction, PropertyWithFileCount } from '../../types';
+import type { Prediction } from '../../types';
 import { supabase } from '../utils/supabaseClient';
 import { AUTOCOMPLETE_DEBOUNCE_MS } from '../../constants';
-import { QuickAccessProperties } from './QuickAccessProperties';
 
 interface MapSearchProps {
   onPlaceSelect: (prediction: Prediction) => void;
@@ -12,7 +11,6 @@ interface MapSearchProps {
   predictions: Prediction[];
   onPredictionsChange: (predictions: Prediction[]) => void;
   onShowDropdownChange?: (show: boolean) => void;
-  onPropertySelect?: (property: PropertyWithFileCount) => void;
 }
 
 const isUserProperty = (prediction: Prediction): boolean =>
@@ -31,11 +29,9 @@ export const MapSearch = ({
   predictions,
   onPredictionsChange,
   onShowDropdownChange,
-  onPropertySelect,
 }: MapSearchProps) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [showQuickAccess, setShowQuickAccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const justSelectedRef = useRef(false);
@@ -47,13 +43,8 @@ export const MapSearch = ({
 
   const updateShowDropdown = useCallback((show: boolean) => {
     setShowDropdown(show);
-    onShowDropdownChange?.(show || showQuickAccess);
-  }, [onShowDropdownChange, showQuickAccess]);
-
-  const updateShowQuickAccess = useCallback((show: boolean) => {
-    setShowQuickAccess(show);
-    onShowDropdownChange?.(show || showDropdown);
-  }, [onShowDropdownChange, showDropdown]);
+    onShowDropdownChange?.(show);
+  }, [onShowDropdownChange]);
 
   // Performs one autocomplete fetch. The caller owns the AbortController so it
   // can cancel us mid-flight; we treat AbortError as a no-op rather than an
@@ -108,10 +99,9 @@ export const MapSearch = ({
       // last-typed query is the only one that ever writes to state.
       onPredictionsChange(newPredictions);
       updateShowDropdown(newPredictions.length > 0);
-      updateShowQuickAccess(false);
       setSelectedIndex(0);
     }, AUTOCOMPLETE_DEBOUNCE_MS);
-  }, [onInputChange, requestPredictions, onPredictionsChange, updateShowDropdown, updateShowQuickAccess]);
+  }, [onInputChange, requestPredictions, onPredictionsChange, updateShowDropdown]);
 
   // Cancel any pending debounce + in-flight fetch when the component unmounts.
   useEffect(() => {
@@ -162,14 +152,12 @@ export const MapSearch = ({
       const recentPredictions = await requestPredictions('');
       onPredictionsChange(recentPredictions);
       updateShowDropdown(recentPredictions.length > 0);
-      updateShowQuickAccess(false);
     }
-  }, [inputValue, predictions, updateShowDropdown, requestPredictions, onPredictionsChange, updateShowQuickAccess]);
+  }, [inputValue, predictions, updateShowDropdown, requestPredictions, onPredictionsChange]);
 
   const handleBlur = useCallback(() => {
     updateShowDropdown(false);
-    updateShowQuickAccess(false);
-  }, [updateShowDropdown, updateShowQuickAccess]);
+  }, [updateShowDropdown]);
 
   const handleClear = useCallback(async () => {
     onInputChange('');
@@ -180,14 +168,8 @@ export const MapSearch = ({
     onPredictionsChange(recentPredictions);
     updateShowDropdown(recentPredictions.length > 0);
     setSelectedIndex(0);
-    updateShowQuickAccess(false);
     inputRef.current?.focus();
-  }, [onInputChange, requestPredictions, onPredictionsChange, updateShowDropdown, updateShowQuickAccess]);
-
-  const handlePropertySelect = useCallback((property: PropertyWithFileCount) => {
-    updateShowQuickAccess(false);
-    onPropertySelect?.(property);
-  }, [updateShowQuickAccess, onPropertySelect]);
+  }, [onInputChange, requestPredictions, onPredictionsChange, updateShowDropdown]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -196,12 +178,11 @@ export const MapSearch = ({
         inputRef.current && !inputRef.current.contains(e.target as Node)
       ) {
         updateShowDropdown(false);
-        updateShowQuickAccess(false);
       }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [updateShowDropdown, updateShowQuickAccess]);
+  }, [updateShowDropdown]);
 
   const hasUserProperties = predictions.some(isUserProperty);
   const showSectionLabel = !inputValue.trim() && hasUserProperties;
@@ -339,11 +320,6 @@ export const MapSearch = ({
 
         {dropdownContent}
       </div>
-
-      <QuickAccessProperties
-        isVisible={showQuickAccess && !showDropdown}
-        onPropertySelect={handlePropertySelect}
-      />
     </div>
   );
 };

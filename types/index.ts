@@ -100,6 +100,10 @@ export interface PendingUpload {
   abortController?: AbortController;
 }
 
+// Map rendering mode. 'hybrid' is satellite imagery with labels; it is what
+// the UI calls "Satellite".
+export type MapType = 'roadmap' | 'hybrid';
+
 // Sort field type
 export type SortField = 'name' | 'date' | 'size';
 export type SortDirection = 'asc' | 'desc';

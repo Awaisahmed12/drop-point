@@ -1,12 +1,7 @@
 import type { Libraries } from '@react-google-maps/api';
+import type { MapType } from '../types';
 
-// Map configuration constants
-export const containerStyle = {
-  width: '100vw',
-  height: '100vh',
-};
-
-// Use this when the map lives inside a flex child (sidebar layout)
+// The map fills its flex parent (sidebar layout)
 export const mapContainerStyleWithSidebar = {
   width: '100%',
   height: '100%',
@@ -26,10 +21,11 @@ export const SEARCH_ZOOM = 17; // slightly wider on mobile for context
 export const CURRENT_LOCATION_ZOOM = 17;
 // Closer follow-up zoom for current location (street-level but not max)
 export const CURRENT_LOCATION_ZOOM_DEEP = 19;
-export const PROPERTY_SELECTION_MIN_ZOOM = 18; // Minimum zoom to show property selection card
-// Map configuration
+// Persisted map preferences
 export const MAP_TYPE_KEY = 'droppoint-map-type';
-export const DEFAULT_MAP_TYPE = 'hybrid';
+export const MAP_POSITION_KEY = 'droppoint-map-position';
+// Two choices only (Hick's Law): a plain map, or satellite imagery with labels.
+export const DEFAULT_MAP_TYPE: MapType = 'hybrid';
 
 // Coordinate comparison threshold
 export const COORDINATE_THRESHOLD = 0.00001;

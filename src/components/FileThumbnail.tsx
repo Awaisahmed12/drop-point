@@ -19,7 +19,7 @@ const urlCache = new Map<string, string | false>();
 
 // Batch queue: accumulate requests from IntersectionObserver callbacks across all mounted
 // components, then flush them all in a single createSignedUrls() call.
-let pendingQueue: Array<{ key: string; resolve: (url: string | false) => void }> = [];
+const pendingQueue: Array<{ key: string; resolve: (url: string | false) => void }> = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleFlush() {
@@ -82,11 +82,12 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
   useEffect(() => {
     if (!isPreviewable || requested.current) return;
 
-    // Double-check cache in case it was populated between render and effect
-    const key = `${propertyId}/${fileName}`;
-    const cached = urlCache.get(key);
-    if (cached !== undefined) {
-      if (typeof cached === 'string') setThumbnailUrl(cached);
+    // Already resolved (possibly between render and effect): no observer needed.
+    if (urlCache.has(`${propertyId}/${fileName}`)) {
+      requested.current = true;
+      requestThumbnail(propertyId, fileName).then(url => {
+        if (typeof url === 'string') setThumbnailUrl(url);
+      });
       return;
     }
 
@@ -131,6 +132,7 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
 
       {/* Thumbnail fades in over the icon once the signed URL is fetched and the image loads */}
       {thumbnailUrl && (
+        // eslint-disable-next-line @next/next/no-img-element -- signed URL, no optimization loader
         <img
           src={thumbnailUrl}
           alt=""
@@ -151,6 +153,3 @@ export const FileThumbnail = ({ fileName, propertyId, size = 64, className = '' 
     </div>
   );
 };
-
-// Kept for call-site compatibility
-export const preloadThumbnails = async () => {};

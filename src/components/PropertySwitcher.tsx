@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useUserProperties } from '../hooks/useUserProperties';
 import type { PropertyWithFileCount } from '../../types';
@@ -42,15 +42,6 @@ export const PropertySwitcher = ({
 
   // Limit to 20 properties for performance
   const displayProperties = sortedProperties.slice(0, 20);
-
-  // Simple cleanup when dropdown closes
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchQuery('');
-    }
-  }, [isOpen]);
-
-  // Focus search input when dropdown opens - REMOVED to prevent mobile keyboard popup
 
   // Handle property selection
   const handlePropertySelect = async (property: PropertyWithFileCount) => {
