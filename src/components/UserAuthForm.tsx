@@ -1,10 +1,41 @@
-import { logger } from '../utils/logger';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { supabase } from '../utils/supabaseClient';
+import { ensureUserProfile } from '../utils/profile';
 import { EyeIcon } from './EyeIcon';
-import { POST_LOGIN_SPINNER_MS } from '../../constants';
+import { POST_LOGIN_SPINNER_MS, AUTH_PROVIDERS, type AuthProvider } from '../../constants';
+
+const PROVIDERS: Record<AuthProvider, { label: string; icon: React.ReactNode }> = {
+  google: {
+    label: 'Google',
+    icon: (
+      <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z" />
+        <path fill="#34A853" d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.7-4.9H1.3v3.1C3.3 21.3 7.3 24 12 24z" />
+        <path fill="#FBBC05" d="M5.3 14.4c-.2-.7-.4-1.5-.4-2.4s.1-1.6.4-2.4V6.5H1.3C.5 8.2 0 10 0 12s.5 3.8 1.3 5.5l4-3.1z" />
+        <path fill="#EA4335" d="M12 4.7c1.8 0 3.3.6 4.6 1.8l3.4-3.4C18 1.2 15.2 0 12 0 7.3 0 3.3 2.7 1.3 6.5l4 3.1c1-2.8 3.6-4.9 6.7-4.9z" />
+      </svg>
+    ),
+  },
+  apple: {
+    label: 'Apple',
+    icon: (
+      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.7-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.8-1.7 0-3.2 1-4.1 2.5-1.8 3-.5 7.5 1.3 10 .8 1.2 1.8 2.6 3.1 2.5 1.3 0 1.7-.8 3.3-.8 1.5 0 1.9.8 3.3.8 1.4 0 2.2-1.2 3-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.7-1-2.7-4zM13.9 5.4c.7-.8 1.2-2 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1.1 3 1.1.1 2.3-.6 3-1.4z" />
+      </svg>
+    ),
+  },
+  facebook: {
+    label: 'Facebook',
+    icon: (
+      <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="12" fill="#1877F2" />
+        <path fill="#fff" d="M16.7 15.5l.5-3.5h-3.4V9.7c0-1 .5-1.9 2-1.9h1.5v-3s-1.4-.2-2.7-.2c-2.7 0-4.5 1.6-4.5 4.6V12H7v3.5h3.1V24h3.7v-8.5h2.9z" />
+      </svg>
+    ),
+  },
+};
 
 const getSiteUrl = (): string => {
   const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
@@ -44,6 +75,34 @@ export default function UserAuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // An OAuth round-trip that failed comes back to this page with the reason.
+  useEffect(() => {
+    const reason = router.query.auth_error;
+    if (typeof reason === 'string' && reason) {
+      setError(reason);
+      void router.replace('/', undefined, { shallow: true });
+    }
+  }, [router]);
+
+  const signInWith = async (provider: AuthProvider) => {
+    if (loading) return;
+    setLoading(true);
+    setError(null);
+    const siteUrl = getSiteUrl();
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: siteUrl ? `${siteUrl}/auth/callback` : undefined,
+        ...(provider === 'google' ? { queryParams: { prompt: 'select_account' } } : {}),
+      },
+    });
+    if (oauthError) {
+      setError(oauthError.message);
+      setLoading(false);
+    }
+    // Otherwise the browser is on its way to the provider.
+  };
 
   const missing = isSignUp && password ? missingPasswordRules(password) : [];
   const mismatch = isSignUp && confirmPassword.length > 0 && password !== confirmPassword;
@@ -86,24 +145,7 @@ export default function UserAuthForm() {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) throw signInError;
 
-      // First sign-in: seed the profile row from the sign-up metadata.
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('first_name')
-        .eq('user_id', data.user.id)
-        .single();
-      if (!profile?.first_name) {
-        const { error: profileError } = await supabase.from('user_profiles').upsert({
-          user_id: data.user.id,
-          first_name: data.user.user_metadata?.first_name || null,
-          last_name: data.user.user_metadata?.last_name || null,
-          phone_number: null,
-          contact_preference: 'email',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-        if (profileError) logger.error('Error saving profile:', profileError);
-      }
+      await ensureUserProfile(data.user);
 
       // Hold the welcome state briefly so the transition reads as "you're in".
       setIsLoggingIn(true);
@@ -166,6 +208,28 @@ export default function UserAuthForm() {
         <h1 className="ios-large-title">{isSignUp ? 'Create account' : 'DropPoint'}</h1>
         {!isSignUp && <p className="text-subhead text-ink-2 -mt-1">Your property documents, on a map.</p>}
       </div>
+
+      {AUTH_PROVIDERS.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {AUTH_PROVIDERS.map(provider => (
+            <button
+              key={provider}
+              type="button"
+              className="ios-button bg-surface text-ink gap-2.5 shadow-[0_0_0_0.5px_var(--color-hairline),0_1px_2px_rgba(0,0,0,0.04)]"
+              onClick={() => signInWith(provider)}
+              disabled={loading}
+            >
+              {PROVIDERS[provider].icon}
+              Continue with {PROVIDERS[provider].label}
+            </button>
+          ))}
+          <div className="flex items-center gap-3 text-footnote text-ink-2 px-2" aria-hidden="true">
+            <span className="flex-1 h-px bg-hairline/70" />
+            or
+            <span className="flex-1 h-px bg-hairline/70" />
+          </div>
+        </div>
+      )}
 
       <form className="flex flex-col gap-4" onSubmit={handleAuth} noValidate>
         <div className="ios-group">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../utils/supabaseClient';
+import { ensureUserProfile } from '../../utils/profile';
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -11,6 +12,16 @@ export default function AuthCallback() {
 
     const finalize = async () => {
       try {
+        // A provider that refused sends us back with the reason; show it on the sign-in screen.
+        const params = new URLSearchParams(window.location.search);
+        const refusal = params.get('error_description') || params.get('error');
+        if (refusal) {
+          if (!isMounted) return;
+          setStatus('done');
+          router.replace(`/?auth_error=${encodeURIComponent(refusal.replace(/\+/g, ' '))}`);
+          return;
+        }
+
         // 1) Handle PKCE or OTP links that include a ?code= or other params
         try {
           await supabase.auth.exchangeCodeForSession(window.location.href);
@@ -21,6 +32,7 @@ export default function AuthCallback() {
         // 2) Detect hash-based tokens (implicit flow) and/or use existing session
         const { data: sessionData } = await supabase.auth.getSession();
         if (sessionData.session) {
+          await ensureUserProfile(sessionData.session.user);
           if (!isMounted) return;
           setStatus('done');
           router.replace('/map');
@@ -31,6 +43,7 @@ export default function AuthCallback() {
         setTimeout(async () => {
           const { data: retry } = await supabase.auth.getSession();
           if (retry.session) {
+            await ensureUserProfile(retry.session.user);
             if (!isMounted) return;
             setStatus('done');
             router.replace('/map');

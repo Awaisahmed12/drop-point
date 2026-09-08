@@ -25,6 +25,11 @@ Create a `.env.local` file with:
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+
+# Optional connectors
+NEXT_PUBLIC_AUTH_PROVIDERS=google,apple,facebook   # social sign-in (enable each provider in Supabase Auth too)
+NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=                 # Google OAuth web client id; enables "Import from Google Drive"
+NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=                  # optional, defaults to the Maps key
 ```
 
 ## Docs

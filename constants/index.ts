@@ -13,6 +13,19 @@ export const US_CENTER = {
 };
 
 export const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!;
+
+// Connectors. Each is off until its env var is set, so nothing shows a
+// button that can't work.
+export type AuthProvider = 'google' | 'apple' | 'facebook';
+/** Social sign-in buttons to offer, from NEXT_PUBLIC_AUTH_PROVIDERS="google,apple,facebook". */
+export const AUTH_PROVIDERS: AuthProvider[] = (process.env.NEXT_PUBLIC_AUTH_PROVIDERS ?? '')
+  .split(',')
+  .map(p => p.trim().toLowerCase())
+  .filter((p): p is AuthProvider => p === 'google' || p === 'apple' || p === 'facebook');
+/** Google Cloud OAuth web client id used by the Drive picker. Empty = no Drive import. */
+export const GOOGLE_OAUTH_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID ?? '';
+/** API key for Google Picker; the Maps key works once the Picker API is enabled on it. */
+export const GOOGLE_PICKER_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 export const GOOGLE_MAP_LIBRARIES = ["places"] as Libraries;
 
 export const DEFAULT_ZOOM = 14; // Lower than recenter zoom (17) so first click zooms in to closer level

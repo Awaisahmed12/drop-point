@@ -26,6 +26,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 ```
 
+Optional connectors (each stays hidden until its variable is set):
+
+```
+NEXT_PUBLIC_AUTH_PROVIDERS=google,apple,facebook   # social sign-in buttons; each provider must also be enabled in Supabase Auth
+NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=                 # Google Cloud OAuth web client (JS origins = site URL); enables "Import from Google Drive"
+NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=                  # optional; defaults to the Maps key (enable the Google Picker API on it)
+```
+
 ## Architecture
 
 **DropPoint** is a Next.js (Pages Router) app where users pin properties on a Google Map and manage documents per property. Supabase handles auth, database (PostgreSQL with RLS), and file storage.
@@ -73,6 +81,12 @@ Components never call Supabase data tables directly — they go through the serv
 
 `withAuth(Component, { requireAuth: boolean })` is a HOC that wraps every page. It checks the Supabase session and redirects accordingly. Row-level security is enforced at the database level.
 
+Sign-in is email/password plus whichever social providers `NEXT_PUBLIC_AUTH_PROVIDERS` lists, all through Supabase Auth (`signInWithOAuth` → `/auth/callback`). `ensureUserProfile` (`src/utils/profile.ts`) seeds the `user_profiles` row on first sign-in from whatever name metadata the provider gave; `namesFromUser` is the one place that reads it.
+
+### Connectors
+
+`src/utils/googleDrive.ts` imports from Google Drive entirely in the browser: Google's picker chooses files (scope `drive.file`, so only picked files are ever accessible), the Drive API supplies the bytes (Docs/Slides export as PDF, Sheets as XLSX), and they go through the normal `uploadFiles` path. It appears as "Import from Google Drive" in the sheet's "+" menu only when `NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID` is set. Add other providers the same way: a helper that returns `File[]`, one menu item, no new upload path.
+
 ### API Routes
 
 The two API routes (`/api/autocomplete`, `/api/reverse-geocode`) are thin proxies to the Google Maps APIs, keeping the API key server-side only.
@@ -102,7 +116,7 @@ Keep the number of simultaneous choices small and grouped:
 - One filled primary button per screen. At most three visible controls per bar.
 - Map: search, a Map / Satellite segmented control, and a location button. No zoom buttons (pinch, scroll, double-tap). Satellite is Google's `hybrid` so labels stay visible; do not reintroduce a third mode.
 - Property card: title, address, one button (Open / Add property). Renaming happens inside the sheet.
-- Property sheet nav bar: close, title, and one "⋯" that opens a grouped action sheet (Switch property, Show as list/grid | Rename, Copy address). The "+" offers exactly Upload files / New folder.
+- Property sheet nav bar: close, title, and one "⋯" that opens a grouped action sheet (Switch property, Show as list/grid | Rename, Copy address). The "+" offers Upload files (and Import from Google Drive when configured) | New folder.
 - File menu groups: Download | Rename, Move to folder, Duplicate | Delete. Folder menu: Rename | Delete.
 - Properties are photo cards (Street View, satellite fallback) with the name set into a scrim and one file-count pill. Tapping a card only opens the property; no per-card menus. One glass search capsule above the grid.
 - Account is an avatar hero (tap the name to edit it inline) over a wash of the user's color, then glass groups: Storage, About you, Sign out. Profile questions are asked one at a time in an action sheet picker, and save on selection.
