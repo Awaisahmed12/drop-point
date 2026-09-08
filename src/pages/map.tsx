@@ -18,6 +18,7 @@ import { usePropertyState } from '../hooks/usePropertyState';
 import { usePropertyData } from '../hooks/usePropertyData';
 import { useSearchState } from '../hooks/useSearchState';
 import { useModalState } from '../hooks/useModalState';
+import { useSheetHistory } from '../hooks/useSheetHistory';
 import { usePropertyFileActions } from '../hooks/usePropertyFileActions';
 import { prefetchPropertyData, getPropertyDataSync, setPropertyDataCache, warmHeroImage } from '../hooks/usePropertyPrefetch';
 import { useToast } from '../contexts/ToastContext';
@@ -296,6 +297,24 @@ function MapPage() {
     setAddress, setAddressLoading, setSnappedLatLng, setSelectedProperty, setShowDetailsModal,
   ]);
 
+  const openPropertyById = useCallback((id: string) => {
+    const match = userProperties.find(p => p.id === id);
+    if (!match) return false;
+    selectProperty(match, { openModal: true });
+    return true;
+  }, [userProperties, selectProperty]);
+
+  // Back/Forward move between properties and folders; a link opens a property.
+  const sheetHistory = useSheetHistory({
+    isOpen: showDetailsModal,
+    propertyId: savedProperty?.id ?? null,
+    selectedFolder,
+    ready: propertiesLoaded,
+    openPropertyById,
+    closeSheet: () => setShowDetailsModal(false),
+    setSelectedFolder,
+  });
+
   /** Show the "add property" card for a location that isn't saved yet. */
   const proposeNewProperty = useCallback((location: LatLng, resolvedAddress: string, snapped: LatLng | null) => {
     setSelectedProperty({ id: null, address: resolvedAddress, lat: location.lat, lng: location.lng, label: null, notes: null });
@@ -468,7 +487,8 @@ function MapPage() {
   const handleSidebarPropertySelect = useCallback((property: Property) => {
     panTo({ lat: property.lat, lng: property.lng });
     selectProperty(property, { openModal: true });
-  }, [panTo, selectProperty]);
+    if (property.id) sheetHistory.open(property.id);
+  }, [panTo, selectProperty, sheetHistory]);
 
   const dismissInfoCard = useCallback(() => {
     setSelectedProperty(null);
@@ -493,12 +513,13 @@ function MapPage() {
       setSelectedFolder('master');
     } else {
       setSavedProperty(selectedProperty);
+      sheetHistory.open(selectedProperty.id);
     }
     setShowDetailsModal(true);
     dismissInfoCard();
   }, [
     selectedProperty, address, dismissInfoCard, setSavedProperty, setFolders, setPropertyFiles,
-    setFoldersLoading, setFilesLoading, setSelectedFolder, setShowDetailsModal,
+    setFoldersLoading, setFilesLoading, setSelectedFolder, setShowDetailsModal, sheetHistory,
   ]);
 
   /** Rename from inside the sheet. An unsaved pin just carries the label until it's persisted. */
@@ -648,7 +669,7 @@ function MapPage() {
               <div className="bg-surface rounded-[16px] p-6 max-w-sm mx-4">
                 <h2 className="text-headline font-semibold mb-1">Couldn’t open this property</h2>
                 <p className="text-subhead text-ink-2 mb-4">Something went wrong loading its files. Close and try again.</p>
-                <button type="button" onClick={() => setShowDetailsModal(false)} className="ios-button ios-button-primary">
+                <button type="button" onClick={sheetHistory.close} className="ios-button ios-button-primary">
                   Close
                 </button>
               </div>
@@ -659,13 +680,13 @@ function MapPage() {
             isOpen={showDetailsModal}
             property={savedProperty}
             snappedLatLng={snappedLatLng}
-            onClose={() => setShowDetailsModal(false)}
+            onClose={sheetHistory.close}
             folders={folders}
             files={propertyFiles}
             foldersLoading={foldersLoading}
             filesLoading={filesLoading}
             selectedFolder={selectedFolder}
-            onFolderChange={setSelectedFolder}
+            onFolderChange={sheetHistory.changeFolder}
             onFileUpload={fileActions.uploadFiles}
             onFileDelete={fileActions.deleteFile}
             onFileRename={fileActions.renameItem}
@@ -677,6 +698,7 @@ function MapPage() {
             onDismiss={fileActions.dismissPendingUpload}
             onPropertyRename={handlePropertyRename}
             onPropertySwitch={(property, files, switchedFolders) => {
+              if (property.id) sheetHistory.open(property.id);
               setSavedProperty(property);
               setPropertyFiles(files);
               setFolders(switchedFolders);

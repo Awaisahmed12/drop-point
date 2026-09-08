@@ -53,12 +53,15 @@ Pages compose single-responsibility hooks rather than using a global store:
 | `usePropertyData` | Files, folders, and current folder for the open property |
 | `usePropertyFileActions` | Upload, rename, move, duplicate, delete, create folder — shared by the map and list pages |
 | `usePropertyPrefetch` | Module-level, id-keyed cache of files/folders (5 min TTL) plus signed thumbnail URLs (batched, 55 min) and image warming (hero photo + first thumbnails); the single cache for property data |
+| `useSheetHistory` | Keeps the open property and folder in the URL (`?property=&folder=`), one history entry per step, so Back/Forward/swipe move through them and a link opens a property; `close` jumps back to the pre-open URL |
 | `usePropertySwitcher` | Switching the open modal to another property |
 | `useUserProperties` | Property list with file counts for list/sidebar/switcher views |
 | `useSearchState` / `useModalState` | Search input and modal/address state on the map page |
 | `useMobileViewport` | Responsive/touch styling |
 
 Every mutation in `usePropertyFileActions` invalidates the prefetch cache for that property so re-opening it never shows stale files.
+
+Navigation is in the URL. The map and Properties pages call `sheetHistory.open/changeFolder/close` on user actions and let its effect drive state when the browser navigates; `PropertyDetailsModal` does the same for the viewed file (`?file=`). Never open or close the sheet with raw state setters from a user action; go through the hook so history stays right.
 
 Prefetch runs ahead of the tap: the map warms the most recent pins on load and on marker hover, and warms the hero when a pin is selected; the Properties page warms its first eight cards on load and any card on press/hover; the desktop sidebar warms on hover. `warmImage` respects Data Saver. Thumbnail URLs that expire re-sign once on image error instead of falling back to the icon.
 
