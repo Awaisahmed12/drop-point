@@ -75,6 +75,9 @@ export default function UserAuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  // Social sign-in leads; email is the last option, revealed on request.
+  const hasProviders = AUTH_PROVIDERS.length > 0;
+  const [useEmail, setUseEmail] = useState(!hasProviders);
 
   // An OAuth round-trip that failed comes back to this page with the reason.
   useEffect(() => {
@@ -209,7 +212,7 @@ export default function UserAuthForm() {
         {!isSignUp && <p className="text-subhead text-ink-2 -mt-1">Your property documents, on a map.</p>}
       </div>
 
-      {AUTH_PROVIDERS.length > 0 && (
+      {!useEmail ? (
         <div className="flex flex-col gap-3">
           {AUTH_PROVIDERS.map(provider => (
             <button
@@ -223,14 +226,19 @@ export default function UserAuthForm() {
               Continue with {PROVIDERS[provider].label}
             </button>
           ))}
-          <div className="flex items-center gap-3 text-footnote text-ink-2 px-2" aria-hidden="true">
-            <span className="flex-1 h-px bg-hairline/70" />
-            or
-            <span className="flex-1 h-px bg-hairline/70" />
-          </div>
+          {error && (
+            <p className="text-footnote text-danger text-center px-4" role="alert">{error}</p>
+          )}
+          <button
+            type="button"
+            className="text-subhead text-accent text-center ios-press mt-3"
+            onClick={() => { setError(null); setUseEmail(true); }}
+          >
+            Continue with email
+          </button>
         </div>
-      )}
-
+      ) : (
+      <>
       <form className="flex flex-col gap-4" onSubmit={handleAuth} noValidate>
         <div className="ios-group">
           {isSignUp && (
@@ -318,13 +326,26 @@ export default function UserAuthForm() {
         </button>
       </form>
 
-      <button
-        type="button"
-        className="text-subhead text-accent text-center ios-press"
-        onClick={() => { setIsSignUp(v => !v); resetForm(); }}
-      >
-        {isSignUp ? 'Have an account? Sign in' : 'New here? Create an account'}
-      </button>
+      <div className="flex flex-col items-center gap-3">
+        <button
+          type="button"
+          className="text-subhead text-accent text-center ios-press"
+          onClick={() => { setIsSignUp(v => !v); resetForm(); }}
+        >
+          {isSignUp ? 'Have an account? Sign in' : 'New here? Create an account'}
+        </button>
+        {hasProviders && (
+          <button
+            type="button"
+            className="text-subhead text-ink-2 text-center ios-press"
+            onClick={() => { setUseEmail(false); setIsSignUp(false); resetForm(); }}
+          >
+            Other sign-in options
+          </button>
+        )}
+      </div>
+      </>
+      )}
     </div>
   );
 }

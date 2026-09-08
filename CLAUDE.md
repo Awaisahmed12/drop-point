@@ -81,7 +81,7 @@ Components never call Supabase data tables directly — they go through the serv
 
 `withAuth(Component, { requireAuth: boolean })` is a HOC that wraps every page. It checks the Supabase session and redirects accordingly. Row-level security is enforced at the database level.
 
-Sign-in is email/password plus whichever social providers `NEXT_PUBLIC_AUTH_PROVIDERS` lists, all through Supabase Auth (`signInWithOAuth` → `/auth/callback`). `ensureUserProfile` (`src/utils/profile.ts`) seeds the `user_profiles` row on first sign-in from whatever name metadata the provider gave; `namesFromUser` is the one place that reads it.
+Sign-in leads with whichever social providers `NEXT_PUBLIC_AUTH_PROVIDERS` lists; email/password is the last option, revealed by "Continue with email" (and shown directly when no provider is configured). All of it goes through Supabase Auth (`signInWithOAuth` → `/auth/callback`). `ensureUserProfile` (`src/utils/profile.ts`) seeds the `user_profiles` row on first sign-in from whatever name metadata the provider gave; `namesFromUser` is the one place that reads it.
 
 ### Connectors
 
