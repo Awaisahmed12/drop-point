@@ -192,6 +192,7 @@ export const PropertyDetailsModal = ({
   const fabButtonRef = useRef<HTMLButtonElement>(null);
   // The nav bar floats over the hero photo and turns solid once content scrolls under it.
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
+  const scrolledPastHeroRef = useRef(false);
   const sheetDrag = useSheetDrag({
     onDismiss: () => {
       onClose();
@@ -800,11 +801,18 @@ export const PropertyDetailsModal = ({
       }
     };
 
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || (!fileMenuId && !folderMenuId)) return;
+      setFileMenuId(null);
+      setFolderMenuId(null);
+    };
     document.addEventListener('click', handleClick, true); // Use capture phase
     document.addEventListener('touchend', handleClick, true); // Also handle touch events for mobile
+    document.addEventListener('keydown', handleKey);
     return () => {
       document.removeEventListener('click', handleClick, true);
       document.removeEventListener('touchend', handleClick, true);
+      document.removeEventListener('keydown', handleKey);
     };
   }, [fileMenuId, folderMenuId]);
 
@@ -1201,7 +1209,13 @@ export const PropertyDetailsModal = ({
               overscrollBehavior: 'contain',
               paddingTop: showHero ? 0 : 'var(--sheet-chrome)',
             }}
-            onScroll={e => setScrolledPastHero(e.currentTarget.scrollTop > heroHeight - 72)}
+            onScroll={e => {
+              const past = e.currentTarget.scrollTop > heroHeight - 72;
+              if (past !== scrolledPastHeroRef.current) {
+                scrolledPastHeroRef.current = past;
+                setScrolledPastHero(past);
+              }
+            }}
           >
             {/* Hero: the property photo with the name set into it. Pulling it also dismisses. */}
             {showHero && (
@@ -1328,7 +1342,8 @@ export const PropertyDetailsModal = ({
                 top: breadcrumbPath.length > 0 ? '0' : '0',
                 zIndex: 60, // Higher z-index to ensure it stays above everything
               }}>
-                <div className="relative">
+                <div className="flex items-center gap-3">
+                <div className="relative flex-1">
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -1352,6 +1367,24 @@ export const PropertyDetailsModal = ({
                       </svg>
                     </button>
                   )}
+                </div>
+                {/* Desktop: the one primary action lives in the toolbar, where a pointer expects it. */}
+                {!isMobile && (
+                  <button
+                    type="button"
+                    ref={fabButtonRef}
+                    onClick={() => setFabOpen(true)}
+                    aria-label="Add files or a folder"
+                    aria-haspopup="menu"
+                    className="ios-button ios-button-primary shrink-0 gap-1.5 text-subhead"
+                    style={{ width: 'auto', height: 40, paddingLeft: 14, paddingRight: 18 }}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add
+                  </button>
+                )}
                 </div>
               </div>
 
@@ -1679,7 +1712,7 @@ export const PropertyDetailsModal = ({
                                 <HeroFolderIcon style={{ width: gridIconSize, height: gridIconSize, color: '#fbbf24' }} />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className="absolute top-1 right-1 rounded-full glass text-ink-2 flex items-center justify-center touch-manipulation"
+                                  className="absolute top-1 right-1 rounded-full bg-surface-2 text-ink-2 shadow-[0_1px_3px_rgba(0,0,0,0.14)] flex items-center justify-center touch-manipulation"
                                   {...menuTriggerProps('folder', folder.id)}
                                   style={{ 
                                     zIndex: 10,
@@ -1786,7 +1819,7 @@ export const PropertyDetailsModal = ({
                                 />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className="absolute top-1 right-1 rounded-full glass text-ink-2 flex items-center justify-center touch-manipulation"
+                                  className="absolute top-1 right-1 rounded-full bg-surface-2 text-ink-2 shadow-[0_1px_3px_rgba(0,0,0,0.14)] flex items-center justify-center touch-manipulation"
                                   {...menuTriggerProps('file', file.id)}
                                   style={{ 
                                     zIndex: 10,
@@ -2088,7 +2121,8 @@ export const PropertyDetailsModal = ({
           }
         `}</style>
 
-        {/* One "+" offering the two ways to add something. */}
+        {/* Phone: one floating "+" offering the two ways to add something. */}
+        {isMobile && (
         <div
           className="absolute z-30"
           style={{ bottom: 'calc(var(--safe-bottom) + 16px)', right: '16px' }}
@@ -2110,6 +2144,7 @@ export const PropertyDetailsModal = ({
             </svg>
           </button>
         </div>
+        )}
         <ActionSheet
           open={fabOpen}
           onClose={() => setFabOpen(false)}
