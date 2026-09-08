@@ -6,6 +6,7 @@ import { MobileBottomNav } from '../components/MobileBottomNav';
 import { WebSidebar } from '../components/WebSidebar';
 import { ActionSheet } from '../components/ActionSheet';
 import { supabase } from '../utils/supabaseClient';
+import { namesFromUser } from '../utils/profile';
 import { getUserUsageBytes, formatBytes } from '../utils/usage';
 import { FREE_TIER_MAX_BYTES, FREE_TIER_GB } from '../../constants';
 import { withAuth } from '../components/withAuth';
@@ -48,8 +49,9 @@ function AccountPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setEmail(user.email ?? null);
-      setFirstName((user.user_metadata?.first_name as string) || '');
-      setLastName((user.user_metadata?.last_name as string) || '');
+      const names = namesFromUser(user);
+      setFirstName(names.first ?? '');
+      setLastName(names.last ?? '');
       try {
         const { data } = await supabase
           .from('user_profiles')

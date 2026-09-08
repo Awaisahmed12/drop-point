@@ -23,6 +23,7 @@ import type { PropertyWithFileCount } from '../../types';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
 import { getFileSignedUrl } from '../utils/supabaseClient';
 import { heroImageUrls } from '../hooks/usePropertyPrefetch';
+import { importFromGoogleDrive, preloadGoogleDrive, googleDriveAvailable } from '../utils/googleDrive';
 import { FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 import { ActionSheet, type ActionSheetItem } from './ActionSheet';
 
@@ -103,7 +104,7 @@ interface PropertyDetailsModalProps {
   
   // File operations. Rename and folder creation may throw; the modal turns
   // the error into an inline message.
-  onFileUpload: (files: FileList) => Promise<void>;
+  onFileUpload: (files: FileList | File[]) => Promise<void>;
   onFileDelete: (file: PropertyFile) => void;
   onFileRename: (item: PropertyFile | PropertyFolder, newName: string) => Promise<void> | void;
   onFileMove?: (file: PropertyFile, targetFolderId: string | null) => Promise<void>;
@@ -287,6 +288,28 @@ export const PropertyDetailsModal = ({
     dragDepthRef.current = 0;
     setIsDragOver(false);
   }, []);
+
+  // Google's picker scripts come down while the sheet is open, not on the tap.
+  useEffect(() => {
+    if (isOpen) void preloadGoogleDrive();
+  }, [isOpen]);
+
+  const importFromDrive = async () => {
+    try {
+      const { files: picked, skipped } = await importFromGoogleDrive();
+      if (picked.length > 0) await onFileUpload(picked);
+      if (skipped > 0) {
+        showToast(
+          picked.length > 0
+            ? `Imported ${picked.length} of ${picked.length + skipped}. Folders and forms can’t be imported.`
+            : 'Nothing to import. Folders and forms can’t be imported.',
+          'warning',
+        );
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Couldn’t import from Google Drive.');
+    }
+  };
 
   const closeMenus = useCallback(() => {
     setFileMenuId(null);
@@ -2196,10 +2219,13 @@ export const PropertyDetailsModal = ({
           presentation={isMobile ? 'sheet' : 'popover'}
           anchorRef={fabButtonRef}
           title={selectedFolder === 'master' ? 'Add to this property' : `Add to “${folders.find(f => f.id === selectedFolder)?.name ?? 'folder'}”`}
-          groups={[[
-            { label: 'Upload files', onSelect: () => document.getElementById('file-upload-input')?.click() },
-            { label: 'New folder', onSelect: () => setCreatingFolder(true) },
-          ]]}
+          groups={[
+            [
+              { label: 'Upload files', onSelect: () => document.getElementById('file-upload-input')?.click() },
+              ...(googleDriveAvailable ? [{ label: 'Import from Google Drive', onSelect: importFromDrive }] : []),
+            ],
+            [{ label: 'New folder', onSelect: () => setCreatingFolder(true) }],
+          ]}
         />
 
         {/* Image Lightbox */}
