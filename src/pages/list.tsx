@@ -8,6 +8,7 @@ import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
 import type { Property, PropertyFile, PropertyFolder, PropertyWithFileCount } from '../../types';
 import { withAuth } from '../components/withAuth';
 import { useUserProperties } from '../hooks/useUserProperties';
+import { useSheetHistory } from '../hooks/useSheetHistory';
 import { usePropertyFileActions } from '../hooks/usePropertyFileActions';
 import { getPropertyDataSync, setPropertyDataCache, prefetchPropertyData } from '../hooks/usePropertyPrefetch';
 import { propertyService } from '../services';
@@ -84,6 +85,29 @@ function ListPage() {
     }
   }, [showToast]);
 
+  const openPropertyById = useCallback((id: string) => {
+    const match = properties.find(p => p.id === id);
+    if (!match) return false;
+    void openProperty(match);
+    return true;
+  }, [properties, openProperty]);
+
+  // Back/Forward move between properties and folders; a link opens a property.
+  const sheetHistory = useSheetHistory({
+    isOpen: showDetailsModal,
+    propertyId: savedProperty?.id ?? null,
+    selectedFolder,
+    ready: !propertiesLoading,
+    openPropertyById,
+    closeSheet: () => setShowDetailsModal(false),
+    setSelectedFolder,
+  });
+
+  const selectProperty = useCallback((property: Property | PropertyWithFileCount) => {
+    void openProperty(property);
+    if (property.id) sheetHistory.open(property.id);
+  }, [openProperty, sheetHistory]);
+
   const renameProperty = useCallback(async (property: Property, label: string | null) => {
     if (!property.id) return;
     const updated = await propertyService.updateProperty(property.id, { label });
@@ -99,27 +123,27 @@ function ListPage() {
       <WebSidebar
         properties={properties}
         selectedPropertyId={savedProperty?.id}
-        onPropertySelect={openProperty}
+        onPropertySelect={selectProperty}
       />
       <div className="flex-1 overflow-auto">
         <ListView
           properties={properties}
           loading={propertiesLoading}
           error={propertiesError}
-          onPropertySelect={openProperty}
+          onPropertySelect={selectProperty}
         />
       </div>
       <PropertyDetailsModal
         isOpen={showDetailsModal}
         property={savedProperty}
         snappedLatLng={savedProperty ? { lat: savedProperty.lat, lng: savedProperty.lng } : null}
-        onClose={() => setShowDetailsModal(false)}
+        onClose={sheetHistory.close}
         folders={folders}
         files={files}
         foldersLoading={loading}
         filesLoading={loading}
         selectedFolder={selectedFolder}
-        onFolderChange={setSelectedFolder}
+        onFolderChange={sheetHistory.changeFolder}
         onFileUpload={fileActions.uploadFiles}
         onFileDelete={fileActions.deleteFile}
         onFileRename={fileActions.renameItem}
@@ -131,6 +155,7 @@ function ListPage() {
         onDismiss={fileActions.dismissPendingUpload}
         onPropertyRename={renameProperty}
         onPropertySwitch={(property, newFiles, newFolders) => {
+          if (property.id) sheetHistory.open(property.id);
           setSavedProperty(toProperty(property));
           setFiles(newFiles);
           setFolders(newFolders);

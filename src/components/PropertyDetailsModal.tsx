@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/router';
 
 import { MoveModal } from './MoveModal';
 import { FileIcon } from './FileIcon';
@@ -182,6 +183,54 @@ export const PropertyDetailsModal = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [imagePreview, setImagePreview] = useState<{ url: string; file: PropertyFile } | null>(null);
+
+  // Mobile file viewer state
+  const [mobileFileViewer, setMobileFileViewer] = useState<{
+    isOpen: boolean;
+    file: PropertyFile | null;
+    fileUrl: string;
+    downloadUrl: string;
+    content?: string;
+  }>({
+    isOpen: false,
+    file: null,
+    fileUrl: '',
+    downloadUrl: '',
+  });
+
+  // The viewed file is in the URL too, so Back leaves the viewer and a link
+  // reopens it. `pushedFile` says whether the entry is ours to go back over.
+  const router = useRouter();
+  const pushedFileRef = useRef(false);
+  const viewedFileId = mobileFileViewer.file?.id ?? imagePreview?.file.id ?? null;
+  const closeFileViewer = useCallback(() => {
+    setImagePreview(null);
+    setMobileFileViewer({ isOpen: false, file: null, fileUrl: '', downloadUrl: '' });
+  }, []);
+  const recordFileInUrl = useCallback((fileId: string) => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('file') === fileId) return;
+    q.set('file', fileId);
+    pushedFileRef.current = true;
+    void router.push(`${router.pathname}?${q.toString()}`, undefined, { shallow: true });
+  }, [router]);
+  /** Leave the viewer through history when we added an entry for it. */
+  const leaveFileViewer = useCallback(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (!q.get('file')) {
+      closeFileViewer();
+      return;
+    }
+    if (pushedFileRef.current) {
+      pushedFileRef.current = false;
+      router.back();
+    } else {
+      q.delete('file');
+      const rest = q.toString();
+      void router.replace(`${router.pathname}${rest ? `?${rest}` : ''}`, undefined, { shallow: true });
+    }
+  }, [router, closeFileViewer]);
+
   const [fabOpen, setFabOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -311,7 +360,7 @@ export const PropertyDetailsModal = ({
         searchInputRef.current?.focus();
       }
       if (e.key === 'Escape' && imagePreview) {
-        setImagePreview(null);
+        leaveFileViewer();
       }
       if (imagePreview && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
@@ -326,7 +375,7 @@ export const PropertyDetailsModal = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, imagePreview, files, loadImagePreview]);
+  }, [isOpen, imagePreview, files, loadImagePreview, leaveFileViewer]);
   
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
@@ -356,20 +405,6 @@ export const PropertyDetailsModal = ({
       closeMenus();
     }
   }, [isOpen, closeMenus]);
-
-  // Mobile file viewer state
-  const [mobileFileViewer, setMobileFileViewer] = useState<{
-    isOpen: boolean;
-    file: PropertyFile | null;
-    fileUrl: string;
-    downloadUrl: string;
-    content?: string;
-  }>({
-    isOpen: false,
-    file: null,
-    fileUrl: '',
-    downloadUrl: '',
-  });
 
   // Use global mobile viewport hook
   const { isMobile } = useMobileViewport();
@@ -829,10 +864,12 @@ export const PropertyDetailsModal = ({
       if (isMobile) {
         if (IMAGE_EXTENSIONS.has(ext) || ext === 'pdf') {
           setMobileFileViewer({ isOpen: true, file, fileUrl, downloadUrl });
+          recordFileInUrl(file.id);
         } else if (ext === 'txt' || ext === 'csv') {
           try {
             const content = await (await fetch(fileUrl)).text();
             setMobileFileViewer({ isOpen: true, file, fileUrl, downloadUrl, content });
+            recordFileInUrl(file.id);
           } catch {
             window.location.href = downloadUrl;
           }
@@ -844,6 +881,7 @@ export const PropertyDetailsModal = ({
 
       if (IMAGE_EXTENSIONS.has(ext)) {
         setImagePreview({ url: fileUrl, file });
+        recordFileInUrl(file.id);
         return;
       }
 
@@ -876,6 +914,20 @@ export const PropertyDetailsModal = ({
     }
   };
 
+  // URL → viewer: Back closes it, Forward or a link reopens it.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const fileId = new URLSearchParams(window.location.search).get('file');
+    if (!fileId) {
+      if (viewedFileId) closeFileViewer();
+      return;
+    }
+    if (fileId === viewedFileId) return;
+    const file = files.find(f => f.id === fileId);
+    if (file) void openFileInline(file);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs on URL change and when files arrive, not on every render
+  }, [router.isReady, router.asPath, files, closeFileViewer]);
+
   // Mobile file viewer component
   const renderMobileFileViewer = () => {
     if (!mobileFileViewer.isOpen || !mobileFileViewer.file) return null;
@@ -883,14 +935,7 @@ export const PropertyDetailsModal = ({
     const file = mobileFileViewer.file;
     const fileExtension = file.file_name.split('.').pop()?.toLowerCase();
 
-    const closeMobileViewer = () => {
-      setMobileFileViewer({
-        isOpen: false,
-        file: null,
-        fileUrl: '',
-        downloadUrl: '',
-      });
-    };
+    const closeMobileViewer = leaveFileViewer;
 
     return (
       <div className="fixed inset-0 z-50 bg-black/90 flex flex-col" style={{
@@ -2161,13 +2206,13 @@ export const PropertyDetailsModal = ({
         {imagePreview && (
           <div
             className="fixed inset-0 z-[999999] bg-black/92 flex flex-col items-center justify-center"
-            onClick={() => setImagePreview(null)}
-            onTouchEnd={e => { e.preventDefault(); setImagePreview(null); }}
+            onClick={leaveFileViewer}
+            onTouchEnd={e => { e.preventDefault(); leaveFileViewer(); }}
           >
             {/* Close */}
             <button
               className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/30 transition-colors"
-              onClick={e => { e.stopPropagation(); setImagePreview(null); }}
+              onClick={e => { e.stopPropagation(); leaveFileViewer(); }}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
