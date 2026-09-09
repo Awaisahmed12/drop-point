@@ -70,7 +70,7 @@ export const PropertyInfoCard = ({ address, addressLoading, property, onSelect, 
           disabled={addressLoading || !address}
           onClick={onSelect}
         >
-          {isNew ? 'Add property' : 'Open'}
+          {isNew ? 'Add Property' : 'Open'}
         </button>
       </div>
     </div>

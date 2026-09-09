@@ -17,32 +17,38 @@ interface ActionSheetProps {
   /** Actions in visual groups. A hairline separates groups; a gap separates groups from Cancel. */
   groups: ActionSheetItem[][];
   cancelLabel?: string;
-  /** Touch devices get a bottom sheet; pointer devices get a menu anchored to `anchorRef`. */
+  /** `popover` (default): a menu anchored to `anchorRef`. `sheet`: an action sheet for follow-up choices. */
   presentation?: 'sheet' | 'popover';
   anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
-const MENU_WIDTH = 224;
-
-/** Place a menu under its anchor, or above it when there's no room below. */
+/** Place a menu under its anchor, above it when there's no room below, and always on screen. */
 function placePopover(menu: HTMLElement, anchor: HTMLElement | null | undefined) {
   if (!anchor) {
     Object.assign(menu.style, { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
     return;
   }
+  const margin = 8;
   const r = anchor.getBoundingClientRect();
-  const left = Math.max(8, Math.min(r.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8));
+  const width = menu.offsetWidth;
+  const height = menu.offsetHeight;
+  const left = Math.max(margin, Math.min(r.right - width, window.innerWidth - width - margin));
   menu.style.left = `${left}px`;
-  if (window.innerHeight - r.bottom > 280) menu.style.top = `${r.bottom + 8}px`;
-  else menu.style.bottom = `${window.innerHeight - r.top + 8}px`;
+  if (r.bottom + margin + height <= window.innerHeight - margin) menu.style.top = `${r.bottom + margin}px`;
+  else if (r.top - margin - height >= margin) menu.style.bottom = `${window.innerHeight - r.top + margin}px`;
+  else menu.style.top = `${Math.max(margin, window.innerHeight - margin - height)}px`;
 }
 
 /**
- * iOS action sheet: a stack of tall buttons rising from the bottom edge with
- * a separate Cancel. Every action is spelled out, grouped, and one tap away;
- * destructive actions are red and last.
+ * Two presentations of one list of actions.
+ *
+ * `popover` (the default for anything a "⋯" or "+" reveals): an anchored menu,
+ * grouped by separators, destructive items red and last, 44pt rows on touch.
+ * `sheet`: an iOS action sheet for choices that follow an action (confirming a
+ * discard, say). Per the HIG the destructive choice comes first there, and a
+ * separate Cancel sits at the bottom.
  */
-export const ActionSheet: React.FC<ActionSheetProps> = ({ open, onClose, title, groups, cancelLabel = 'Cancel', presentation = 'sheet', anchorRef }) => {
+export const ActionSheet: React.FC<ActionSheetProps> = ({ open, onClose, title, groups, cancelLabel = 'Cancel', presentation = 'popover', anchorRef }) => {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -63,8 +69,7 @@ export const ActionSheet: React.FC<ActionSheetProps> = ({ open, onClose, title, 
         <div
           role="menu"
           aria-label={title || 'Actions'}
-          className="fixed ios-float rounded-[14px] overflow-hidden py-1 animate-fade-in"
-          style={{ width: MENU_WIDTH }}
+          className="fixed ios-float rounded-[14px] overflow-y-auto py-1 animate-fade-in w-max min-w-[224px] pointer-coarse:min-w-[260px] max-w-[min(320px,calc(100vw-16px))] max-h-[calc(100dvh-16px)]"
           ref={el => { if (el) placePopover(el, anchorRef?.current); }}
           onClick={e => e.stopPropagation()}
         >
@@ -78,12 +83,12 @@ export const ActionSheet: React.FC<ActionSheetProps> = ({ open, onClose, title, 
                   key={item.label}
                   type="button"
                   role="menuitem"
-                  className={`flex items-center gap-3 w-full text-left px-4 h-10 text-subhead ios-row-press ${
+                  className={`flex items-center gap-3 w-full text-left px-4 h-10 text-subhead pointer-coarse:h-11 pointer-coarse:text-body ios-row-press ${
                     item.tone === 'danger' ? 'text-danger' : 'text-ink'
                   }`}
                   onClick={() => run(item)}
                 >
-                  <span className={`flex-1 ${item.selected ? 'font-semibold' : ''}`}>{item.label}</span>
+                  <span className={`flex-1 whitespace-nowrap ${item.selected ? 'font-semibold' : ''}`}>{item.label}</span>
                   {item.selected && (
                     <svg className="w-4 h-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M5 13l4 4L19 7" />
@@ -119,7 +124,9 @@ export const ActionSheet: React.FC<ActionSheetProps> = ({ open, onClose, title, 
               {title}
             </div>
           )}
-          {groups.map((group, gi) => (
+          {[...groups]
+            .sort((a, b) => Number(b.some(i => i.tone === 'danger')) - Number(a.some(i => i.tone === 'danger')))
+            .map((group, gi) => (
             <div key={gi} className={gi > 0 ? 'border-t-[6px] border-black/5' : ''}>
               {group.map((item, ii) => (
                 <button

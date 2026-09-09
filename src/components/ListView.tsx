@@ -37,7 +37,8 @@ const fileCountLabel = (n: number) => `${n} ${n === 1 ? 'file' : 'files'}`;
 /**
  * The Properties screen: a large title, a floating glass search capsule, and
  * one photo card per property with its name set into the picture, the same
- * language as the property sheet's hero. Tapping a card opens it.
+ * language as the property sheet's hero. Tapping a card opens it. Cards are
+ * content, so they use standard materials, not glass.
  */
 export const ListView = ({ properties, loading, error, onPropertySelect }: ListViewProps) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,9 +61,12 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
 
   const renderState = () => {
     if (loading) {
+      // Placeholder cards hold the layout while the list arrives.
       return (
-        <div className="flex items-center justify-center py-24">
-          <div className="w-7 h-7 border-[3px] border-surface-2 border-t-accent rounded-full animate-spin" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" aria-busy="true" aria-label="Loading properties">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="h-48 sm:h-56 rounded-[24px] bg-surface-2 animate-pulse" />
+          ))}
         </div>
       );
     }
@@ -71,7 +75,7 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
     }
     if (properties.length === 0) {
       return (
-        <div className="glass rounded-[28px] px-6 py-10 text-center max-w-sm mx-auto mt-4">
+        <div className="bg-surface rounded-[28px] px-6 py-10 text-center max-w-sm mx-auto mt-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_0_0_0.5px_rgba(0,0,0,0.04)]">
           <div className="w-16 h-16 mx-auto rounded-full bg-accent-soft flex items-center justify-center mb-4">
             <svg className="w-8 h-8 text-accent" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M12 2a7 7 0 00-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 00-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" />
@@ -79,7 +83,7 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
           </div>
           <h3 className="text-title-3 font-semibold">No properties yet</h3>
           <p className="text-subhead text-ink-2 mt-1 mb-5">Drop a pin on the map to add your first one.</p>
-          <Link href="/map" className="ios-button ios-button-primary">Open the map</Link>
+          <Link href="/map" className="ios-button ios-button-primary">Open the Map</Link>
         </div>
       );
     }
@@ -111,13 +115,13 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
             type="search"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search"
+            placeholder="Search properties"
             aria-label="Search properties"
             className="w-full h-12 pl-11 pr-11 rounded-full bg-transparent text-body text-ink placeholder:text-ink-2 focus:outline-none"
             autoComplete="off"
           />
           {searchQuery && (
-            <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-ink-3 text-white flex items-center justify-center z-10">
+            <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-ink-3 text-white flex items-center justify-center z-10 hit-44">
               <XMarkIcon className="w-3.5 h-3.5" strokeWidth={3} />
             </button>
           )}
@@ -149,7 +153,7 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
                   onError={e => swapToFallback(e, staticMapUrl(property))}
                 />
                 <div className="hero-scrim absolute inset-x-0 bottom-0 h-[75%]" />
-                <span className="glass-dark absolute top-3 left-3 rounded-full px-3 py-1 text-footnote font-semibold">
+                <span className="absolute top-3 left-3 rounded-full px-3 py-1 text-footnote font-semibold bg-black/45 text-white">
                   {fileCountLabel(property.file_count)}
                 </span>
                 <div className="absolute inset-x-0 bottom-0 px-4 pb-4 text-white">

@@ -13,7 +13,7 @@ interface FileMenuProps {
   onMove?: (file: PropertyFile) => void;
   onDuplicate?: (file: PropertyFile) => void;
   onDelete: (file: PropertyFile) => void;
-  /** Touch devices get an action sheet; pointer devices get an anchored menu. */
+  /** `popover` (default) is an anchored menu; `sheet` is kept for confirmations. */
   presentation?: 'popover' | 'sheet';
   menuPosition: { top?: number; bottom?: number; left?: number; right?: number };
   menuRef: React.RefObject<HTMLDivElement | null>;
@@ -66,13 +66,13 @@ export const FileMenu: React.FC<FileMenuProps> = ({
     ],
     [
       {
-        label: 'Rename',
+        label: 'Rename…',
         onSelect: () => onRename(file),
         icon: <Icon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />,
       },
       ...(onMove
         ? [{
-            label: 'Move to folder',
+            label: 'Move to Folder…',
             onSelect: () => onMove(file),
             icon: <Icon d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />,
           }]
@@ -108,7 +108,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
     <div
       ref={menuRef}
       role="menu"
-      className="fixed w-52 ios-float rounded-[12px] overflow-hidden py-1"
+      className="fixed w-52 pointer-coarse:w-60 ios-float rounded-[14px] overflow-hidden py-1"
       style={{ zIndex: 999999, ...menuPosition }}
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
@@ -121,7 +121,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
               key={item.label}
               type="button"
               role="menuitem"
-              className={`flex items-center gap-3 w-full text-left px-4 h-11 text-subhead ios-row-press ${
+              className={`flex items-center gap-3 w-full text-left px-4 h-11 text-subhead pointer-coarse:text-body ios-row-press ${
                 item.tone === 'danger' ? 'text-danger' : 'text-ink'
               }`}
               onClick={e => { e.stopPropagation(); run(item); }}

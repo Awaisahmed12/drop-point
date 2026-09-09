@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { ChevronRightIcon } from '@heroicons/react/24/outline';
@@ -29,7 +29,7 @@ function getAvatarColor(str: string): string {
 }
 
 /**
- * Account: an avatar hero on a wash of the user's color, then glass groups.
+ * Account: an avatar hero on a wash of the user's color, then grouped lists.
  * One value per row, pickers as action sheets, sign out on its own at the end.
  */
 function AccountPage() {
@@ -43,6 +43,7 @@ function AccountPage() {
   const [nameSaving, setNameSaving] = useState(false);
   const [profile, setProfile] = useState<Record<ProfileKey, string>>({ userType: '', propertyCount: '', useCase: '' });
   const [picker, setPicker] = useState<ProfileKey | null>(null);
+  const pickerAnchor = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -125,7 +126,7 @@ function AccountPage() {
   const avatarColor = getAvatarColor(displayName || email || '?');
 
   const valueRow = (key: ProfileKey) => (
-    <button key={key} type="button" className="ios-row ios-row-press" onClick={() => setPicker(key)}>
+    <button key={key} type="button" className="ios-row ios-row-press" aria-haspopup="menu" onClick={e => { pickerAnchor.current = e.currentTarget; setPicker(key); }}>
       <span className="flex-1 text-body whitespace-nowrap">{PROFILE_QUESTIONS[key].label}</span>
       <span className="text-body text-ink-2 truncate max-w-[55%]">{profile[key] || 'Choose'}</span>
       <ChevronRightIcon className="ios-chevron w-4 h-4" strokeWidth={2.5} />
@@ -147,7 +148,7 @@ function AccountPage() {
             <div className="space-y-4 pt-10">
               <div className="w-24 h-24 rounded-full bg-surface-2 mx-auto animate-pulse" />
               {[1, 2].map(i => (
-                <div key={i} className="ios-group-glass p-4 animate-pulse">
+                <div key={i} className="ios-group p-4 animate-pulse">
                   <div className="h-4 bg-surface-2 rounded w-1/3 mb-3" />
                   <div className="h-3 bg-surface-2 rounded w-2/3" />
                 </div>
@@ -175,7 +176,7 @@ function AccountPage() {
                     <div className="text-subhead text-ink-2 mt-0.5">{email}</div>
                   </button>
                 ) : (
-                  <div className="ios-group-glass w-full mt-4 text-left">
+                  <div className="ios-group w-full mt-4 text-left">
                     <input
                       value={firstName}
                       onChange={e => setFirstName(e.target.value)}
@@ -204,7 +205,7 @@ function AccountPage() {
               </div>
 
               {/* Storage */}
-              <div className="ios-group-glass">
+              <div className="ios-group">
                 <div className="ios-row flex-col items-stretch gap-2.5 py-4">
                   <div className="flex items-baseline justify-between gap-4">
                     <span className="text-headline font-semibold">Storage</span>
@@ -226,14 +227,14 @@ function AccountPage() {
               {/* About you */}
               <div>
                 <div className="ios-group-label">About you</div>
-                <div className="ios-group-glass">
+                <div className="ios-group">
                   {(Object.keys(PROFILE_QUESTIONS) as ProfileKey[]).map(valueRow)}
                 </div>
                 <p className="text-footnote text-ink-2 px-4 pt-2">Optional. Helps us build the right things for you.</p>
               </div>
 
               {profile.userType === 'Admin' && (
-                <div className="ios-group-glass">
+                <div className="ios-group">
                   <Link href="/admin" className="ios-row ios-row-press">
                     <span className="flex-1 text-body">Admin configuration</span>
                     <ChevronRightIcon className="ios-chevron w-4 h-4" strokeWidth={2.5} />
@@ -241,9 +242,9 @@ function AccountPage() {
                 </div>
               )}
 
-              <div className="ios-group-glass">
+              <div className="ios-group">
                 <button type="button" className="ios-row ios-row-press justify-center text-body text-danger" onClick={signOut}>
-                  Sign out
+                  Sign Out
                 </button>
               </div>
             </div>
@@ -256,6 +257,8 @@ function AccountPage() {
         <ActionSheet
           open
           onClose={() => setPicker(null)}
+          presentation="popover"
+          anchorRef={pickerAnchor}
           title={PROFILE_QUESTIONS[picker].label}
           groups={[
             PROFILE_QUESTIONS[picker].options.map(option => ({

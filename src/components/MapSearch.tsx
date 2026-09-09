@@ -300,7 +300,7 @@ export const MapSearch = ({
           {inputValue && (
             <button
               type="button"
-              className="absolute right-3 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-ink-3 text-white ios-press"
+              className="absolute right-3 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-ink-3 text-white ios-press hit-44"
               onClick={handleClear}
               aria-label="Clear search"
             >

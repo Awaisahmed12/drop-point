@@ -48,10 +48,10 @@ export const CookieConsentBanner: React.FC = () => {
         </p>
         <div className="flex gap-2 mt-3">
           <button type="button" className="ios-button ios-button-tinted h-11 text-subhead" onClick={() => decide(false)}>
-            Essential only
+            Essential Only
           </button>
           <button type="button" className="ios-button ios-button-primary h-11 text-subhead" onClick={() => decide(true)}>
-            Allow analytics
+            Allow Analytics
           </button>
         </div>
       </div>
