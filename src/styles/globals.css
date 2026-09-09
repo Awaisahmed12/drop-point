@@ -29,29 +29,34 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
 
   /* iOS Human Interface Guidelines type scale */
-  --text-large-title: 34px;
-  --text-large-title--line-height: 41px;
+  /* Sizes are rem on a 17px root so they track iOS Dynamic Type (see `html`).
+     The values are the HIG defaults: 34/28/22/20/17/17/16/15/13/12/11. */
+  --text-large-title: 2rem;
+  --text-large-title--line-height: 2.4118rem;
   --text-large-title--letter-spacing: 0.37px;
-  --text-title-1: 28px;
-  --text-title-1--line-height: 34px;
-  --text-title-2: 22px;
-  --text-title-2--line-height: 28px;
-  --text-title-3: 20px;
-  --text-title-3--line-height: 25px;
-  --text-headline: 17px;
-  --text-headline--line-height: 22px;
-  --text-body: 17px;
-  --text-body--line-height: 22px;
-  --text-callout: 16px;
-  --text-callout--line-height: 21px;
-  --text-subhead: 15px;
-  --text-subhead--line-height: 20px;
-  --text-footnote: 13px;
-  --text-footnote--line-height: 18px;
-  --text-caption: 12px;
-  --text-caption--line-height: 16px;
-  --text-caption-2: 11px;
-  --text-caption-2--line-height: 13px;
+  --text-title-1: 1.6471rem;
+  --text-title-1--line-height: 2rem;
+  --text-title-2: 1.2941rem;
+  --text-title-2--line-height: 1.6471rem;
+  --text-title-3: 1.1765rem;
+  --text-title-3--line-height: 1.4706rem;
+  --text-headline: 1rem;
+  --text-headline--line-height: 1.2941rem;
+  --text-body: 1rem;
+  --text-body--line-height: 1.2941rem;
+  --text-callout: 0.9412rem;
+  --text-callout--line-height: 1.2353rem;
+  --text-subhead: 0.8824rem;
+  --text-subhead--line-height: 1.1765rem;
+  --text-footnote: 0.7647rem;
+  --text-footnote--line-height: 1.0588rem;
+  --text-caption: 0.7059rem;
+  --text-caption--line-height: 0.9412rem;
+  --text-caption-2: 0.6471rem;
+  --text-caption-2--line-height: 0.7647rem;
+
+  /* Spacing stays in points; only type follows the text-size setting. */
+  --spacing: 4px;
 
   --radius-row: 20px;               /* grouped list corners */
   --radius-sheet: 28px;             /* sheet corners (concentric with rows) */
@@ -100,8 +105,14 @@
 }
 
 html {
+  font-size: 17px; /* the HIG default body size; type tokens are rem of this */
   color-scheme: light dark;
   -webkit-text-size-adjust: 100%;
+}
+/* iOS: follow the person's Dynamic Type setting. Safari resolves this keyword
+   to the current body size, so every rem-based text style scales with it. */
+@supports (font: -apple-system-body) {
+  html { font: -apple-system-body; }
 }
 
 body {
@@ -157,7 +168,7 @@ input, textarea, [contenteditable], .selectable {
 
 /* iOS never zooms an input whose font is at least 16px. */
 @media (max-width: 639px) {
-  input, textarea, select { font-size: 16px !important; }
+  input, textarea, select { font-size: max(16px, var(--text-body)) !important; }
 }
 
 /* ----------------------------------------------------------------------------
@@ -378,6 +389,7 @@ input, textarea, [contenteditable], .selectable {
 
 /* Circular glass glyph button: close, more, dismiss. */
 .ios-close {
+  position: relative; /* anchors the 44pt hit region below */
   width: 34px;
   height: 34px;
   border-radius: 999px;
@@ -435,6 +447,19 @@ input, textarea, [contenteditable], .selectable {
 /* Minimum 44pt hit area for icon buttons. */
 .tap-target { min-width: 44px; min-height: 44px; }
 
+/* Small glyph buttons keep their size but get the HIG 44pt hit region. The
+   element must be positioned (absolute, or `ios-close`). */
+.hit-44::after,
+.ios-close::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
 /* Enter animations: only for things the user just opened. */
 @keyframes sheet-up {
   from { transform: translateY(24px); opacity: 0; }
@@ -450,6 +475,32 @@ input, textarea, [contenteditable], .selectable {
 @media (prefers-reduced-motion: reduce) {
   .animate-sheet-up, .animate-fade-in { animation: none; }
   .ios-segment, .ios-button, .ios-press { transition: none; }
+}
+
+/* Accessibility settings: Reduce Transparency makes every material opaque;
+   Increase Contrast darkens secondary text and separators. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .ios-float, .ios-group-glass, .ios-navbar-solid, .ios-close, .ios-segmented {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--color-surface);
+  }
+  .glass-dark { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(20, 20, 24, 0.88); }
+  .ios-tab[aria-current="page"] { background: var(--color-surface-2); }
+}
+@media (prefers-contrast: more) {
+  :root {
+    --color-ink-2: #636366;
+    --color-ink-3: #8e8e93;
+    --color-hairline: #8e8e93;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-ink-2: #aeaeb2;
+      --color-ink-3: #8e8e93;
+      --color-hairline: #8e8e93;
+    }
+  }
 }
 
 /* Keyboard focus is visible on controls; text fields show focus by their own styling. */

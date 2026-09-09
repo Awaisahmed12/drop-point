@@ -561,7 +561,8 @@ export const PropertyDetailsModal = ({
   const calculateMenuPosition = (buttonElement: HTMLElement, menuId: string) => {
     const rect = buttonElement.getBoundingClientRect();
     const menuHeight = 200; // Approximate menu height
-    const menuWidth = 176; // 44 * 4 (w-44)
+    // FileMenu / FolderMenu are w-52 (208px), w-60 (240px) on touch.
+    const menuWidth = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches ? 240 : 208;
     const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
     const padding = 8; // Minimum distance from screen edge
@@ -589,22 +590,11 @@ export const PropertyDetailsModal = ({
       }
     }
     
-    // Horizontal positioning - prefer right-aligned with button, but adjust if would go off-screen
-    const spaceRight = viewportWidth - rect.right;
-    const spaceLeft = rect.left;
-    
-    if (spaceRight >= menuWidth + padding) {
-      // Enough space to the right of button (right-aligned)
+    // Horizontal positioning: right-align to the button unless that runs off the left edge.
+    if (rect.right - menuWidth >= padding) {
       position.right = viewportWidth - rect.right;
-    } else if (spaceLeft >= menuWidth + padding) {
-      // Not enough space right-aligned, try left-aligned with button
-      position.left = rect.left - menuWidth + rect.width;
-    } else if (rect.left + menuWidth + padding <= viewportWidth) {
-      // Try left edge of button
-      position.left = rect.left;
     } else {
-      // Force fit - position as far right as possible while staying on screen
-      position.right = padding;
+      position.left = padding;
     }
     
     // Final safety check - ensure we don't go off any edge
@@ -1154,18 +1144,18 @@ export const PropertyDetailsModal = ({
   // Everything that isn't browsing files lives behind one "more" control.
   const moreGroups: ActionSheetItem[][] = [
     [
-      { label: 'Switch property', onSelect: () => setSwitcherOpen(true) },
-      { label: viewMode === 'list' ? 'Show as grid' : 'Show as list', onSelect: toggleViewMode },
+      { label: 'Switch Property…', onSelect: () => setSwitcherOpen(true) },
+      { label: viewMode === 'list' ? 'Show as Grid' : 'Show as List', onSelect: toggleViewMode },
     ],
     [
       ...(onPropertyRename
         ? [{
-            label: property.label ? 'Rename' : 'Add a name',
+            label: property.label ? 'Rename…' : 'Add a Name…',
             onSelect: () => { setPropertyLabelDraft(property.label || ''); setRenamingProperty(true); },
           }]
         : []),
       {
-        label: 'Copy address',
+        label: 'Copy Address',
         onSelect: () =>
           navigator.clipboard.writeText(property.address)
             .then(() => showToast('Address copied', 'success'))
@@ -1241,7 +1231,7 @@ export const PropertyDetailsModal = ({
             ref={moreButtonRef}
             onClick={() => setMoreOpen(true)}
             aria-label="More actions"
-            aria-haspopup={isMobile ? 'dialog' : 'menu'}
+            aria-haspopup="menu"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
@@ -1415,7 +1405,7 @@ export const PropertyDetailsModal = ({
                   <input
                     ref={searchInputRef}
                     type="text"
-                    placeholder="Search"
+                    placeholder="Search files"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="ios-search"
@@ -1427,7 +1417,7 @@ export const PropertyDetailsModal = ({
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-ink-3 text-white flex items-center justify-center"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-ink-3 text-white flex items-center justify-center hit-44"
                       aria-label="Clear search"
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
@@ -1623,7 +1613,7 @@ export const PropertyDetailsModal = ({
                                   onDelete={onFolderDelete}
                                   menuPosition={menuPosition[folder.id] || {}}
                                   menuRef={folderMenuRef}
-                                  presentation={isMobile ? 'sheet' : 'popover'}
+                                  presentation="popover"
                                 />
                               </div>
                             </div>
@@ -1740,7 +1730,7 @@ export const PropertyDetailsModal = ({
                                   onDelete={onFileDelete}
                                   menuPosition={menuPosition[file.id] || {}}
                                   menuRef={fileMenuRef}
-                                  presentation={isMobile ? 'sheet' : 'popover'}
+                                  presentation="popover"
                                 />
                               </div>
                             </div>
@@ -1780,7 +1770,7 @@ export const PropertyDetailsModal = ({
                                 <HeroFolderIcon style={{ width: gridIconSize, height: gridIconSize, color: '#fbbf24' }} />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className="absolute top-1 right-1 rounded-full bg-surface-2 text-ink-2 shadow-[0_1px_3px_rgba(0,0,0,0.14)] flex items-center justify-center touch-manipulation"
+                                  className="absolute top-1 right-1 rounded-full bg-surface-2 text-ink-2 shadow-[0_1px_3px_rgba(0,0,0,0.14)] flex items-center justify-center touch-manipulation hit-44"
                                   {...menuTriggerProps('folder', folder.id)}
                                   style={{ 
                                     zIndex: 10,
@@ -1808,7 +1798,7 @@ export const PropertyDetailsModal = ({
                                   onDelete={onFolderDelete}
                                   menuPosition={menuPosition[folder.id] || {}}
                                   menuRef={folderMenuRef}
-                                  presentation={isMobile ? 'sheet' : 'popover'}
+                                  presentation="popover"
                                 />
                               </div>
                               <div className="mt-2 text-center w-full">
@@ -1887,7 +1877,7 @@ export const PropertyDetailsModal = ({
                                 />
                                 {/* iOS-style perfectly circular menu button */}
                                 <button
-                                  className="absolute top-1 right-1 rounded-full bg-surface-2 text-ink-2 shadow-[0_1px_3px_rgba(0,0,0,0.14)] flex items-center justify-center touch-manipulation"
+                                  className="absolute top-1 right-1 rounded-full bg-surface-2 text-ink-2 shadow-[0_1px_3px_rgba(0,0,0,0.14)] flex items-center justify-center touch-manipulation hit-44"
                                   {...menuTriggerProps('file', file.id)}
                                   style={{ 
                                     zIndex: 10,
@@ -1920,7 +1910,7 @@ export const PropertyDetailsModal = ({
                                   onDelete={onFileDelete}
                                   menuPosition={menuPosition[file.id] || {}}
                                   menuRef={fileMenuRef}
-                                  presentation={isMobile ? 'sheet' : 'popover'}
+                                  presentation="popover"
                                 />
                               </div>
                               <div className="mt-2 text-center w-full">
@@ -2205,7 +2195,7 @@ export const PropertyDetailsModal = ({
             ref={fabButtonRef}
             onClick={() => setFabOpen(true)}
             aria-label="Add files or a folder"
-            aria-haspopup={isMobile ? 'dialog' : 'menu'}
+            aria-haspopup="menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -2216,15 +2206,15 @@ export const PropertyDetailsModal = ({
         <ActionSheet
           open={fabOpen}
           onClose={() => setFabOpen(false)}
-          presentation={isMobile ? 'sheet' : 'popover'}
+          presentation="popover"
           anchorRef={fabButtonRef}
           title={selectedFolder === 'master' ? 'Add to this property' : `Add to “${folders.find(f => f.id === selectedFolder)?.name ?? 'folder'}”`}
           groups={[
             [
-              { label: 'Upload files', onSelect: () => document.getElementById('file-upload-input')?.click() },
-              ...(googleDriveAvailable ? [{ label: 'Import from Google Drive', onSelect: importFromDrive }] : []),
+              { label: 'Upload Files…', onSelect: () => document.getElementById('file-upload-input')?.click() },
+              ...(googleDriveAvailable ? [{ label: 'Import from Google Drive…', onSelect: importFromDrive }] : []),
             ],
-            [{ label: 'New folder', onSelect: () => setCreatingFolder(true) }],
+            [{ label: 'New Folder…', onSelect: () => setCreatingFolder(true) }],
           ]}
         />
 
@@ -2329,7 +2319,7 @@ export const PropertyDetailsModal = ({
               onTouchEnd={e => e.stopPropagation()}
             >
               <div className="px-4 pt-5 pb-3 text-center">
-                <div className="text-headline font-semibold">New folder</div>
+                <div className="text-headline font-semibold">New Folder</div>
                 <div className="text-footnote text-ink-2 mt-1">Enter a name for this folder.</div>
                 <input
                   ref={folderInputRef}
@@ -2378,7 +2368,7 @@ export const PropertyDetailsModal = ({
         )}
       </div>
 
-      <ActionSheet open={moreOpen} onClose={() => setMoreOpen(false)} title={property.address} groups={moreGroups} presentation={isMobile ? 'sheet' : 'popover'} anchorRef={moreButtonRef} />
+      <ActionSheet open={moreOpen} onClose={() => setMoreOpen(false)} title={property.address} groups={moreGroups} presentation="popover" anchorRef={moreButtonRef} />
       {currentPropertyWithFileCount && (
         <PropertySwitcher
           currentProperty={currentPropertyWithFileCount}

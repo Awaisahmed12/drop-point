@@ -78,7 +78,7 @@ export const PropertySwitcher = ({ currentProperty, onPropertySelect, open, onCl
           <MagnifyingGlassIcon className="absolute left-6.5 top-1/2 -translate-y-1/2 -mt-1.5 w-4.5 h-4.5 text-ink-2 pointer-events-none" strokeWidth={2.5} />
           <input
             type="search"
-            placeholder="Search"
+            placeholder="Search properties"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="ios-search"

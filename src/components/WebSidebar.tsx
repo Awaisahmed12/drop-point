@@ -151,7 +151,7 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search"
+                placeholder="Search properties"
                 className="ios-search !h-8 !pl-8 !text-subhead"
               />
             </div>

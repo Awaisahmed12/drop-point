@@ -183,7 +183,7 @@ export default function UserAuthForm() {
           className="ios-button ios-button-primary"
           onClick={() => { setSentTo(null); setIsSignUp(false); resetForm(); }}
         >
-          Back to sign in
+          Back to Sign In
         </button>
       </div>
     );
@@ -208,7 +208,7 @@ export default function UserAuthForm() {
     <div className="w-full max-w-sm flex flex-col gap-6">
       <div className="flex flex-col items-center gap-3">
         {logo}
-        <h1 className="ios-large-title">{isSignUp ? 'Create account' : 'DropPoint'}</h1>
+        <h1 className="ios-large-title">{isSignUp ? 'Create Account' : 'DropPoint'}</h1>
         {!isSignUp && <p className="text-subhead text-ink-2 -mt-1">Your property documents, on a map.</p>}
       </div>
 
@@ -218,7 +218,11 @@ export default function UserAuthForm() {
             <button
               key={provider}
               type="button"
-              className="ios-button bg-surface text-ink gap-2.5 shadow-[0_0_0_0.5px_var(--color-hairline),0_1px_2px_rgba(0,0,0,0.04)]"
+              // Apple's white sign-in style (black logo and title on white), which
+              // Google and Facebook also allow, so the set stays one style. The
+              // 44pt height and 19px title are the system button's proportions.
+              className="ios-button gap-2.5 bg-white text-black font-semibold shadow-[0_0_0_0.5px_var(--color-hairline),0_1px_2px_rgba(0,0,0,0.06)]"
+              style={{ height: 44, fontSize: 19 }}
               onClick={() => signInWith(provider)}
               disabled={loading}
             >
@@ -234,7 +238,7 @@ export default function UserAuthForm() {
             className="text-subhead text-accent text-center ios-press mt-3"
             onClick={() => { setError(null); setUseEmail(true); }}
           >
-            Continue with email
+            Continue with Email
           </button>
         </div>
       ) : (
@@ -322,7 +326,7 @@ export default function UserAuthForm() {
         )}
 
         <button type="submit" className="ios-button ios-button-primary" disabled={loading || !canSubmit}>
-          {loading ? (isSignUp ? 'Creating account…' : 'Signing in…') : (isSignUp ? 'Create account' : 'Sign in')}
+          {loading ? (isSignUp ? 'Creating Account…' : 'Signing In…') : (isSignUp ? 'Create Account' : 'Sign In')}
         </button>
       </form>
 
@@ -340,7 +344,7 @@ export default function UserAuthForm() {
             className="text-subhead text-ink-2 text-center ios-press"
             onClick={() => { setUseEmail(false); setIsSignUp(false); resetForm(); }}
           >
-            Other sign-in options
+            Other Sign-In Options
           </button>
         )}
       </div>

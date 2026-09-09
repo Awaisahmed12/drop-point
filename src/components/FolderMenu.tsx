@@ -35,7 +35,7 @@ export const FolderMenu: React.FC<FolderMenuProps> = ({
   const groups: ActionSheetItem[][] = [
     [
       {
-        label: 'Rename',
+        label: 'Rename…',
         onSelect: () => onRename(folder),
         icon: <Icon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />,
       },
@@ -63,7 +63,7 @@ export const FolderMenu: React.FC<FolderMenuProps> = ({
     <div
       ref={menuRef}
       role="menu"
-      className="fixed w-52 ios-float rounded-[12px] overflow-hidden py-1"
+      className="fixed w-52 pointer-coarse:w-60 ios-float rounded-[14px] overflow-hidden py-1"
       style={{ zIndex: 999999, ...menuPosition }}
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
@@ -76,7 +76,7 @@ export const FolderMenu: React.FC<FolderMenuProps> = ({
               key={item.label}
               type="button"
               role="menuitem"
-              className={`flex items-center gap-3 w-full text-left px-4 h-11 text-subhead ios-row-press ${
+              className={`flex items-center gap-3 w-full text-left px-4 h-11 text-subhead pointer-coarse:text-body ios-row-press ${
                 item.tone === 'danger' ? 'text-danger' : 'text-ink'
               }`}
               onClick={e => { e.stopPropagation(); run(item); }}
