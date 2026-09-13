@@ -15,10 +15,10 @@ export default function Document() {
 
         {/* Open Graph */}
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://drop-point-xi.vercel.app/" />
+        <meta property="og:url" content="https://www.droppoint.app/" />
         <meta property="og:title" content="DropPoint - Real Estate Document Management" />
         <meta property="og:description" content="Map-based document management platform for real estate professionals. Select properties from an interactive map, organize unlimited files per property, and access everything from anywhere." />
-        <meta property="og:image" content="https://drop-point-xi.vercel.app/logo.png" />
+        <meta property="og:image" content="https://www.droppoint.app/logo.png" />
         <meta property="og:image:width" content="505" />
         <meta property="og:image:height" content="482" />
         <meta property="og:image:alt" content="DropPoint Logo - Real Estate Document Management" />
@@ -26,10 +26,10 @@ export default function Document() {
 
         {/* Twitter */}
         <meta property="twitter:card" content="summary" />
-        <meta property="twitter:url" content="https://drop-point-xi.vercel.app/" />
+        <meta property="twitter:url" content="https://www.droppoint.app/" />
         <meta property="twitter:title" content="DropPoint - Real Estate Document Management" />
         <meta property="twitter:description" content="Map-based document management platform for real estate professionals. Select properties from an interactive map, organize unlimited files per property, and access everything from anywhere." />
-        <meta property="twitter:image" content="https://drop-point-xi.vercel.app/logo.png" />
+        <meta property="twitter:image" content="https://www.droppoint.app/logo.png" />
         <meta property="twitter:image:alt" content="DropPoint Logo - Real Estate Document Management" />
 
         <meta name="robots" content="index, follow" />
