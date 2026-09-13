@@ -24,6 +24,7 @@ Create `.env.local` with:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
+NEXT_PUBLIC_SITE_URL=            # public origin, used for OAuth redirects and share-preview links; production is https://drop-point-xi.vercel.app
 ```
 
 Optional connectors (each stays hidden until its variable is set):
@@ -33,6 +34,8 @@ NEXT_PUBLIC_AUTH_PROVIDERS=google,apple,facebook   # social sign-in buttons; eac
 NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=                 # Google Cloud OAuth web client (JS origins = site URL); enables "Import from Google Drive"
 NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=                  # optional; defaults to the Maps key (enable the Google Picker API on it)
 ```
+
+The only production URL is **https://drop-point-xi.vercel.app** (Vercel project `drop-point`). The project does not own `droppoint.app`; that domain belongs to an unrelated site and must never appear in code, docs, or configuration. Never hardcode the site origin: read `NEXT_PUBLIC_SITE_URL` (client code via `getSiteUrl()`, which falls back to `window.location.origin`).
 
 ## Architecture
 
