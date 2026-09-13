@@ -25,6 +25,7 @@ Create a `.env.local` file with:
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+NEXT_PUBLIC_SITE_URL=https://drop-point-xi.vercel.app   # public origin for OAuth redirects and share previews
 
 # Optional connectors
 NEXT_PUBLIC_AUTH_PROVIDERS=google,apple,facebook   # social sign-in (enable each provider in Supabase Auth too)

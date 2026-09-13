@@ -1,5 +1,11 @@
 import { Html, Head, Main, NextScript } from "next/document";
 
+// The site's public origin is never hardcoded: share-preview links come from
+// NEXT_PUBLIC_SITE_URL (production: https://drop-point-xi.vercel.app) and are
+// omitted when it is unset. Client code uses getSiteUrl(), which falls back to
+// window.location.origin.
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '');
+
 export default function Document() {
   return (
     <Html lang="en">
@@ -15,10 +21,10 @@ export default function Document() {
 
         {/* Open Graph */}
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.droppoint.app/" />
+        {siteUrl && <meta property="og:url" content={`${siteUrl}/`} />}
         <meta property="og:title" content="DropPoint - Real Estate Document Management" />
         <meta property="og:description" content="Map-based document management platform for real estate professionals. Select properties from an interactive map, organize unlimited files per property, and access everything from anywhere." />
-        <meta property="og:image" content="https://www.droppoint.app/logo.png" />
+        {siteUrl && <meta property="og:image" content={`${siteUrl}/logo.png`} />}
         <meta property="og:image:width" content="505" />
         <meta property="og:image:height" content="482" />
         <meta property="og:image:alt" content="DropPoint Logo - Real Estate Document Management" />
@@ -26,10 +32,10 @@ export default function Document() {
 
         {/* Twitter */}
         <meta property="twitter:card" content="summary" />
-        <meta property="twitter:url" content="https://www.droppoint.app/" />
+        {siteUrl && <meta property="twitter:url" content={`${siteUrl}/`} />}
         <meta property="twitter:title" content="DropPoint - Real Estate Document Management" />
         <meta property="twitter:description" content="Map-based document management platform for real estate professionals. Select properties from an interactive map, organize unlimited files per property, and access everything from anywhere." />
-        <meta property="twitter:image" content="https://www.droppoint.app/logo.png" />
+        {siteUrl && <meta property="twitter:image" content={`${siteUrl}/logo.png`} />}
         <meta property="twitter:image:alt" content="DropPoint Logo - Real Estate Document Management" />
 
         <meta name="robots" content="index, follow" />
