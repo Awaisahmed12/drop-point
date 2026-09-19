@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import type { Property } from '../../types';
 import { prefetchPropertyData } from '../hooks/usePropertyPrefetch';
+import { useTagViews } from '../hooks/useTagViews';
+import { ViewsSheet, ViewCheck } from './ViewsSheet';
+import { UNTAGGED_VIEW_ID } from '../../constants';
 
 interface WebSidebarProps {
   properties?: Property[];
@@ -18,6 +21,8 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState(false);
+  const [viewsOpen, setViewsOpen] = useState(false);
+  const views = useTagViews();
 
   // Restore after mount so the server-rendered markup matches the first client render.
   useEffect(() => {
@@ -37,11 +42,55 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
 
   const filteredProperties = properties
     ? properties.filter(p =>
-        !search.trim() ||
-        p.address.toLowerCase().includes(search.toLowerCase()) ||
-        (p.label ?? '').toLowerCase().includes(search.toLowerCase())
+        views.isVisible(p) && (
+          !search.trim() ||
+          p.address.toLowerCase().includes(search.toLowerCase()) ||
+          (p.label ?? '').toLowerCase().includes(search.toLowerCase())
+        )
       )
     : [];
+
+  // Google Calendar's left rail: one switch per view, plus the built-in
+  // "no view" layer once there is at least one view to contrast it with.
+  const viewRows = views.loaded && (
+    <div className="px-3 pb-2">
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-footnote text-ink-2">Views</div>
+        <button type="button" className="text-footnote text-accent ios-press" onClick={() => setViewsOpen(true)}>
+          {views.tags.length === 0 ? 'New' : 'Edit'}
+        </button>
+      </div>
+      {views.tags.map(t => {
+        const on = !views.hidden.has(t.id);
+        return (
+          <button
+            key={t.id}
+            type="button"
+            role="switch"
+            aria-checked={on}
+            onClick={() => views.toggleView(t.id)}
+            className="w-full flex items-center gap-2 px-1.5 py-1 rounded-lg ios-row-press text-left"
+            title={t.owner_id !== views.userId ? `${t.name} (shared with you)` : t.name}
+          >
+            <ViewCheck color={t.color} on={on} size={16} />
+            <span className={`text-xs truncate flex-1 ${on ? 'text-ink' : 'text-ink-2'}`}>{t.name}</span>
+          </button>
+        );
+      })}
+      {views.tags.length > 0 && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={!views.hidden.has(UNTAGGED_VIEW_ID)}
+          onClick={() => views.toggleView(UNTAGGED_VIEW_ID)}
+          className="w-full flex items-center gap-2 px-1.5 py-1 rounded-lg ios-row-press text-left"
+        >
+          <ViewCheck color="#8e8e93" on={!views.hidden.has(UNTAGGED_VIEW_ID)} size={16} />
+          <span className={`text-xs truncate flex-1 ${!views.hidden.has(UNTAGGED_VIEW_ID) ? 'text-ink' : 'text-ink-2'}`}>No view</span>
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div
@@ -132,6 +181,13 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
         })}
       </nav>
 
+      {!collapsed && (
+        <>
+          <div className="mx-3 mt-1 mb-2 border-t border-hairline/60" />
+          {viewRows}
+        </>
+      )}
+
       {/* Property list — only when properties prop provided and sidebar is expanded */}
       {properties !== undefined && !collapsed && (
         <>
@@ -166,6 +222,7 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
                 const isSelected = property.id === selectedPropertyId;
                 const streetAddress = property.address.split(',')[0];
                 const fileCount = (property as Property & { file_count?: number }).file_count;
+                const pinColor = views.pinColor(property);
                 return (
                   <button
                     key={property.id}
@@ -176,6 +233,9 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1 min-w-0">
+                      {(property.tag_ids?.length ?? 0) > 0 && (
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: pinColor }} aria-hidden="true" />
+                      )}
                       <div className="text-xs font-medium leading-snug truncate flex-1 min-w-0">
                         {property.label || streetAddress}
                       </div>
@@ -208,6 +268,8 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
           <div className="w-1 h-1 rounded-full bg-ink-3" />
         </div>
       )}
+
+      <ViewsSheet open={viewsOpen} onClose={() => setViewsOpen(false)} />
     </div>
   );
 };

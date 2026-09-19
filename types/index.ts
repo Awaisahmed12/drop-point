@@ -10,6 +10,37 @@ export type Property = {
   label?: string | null;
   notes?: string | null;
   thumbnail_url?: string | null;
+  /** Ids of the views (tags) this property carries. */
+  tag_ids?: string[];
+};
+
+// Who may see a file or folder: its uploader only, or everyone who can see
+// the property (the owner and members of any view it carries).
+export type Visibility = 'private' | 'shared';
+
+// A view: a named, colored label owned by one person (the `tags` table).
+// Put on properties to group them; shared with people to collaborate.
+export type Tag = {
+  id: string;
+  owner_id: string;
+  name: string;
+  color: string;
+  created_at?: string;
+  updated_at?: string;
+  /** Only the owner sees the full list; a member sees their own row. */
+  members?: TagMember[];
+};
+
+export type TagRole = 'viewer' | 'editor';
+
+export type TagMember = {
+  id: string;
+  tag_id: string;
+  email: string;
+  /** Null until the invited person signs in. */
+  user_id: string | null;
+  role: TagRole;
+  created_at?: string;
 };
 
 // Property with file count for list views and property switching
@@ -32,6 +63,8 @@ export type PropertyFile = {
   file_type: string;
   file_size: number;
   modified_at?: string;
+  /** Private to the uploader unless 'shared'. Missing on rows from before the migration = private. */
+  visibility?: Visibility;
 };
 
 // Prediction type for Google Places API
@@ -83,6 +116,8 @@ export type PropertyFolder = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /** Private to its creator unless 'shared'. Uploads inherit the folder's setting. */
+  visibility?: Visibility;
 };
 
 // PendingUpload interface for file upload tracking

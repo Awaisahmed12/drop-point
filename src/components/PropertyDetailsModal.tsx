@@ -17,15 +17,25 @@ import { useConfig } from '../contexts/ConfigContext';
 import { useToast } from '../contexts/ToastContext';
 import { useInternalDrag } from '../hooks/useInternalDrag';
 import { useSheetDrag } from '../hooks/useSheetDrag';
+import { useTagViews } from '../hooks/useTagViews';
 import { tryWithToast } from '../utils/tryWithToast';
-import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection } from '../../types';
+import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection, Visibility } from '../../types';
 import type { PropertyWithFileCount } from '../../types';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
+import { tagsForProperty } from '../../utils/tagViews';
 import { getFileSignedUrl } from '../utils/supabaseClient';
 import { heroImageUrls } from '../hooks/usePropertyPrefetch';
 import { importFromGoogleDrive, preloadGoogleDrive, googleDriveAvailable } from '../utils/googleDrive';
 import { FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 import { ActionSheet, type ActionSheetItem } from './ActionSheet';
+import { InputAlert } from './InputAlert';
+
+/** Marks a folder or file the whole team can see. */
+const SharedGlyph = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="9" cy="7" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0113 0" /><circle cx="17" cy="9" r="2.5" /><path d="M15 15.5a5 5 0 016.5 4.5" />
+  </svg>
+);
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']);
 const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']);
@@ -121,6 +131,17 @@ interface PropertyDetailsModalProps {
   onMapMove?: (lat: number, lng: number) => void;
   /** Rename the open property (null clears the custom name). */
   onPropertyRename?: (property: Property, label: string | null) => Promise<void>;
+  /** Put the property in exactly these views. Only its owner may. */
+  onPropertyViewsChange?: (property: Property, tagIds: string[]) => Promise<void>;
+  /** Delete the property and everything on it. Only its owner may. */
+  onPropertyDelete?: (property: Property) => Promise<void>;
+  /** A just-saved pin with views to choose from: open the Views picker as the sheet opens. */
+  promptViews?: boolean;
+  onViewsPromptShown?: () => void;
+  /** Share a file with everyone on the property, or make it private. */
+  onFileVisibilityChange?: (file: PropertyFile, visibility: Visibility) => Promise<void>;
+  /** Share a folder and its contents, or make them private. */
+  onFolderVisibilityChange?: (folder: PropertyFolder, visibility: Visibility) => Promise<void>;
 }
 
 export const PropertyDetailsModal = ({ 
@@ -146,8 +167,25 @@ export const PropertyDetailsModal = ({
   onPropertySwitch,
   onMapMove,
   onPropertyRename,
+  onPropertyViewsChange,
+  onPropertyDelete,
+  promptViews = false,
+  onViewsPromptShown,
+  onFileVisibilityChange,
+  onFolderVisibilityChange,
 }: PropertyDetailsModalProps) => {
   const { showToast } = useToast();
+  const views = useTagViews();
+  const [viewsPickerOpen, setViewsPickerOpen] = useState(false);
+  const [newViewOpen, setNewViewOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  // A new pin lands in the sheet; if there are views it could join, ask now.
+  useEffect(() => {
+    if (!isOpen || !promptViews || !property?.id) return;
+    setViewsPickerOpen(true);
+    onViewsPromptShown?.();
+  }, [isOpen, promptViews, property?.id, onViewsPromptShown]);
 
   // State for UI interactions
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -1141,6 +1179,38 @@ export const PropertyDetailsModal = ({
     ? [streetAddress, locationInfo].filter(Boolean).join(', ')
     : locationInfo;
 
+  // Who is looking. An unsaved pin has no owner yet, so it is the person's own.
+  const isOwner = !property.user_id || property.user_id === views.userId;
+  const propertyTags = tagsForProperty(property, views.tags);
+  const propertyShared = views.isShared(property);
+  // Editors of any view on the property may add to it; viewers only look.
+  const isEditorMember = propertyTags.some(t =>
+    t.owner_id === views.userId || (t.members ?? []).some(m => m.user_id === views.userId && m.role === 'editor'),
+  );
+  const canEdit = isOwner || isEditorMember;
+  // The uploader and the property's owner decide what a file or folder shows to.
+  const canShareItem = (item: { user_id: string }) => propertyShared && (isOwner || item.user_id === views.userId);
+  // Views the owner can put this property in: their own, and ones they edit.
+  const assignableViews = views.tags.filter(t =>
+    t.owner_id === views.userId || (t.members ?? []).some(m => m.user_id === views.userId && m.role === 'editor'),
+  );
+
+  const setPropertyViews = async (tagIds: string[]) => {
+    if (!onPropertyViewsChange) return;
+    try {
+      await onPropertyViewsChange(property, tagIds);
+    } catch (error) {
+      logger.error('Change property views failed:', error);
+      showToast('Couldn’t update this property’s views. Please try again.');
+    }
+  };
+
+  const toggleItemShared = (item: PropertyFile | PropertyFolder) => {
+    const next: Visibility = item.visibility === 'shared' ? 'private' : 'shared';
+    if ('file_name' in item) void onFileVisibilityChange?.(item, next);
+    else void onFolderVisibilityChange?.(item, next);
+  };
+
   // Everything that isn't browsing files lives behind one "more" control.
   const moreGroups: ActionSheetItem[][] = [
     [
@@ -1148,7 +1218,10 @@ export const PropertyDetailsModal = ({
       { label: viewMode === 'list' ? 'Show as Grid' : 'Show as List', onSelect: toggleViewMode },
     ],
     [
-      ...(onPropertyRename
+      ...(onPropertyViewsChange && isOwner && property.id
+        ? [{ label: 'Views…', onSelect: () => setViewsPickerOpen(true) }]
+        : []),
+      ...(onPropertyRename && isOwner
         ? [{
             label: property.label ? 'Rename…' : 'Add a Name…',
             onSelect: () => { setPropertyLabelDraft(property.label || ''); setRenamingProperty(true); },
@@ -1162,7 +1235,64 @@ export const PropertyDetailsModal = ({
             .catch(() => showToast('Couldn’t copy the address.')),
       },
     ],
+    ...(onPropertyDelete && isOwner && property.id
+      ? [[{ label: 'Delete Property', tone: 'danger' as const, onSelect: () => setConfirmDeleteOpen(true) }]]
+      : []),
   ];
+
+  const deleteProperty = async () => {
+    if (!onPropertyDelete) return;
+    try {
+      await onPropertyDelete(property);
+    } catch (error) {
+      logger.error('Delete property failed:', error);
+      showToast('Couldn’t delete this property. Please try again.');
+    }
+  };
+  const deleteSummary = files.length === 0
+    ? 'Its pin is removed.'
+    : `Its ${files.length} ${files.length === 1 ? 'file is' : 'files are'} deleted too.`;
+
+  // Calendar-style multi-select: each view toggles and the menu stays open.
+  const viewsPickerGroups: ActionSheetItem[][] = [
+    assignableViews.map(t => {
+      const on = (property.tag_ids ?? []).includes(t.id);
+      return {
+        label: t.name,
+        selected: on,
+        keepOpen: true,
+        leading: <span className="w-3.5 h-3.5 rounded-full" style={{ background: t.color }} aria-hidden="true" />,
+        onSelect: () => {
+          const current = property.tag_ids ?? [];
+          void setPropertyViews(on ? current.filter(id => id !== t.id) : [...current, t.id]);
+        },
+      };
+    }),
+    [{ label: 'New View…', onSelect: () => setNewViewOpen(true) }],
+  ].filter(group => group.length > 0);
+
+  const heroChips = (propertyShared || propertyTags.length > 0) && (
+    <div className="flex flex-wrap gap-1.5 mt-2" aria-label={propertyTags.length ? `Views: ${propertyTags.map(t => t.name).join(', ')}` : 'Shared'}>
+      {propertyShared && (
+        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-semibold bg-white/25 text-white">
+          <SharedGlyph className="w-3 h-3" />
+          {isOwner ? 'Shared' : 'Shared with you'}
+        </span>
+      )}
+      {propertyTags.map(t => (
+        <span key={t.id} className="inline-flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-caption font-semibold bg-white/20 text-white">
+          <span className="w-2 h-2 rounded-full" style={{ background: t.color, boxShadow: '0 0 0 1px rgba(255,255,255,0.6)' }} aria-hidden="true" />
+          {t.name}
+        </span>
+      ))}
+    </div>
+  );
+
+  /** Small "people" mark on rows the team can see; only meaningful on a shared property. */
+  const sharedMark = (item: { visibility?: Visibility }) =>
+    propertyShared && item.visibility === 'shared'
+      ? <span className="inline-flex items-center text-ink-2 flex-shrink-0" title="Shared with everyone on this property"><SharedGlyph /></span>
+      : null;
 
   return (
     <div
@@ -1299,6 +1429,7 @@ export const PropertyDetailsModal = ({
                 <div className="absolute inset-x-0 bottom-0 px-5 pb-4 text-white pointer-events-none">
                   <h1 className="text-title-1 font-bold leading-tight" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{displayName}</h1>
                   {headerSubtitle && <p className="text-subhead text-white/85 mt-0.5">{headerSubtitle}</p>}
+                  {heroChips}
                 </div>
               </div>
             )}
@@ -1427,7 +1558,7 @@ export const PropertyDetailsModal = ({
                   )}
                 </div>
                 {/* Desktop: the one primary action lives in the toolbar, where a pointer expects it. */}
-                {!isMobile && (
+                {!isMobile && canEdit && (
                   <button
                     type="button"
                     ref={fabButtonRef}
@@ -1579,8 +1710,9 @@ export const PropertyDetailsModal = ({
                                     />
                                   ) : (
                                     <>
-                                      <div className="text-body font-medium truncate">
-                                        {folder.name}
+                                      <div className="text-body font-medium truncate flex items-center gap-1.5">
+                                        <span className="truncate">{folder.name}</span>
+                                        {sharedMark(folder)}
                                       </div>
                                       <div className="text-footnote text-ink-2 mt-0.5 flex items-center gap-2 sm:hidden">
                                         <span>{formatDate(folder.created_at)}</span>
@@ -1611,6 +1743,7 @@ export const PropertyDetailsModal = ({
                                     setRenamingFileName(folder.name);
                                   }}
                                   onDelete={onFolderDelete}
+                                  onToggleShared={onFolderVisibilityChange && canShareItem(folder) ? toggleItemShared : undefined}
                                   menuPosition={menuPosition[folder.id] || {}}
                                   menuRef={folderMenuRef}
                                   presentation="popover"
@@ -1688,9 +1821,10 @@ export const PropertyDetailsModal = ({
                                     />
                                   ) : (
                                     <>
-                                      <span className="text-body font-medium truncate">
-                                        {getFileNameWithoutExtension(file.file_name)}
-                                      </span>
+                                      <div className="text-body font-medium truncate flex items-center gap-1.5">
+                                        <span className="truncate">{getFileNameWithoutExtension(file.file_name)}</span>
+                                        {sharedMark(file)}
+                                      </div>
                                       <div className="text-footnote text-ink-2 mt-0.5 flex items-center gap-2 sm:hidden">
                                         <span>{formatDate(file.modified_at || file.uploaded_at)}</span>
                                         <span>•</span>
@@ -1728,6 +1862,7 @@ export const PropertyDetailsModal = ({
                                   } : undefined}
                                   onDuplicate={onFileCopy}
                                   onDelete={onFileDelete}
+                                  onToggleShared={onFileVisibilityChange && canShareItem(file) ? toggleItemShared : undefined}
                                   menuPosition={menuPosition[file.id] || {}}
                                   menuRef={fileMenuRef}
                                   presentation="popover"
@@ -1796,10 +1931,14 @@ export const PropertyDetailsModal = ({
                                     setRenamingFileName(folder.name);
                                   }}
                                   onDelete={onFolderDelete}
+                                  onToggleShared={onFolderVisibilityChange && canShareItem(folder) ? toggleItemShared : undefined}
                                   menuPosition={menuPosition[folder.id] || {}}
                                   menuRef={folderMenuRef}
                                   presentation="popover"
                                 />
+                                {propertyShared && folder.visibility === 'shared' && (
+                                  <span className="absolute bottom-1 left-1 w-5 h-5 rounded-full bg-surface-2 text-ink-2 flex items-center justify-center" title="Shared with everyone on this property"><SharedGlyph className="w-3 h-3" /></span>
+                                )}
                               </div>
                               <div className="mt-2 text-center w-full">
                                 {renamingFileId === folder.id ? (
@@ -1908,10 +2047,14 @@ export const PropertyDetailsModal = ({
                                   } : undefined}
                                   onDuplicate={onFileCopy}
                                   onDelete={onFileDelete}
+                                  onToggleShared={onFileVisibilityChange && canShareItem(file) ? toggleItemShared : undefined}
                                   menuPosition={menuPosition[file.id] || {}}
                                   menuRef={fileMenuRef}
                                   presentation="popover"
                                 />
+                                {propertyShared && file.visibility === 'shared' && (
+                                  <span className="absolute bottom-1 left-1 w-5 h-5 rounded-full bg-surface-2 text-ink-2 flex items-center justify-center" title="Shared with everyone on this property"><SharedGlyph className="w-3 h-3" /></span>
+                                )}
                               </div>
                               <div className="mt-2 text-center w-full">
                                 {renamingFileId === file.id ? (
@@ -2180,7 +2323,7 @@ export const PropertyDetailsModal = ({
         `}</style>
 
         {/* Phone: one floating "+" offering the two ways to add something. */}
-        {isMobile && (
+        {isMobile && canEdit && (
         <div
           className="absolute z-30"
           style={{ bottom: 'calc(var(--safe-bottom) + 16px)', right: '16px' }}
@@ -2369,6 +2512,42 @@ export const PropertyDetailsModal = ({
       </div>
 
       <ActionSheet open={moreOpen} onClose={() => setMoreOpen(false)} title={property.address} groups={moreGroups} presentation="popover" anchorRef={moreButtonRef} />
+      <ActionSheet
+        open={viewsPickerOpen}
+        onClose={() => setViewsPickerOpen(false)}
+        title={assignableViews.length ? 'Views' : 'No views yet'}
+        groups={viewsPickerGroups}
+        presentation="popover"
+        anchorRef={moreButtonRef}
+      />
+      <ActionSheet
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        presentation="sheet"
+        title={`Delete “${displayName}”? ${deleteSummary} This can’t be undone.`}
+        groups={[[{ label: 'Delete Property', tone: 'danger', onSelect: deleteProperty }]]}
+      />
+      <InputAlert
+        open={newViewOpen}
+        title="New View"
+        message="This property will be added to it."
+        placeholder="Name"
+        confirmLabel="Create"
+        onConfirm={async name => {
+          try {
+            const tag = await views.createView(name);
+            setNewViewOpen(false);
+            await setPropertyViews([...(property.tag_ids ?? []), tag.id]);
+          } catch (error) {
+            const m = error instanceof Error ? error.message : '';
+            if (m === 'DUPLICATE_TAG') return 'You already have a view with this name.';
+            if (m === 'INVALID_NAME') return 'Use up to 40 characters.';
+            logger.error('Create view failed:', error);
+            return 'Couldn’t create the view. Please try again.';
+          }
+        }}
+        onCancel={() => setNewViewOpen(false)}
+      />
       {currentPropertyWithFileCount && (
         <PropertySwitcher
           currentProperty={currentPropertyWithFileCount}

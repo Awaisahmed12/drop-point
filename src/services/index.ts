@@ -11,4 +11,5 @@
 export { PropertyService, propertyService } from './PropertyService';
 export { FileService, fileService } from './FileService';
 export { FolderService, folderService } from './FolderService';
+export { TagService, tagService } from './TagService';
 

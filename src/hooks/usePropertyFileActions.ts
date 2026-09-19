@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import type { PendingUpload, Property, PropertyFile, PropertyFolder } from '../../types';
-import { fileService, folderService } from '../services';
+import type { PendingUpload, Property, PropertyFile, PropertyFolder, Visibility } from '../../types';
+import { fileService, folderService, propertyService } from '../services';
 import { supabase } from '../utils/supabaseClient';
 import { getUserUsageBytes } from '../utils/usage';
 import { FREE_TIER_GB, FREE_TIER_MAX_BYTES } from '../../constants';
@@ -23,6 +23,13 @@ interface UsePropertyFileActionsOptions {
    * return null after surfacing an error to the user.
    */
   ensurePropertyId?: () => Promise<string | null>;
+  /**
+   * What a new file or folder at the property root is. Uploads inside a
+   * folder take the folder's setting instead. Owners default to private;
+   * a page passes 'shared' for someone collaborating on another person's
+   * property, where the point of adding something is that the team sees it.
+   */
+  defaultVisibility?: Visibility;
 }
 
 const FOLDER_NAME_FORBIDDEN = /[<>:"/\\|?*]/g;
@@ -45,11 +52,19 @@ export function usePropertyFileActions({
   setFolders,
   selectedFolder,
   ensurePropertyId,
+  defaultVisibility = 'private',
 }: UsePropertyFileActionsOptions) {
   const { showToast } = useToast();
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
   const propertyId = property?.id ?? null;
   const folderIdForWrites = selectedFolder === 'master' ? null : selectedFolder;
+
+  /** New things inherit the folder they land in; at the root, the page's default. */
+  const visibilityIn = useCallback((folderId: string | null): Visibility => {
+    if (!folderId) return defaultVisibility;
+    return folders.find(f => f.id === folderId)?.visibility ?? 'private';
+  }, [folders, defaultVisibility]);
+  const visibilityForWrites = visibilityIn(folderIdForWrites);
 
   // Uploads belong to the property they started on.
   useEffect(() => {
@@ -91,6 +106,7 @@ export function usePropertyFileActions({
     uniqueName: string,
     targetPropertyId: string,
     folderId: string | null,
+    visibility: Visibility,
   ) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -131,6 +147,7 @@ export function usePropertyFileActions({
             file.size,
             folderId,
             new Date(file.lastModified).toISOString(),
+            visibility,
           );
           lastError = null;
           break;
@@ -161,6 +178,7 @@ export function usePropertyFileActions({
     if (!targetPropertyId) return;
 
     const folderId = folderIdForWrites;
+    const visibility = visibilityForWrites;
     // Track names assigned within this batch so two "photo.jpg" in one
     // selection don't both resolve to the same unique name.
     const taken: PropertyFile[] = [...files];
@@ -189,16 +207,16 @@ export function usePropertyFileActions({
           setPendingUploads(prev => prev.map(p =>
             p.id === uploadId ? { ...p, status: 'uploading', progress: 0, error: undefined } : p
           ));
-          void startSingleUpload(uploadId, file, uniqueName, targetPropertyId, folderId);
+          void startSingleUpload(uploadId, file, uniqueName, targetPropertyId, folderId, visibility);
         },
       };
     });
 
     setPendingUploads(prev => [...prev, ...newPendingUploads]);
     newPendingUploads.forEach(pending => {
-      void startSingleUpload(pending.id, pending.file, pending.name, targetPropertyId, folderId);
+      void startSingleUpload(pending.id, pending.file, pending.name, targetPropertyId, folderId, visibility);
     });
-  }, [files, folderIdForWrites, resolvePropertyId, startSingleUpload]);
+  }, [files, folderIdForWrites, visibilityForWrites, resolvePropertyId, startSingleUpload]);
 
   /** Throws on failure so the caller can show a contextual message. */
   const renameItem = useCallback(async (item: PropertyFile | PropertyFolder, newName: string) => {
@@ -268,10 +286,10 @@ export function usePropertyFileActions({
     );
     if (clash) throw new Error('DUPLICATE_FOLDER');
 
-    const created = await folderService.createFolder(targetPropertyId, sanitized, folderIdForWrites);
+    const created = await folderService.createFolder(targetPropertyId, sanitized, folderIdForWrites, visibilityForWrites);
     setFolders(prev => [...prev, created]);
     invalidatePropertyCache(targetPropertyId);
-  }, [folders, folderIdForWrites, resolvePropertyId, setFolders]);
+  }, [folders, folderIdForWrites, visibilityForWrites, resolvePropertyId, setFolders]);
 
   const moveFile = useCallback(async (file: PropertyFile, targetFolderId: string | null) => {
     if (file.folder_id === targetFolderId) return;
@@ -282,14 +300,47 @@ export function usePropertyFileActions({
         return;
       }
       const newName = candidate === file.file_name ? undefined : candidate;
-      const updated = await fileService.moveFile(file, targetFolderId, newName);
+      // Into a folder: take on the folder's sharing. Back to the root: keep its own.
+      const visibility = targetFolderId ? visibilityIn(targetFolderId) : undefined;
+      const updated = await fileService.moveFile(file, targetFolderId, newName, visibility);
       setFiles(prev => prev.map(f => (f.id === file.id ? updated : f)));
       invalidatePropertyCache(file.property_id);
     } catch (error) {
       logger.error('[MOVE] Error moving file:', error);
       showToast(`Failed to move file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [files, setFiles, showToast]);
+  }, [files, setFiles, showToast, visibilityIn]);
+
+  /** Share a file with everyone on the property, or take it back. */
+  const setFileVisibility = useCallback(async (file: PropertyFile, visibility: Visibility) => {
+    try {
+      const updated = await fileService.setVisibility(file, visibility);
+      setFiles(prev => prev.map(f => (f.id === file.id ? updated : f)));
+      invalidatePropertyCache(file.property_id);
+      showToast(visibility === 'shared' ? 'Shared with everyone on this property' : 'Now private to you', 'success');
+    } catch (error) {
+      logger.error('[SHARE] Error changing file visibility:', error);
+      showToast(`Couldn’t change sharing: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [setFiles, showToast]);
+
+  /**
+   * Share a folder and its contents, or make them private. The database
+   * cascades, so files and folders are re-read to show the result.
+   */
+  const setFolderVisibility = useCallback(async (folder: PropertyFolder, visibility: Visibility) => {
+    try {
+      await folderService.setVisibility(folder.id, visibility);
+      const data = await propertyService.getPropertyData(folder.property_id);
+      setFolders(data.folders);
+      setFiles(data.files);
+      invalidatePropertyCache(folder.property_id);
+      showToast(visibility === 'shared' ? `“${folder.name}” is shared with everyone on this property` : `“${folder.name}” is now private to you`, 'success');
+    } catch (error) {
+      logger.error('[SHARE] Error changing folder visibility:', error);
+      showToast(`Couldn’t change sharing: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [setFiles, setFolders, showToast]);
 
   const copyFile = useCallback(async (file: PropertyFile) => {
     try {
@@ -318,5 +369,7 @@ export function usePropertyFileActions({
     createFolder,
     moveFile,
     copyFile,
+    setFileVisibility,
+    setFolderVisibility,
   };
 }

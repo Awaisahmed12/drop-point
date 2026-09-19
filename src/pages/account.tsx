@@ -11,6 +11,7 @@ import { getUserUsageBytes, formatBytes } from '../utils/usage';
 import { FREE_TIER_MAX_BYTES, FREE_TIER_GB } from '../../constants';
 import { withAuth } from '../components/withAuth';
 import { useToast } from '../contexts/ToastContext';
+import { resetTagViews } from '../hooks/useTagViews';
 import { logger } from '../utils/logger';
 
 // One question at a time, asked only when the user taps the row.
@@ -112,6 +113,7 @@ function AccountPage() {
   const signOut = async () => {
     try {
       try { sessionStorage.clear(); } catch {}
+      resetTagViews();
       await supabase.auth.signOut();
     } finally {
       window.location.href = '/';

@@ -18,6 +18,7 @@ Make property documents accessible anywhere, anytime, with an interface that fee
 - Pin-only map interaction: users drop pins to add properties and select existing pins to open property details.
 - Property details modal: manage folders, files, and uploads without leaving the map context.
 - File management: folders-first sorting, grid and list views, search within a property, and drag-and-drop uploads.
+- Views: named, colored labels on properties that switch on and off like calendars and color the pins; a view can be shared with a team, and folders and files on a shared property are private until marked Shared (see `docs/collaboration.md`).
 - Mobile-first UI: touch-friendly targets, clear spacing, and performance-oriented rendering.
 
 ## Architecture snapshot
@@ -28,7 +29,6 @@ Make property documents accessible anywhere, anytime, with an interface that fee
 
 ## Non-goals for MVP
 
-- Team collaboration and role-based sharing.
 - Advanced automation or AI-driven organization.
 - Offline-first support.
 

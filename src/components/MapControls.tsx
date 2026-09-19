@@ -62,8 +62,8 @@ export const MapControls = ({ mapType, onMapTypeChange, onCurrentLocationClick, 
       <div className="hidden sm:block absolute top-4 left-4 z-30">{segmented}</div>
       <div className="hidden sm:block absolute top-4 right-4 z-30">{locationButton}</div>
 
-      {/* Phone: style centered under the search field, location by the thumb. */}
-      <div className="sm:hidden absolute left-1/2 -translate-x-1/2 z-30" style={{ top: 'calc(var(--safe-top) + 66px)' }}>
+      {/* Phone: style centered under the search field and the view chips, location by the thumb. */}
+      <div className="sm:hidden absolute left-1/2 -translate-x-1/2 z-30" style={{ top: 'calc(var(--safe-top) + 108px)' }}>
         {segmented}
       </div>
       <div className="sm:hidden absolute right-4 z-30" style={{ bottom: 'calc(var(--tabbar-total) + 16px)' }}>

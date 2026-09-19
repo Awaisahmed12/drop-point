@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../utils/supabaseClient';
-import type { PropertyFolder } from '../../types';
+import type { PropertyFolder, Visibility } from '../../types';
 
 /**
  * Service layer for folder-related operations
@@ -13,7 +13,8 @@ export class FolderService {
   async createFolder(
     propertyId: string,
     name: string,
-    parentId: string | null = null
+    parentId: string | null = null,
+    visibility: Visibility = 'private'
   ): Promise<PropertyFolder> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -33,6 +34,7 @@ export class FolderService {
         user_id: user.id,
         name: sanitizedName,
         parent_id: parentId,
+        visibility,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }])
@@ -111,12 +113,12 @@ export class FolderService {
       throw new Error('User not authenticated');
     }
 
-    // Soft delete by setting deleted_at timestamp
+    // Soft delete by setting deleted_at timestamp. Row-level security lets
+    // the creator and the property's owner through.
     const { error } = await supabase
       .from('property_folders')
       .update({ deleted_at: new Date().toISOString() })
-      .eq('id', folderId)
-      .eq('user_id', user.id);
+      .eq('id', folderId);
 
     if (error) {
       logger.error('[FolderService] Error deleting folder:', error);
@@ -146,7 +148,6 @@ export class FolderService {
       .from('property_folders')
       .update({ name: sanitizedName })
       .eq('id', folder.id)
-      .eq('user_id', user.id)
       .select()
       .single();
 
@@ -163,7 +164,27 @@ export class FolderService {
   }
 
   /**
-   * Get all folders for a property
+   * Share a folder with everyone who can see the property, or make it
+   * private again. Sharing also opens the folders above it so it can be
+   * reached; both directions apply to everything inside it. Done in one
+   * database call (set_folder_visibility) so a half-applied change can't
+   * leave a shared file in a private folder.
+   */
+  async setVisibility(folderId: string, visibility: Visibility): Promise<void> {
+    const { error } = await supabase.rpc('set_folder_visibility', {
+      p_folder: folderId,
+      p_visibility: visibility,
+      p_include_contents: true,
+    });
+    if (error) {
+      logger.error('[FolderService] Error changing folder visibility:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * The folders of a property this person may see: their own plus shared
+   * ones (row-level security).
    */
   async getPropertyFolders(propertyId: string): Promise<PropertyFolder[]> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -175,7 +196,6 @@ export class FolderService {
       .from('property_folders')
       .select('*')
       .eq('property_id', propertyId)
-      .eq('user_id', user.id)
       .is('deleted_at', null)
       .order('created_at', { ascending: true });
 
@@ -205,7 +225,6 @@ export class FolderService {
       .from('property_folders')
       .select('id')
       .eq('property_id', propertyId)
-      .eq('user_id', user.id)
       .eq('name', name)
       .eq('parent_id', parentId || null)
       .is('deleted_at', null);

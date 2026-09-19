@@ -46,7 +46,8 @@ The only production URL is **https://drop-point-xi.vercel.app** (Vercel project 
 - `src/pages/` — Next.js pages + API routes (`api/autocomplete`, `api/reverse-geocode`)
 - `src/components/` — React components
 - `src/hooks/` — Component state and shared behavior
-- `src/services/` — `PropertyService`, `FileService`, `FolderService` — thin wrappers over the Supabase SDK
+- `src/services/` — `PropertyService`, `FileService`, `FolderService`, `TagService` — thin wrappers over the Supabase SDK
+- `database/` — SQL to run once in Supabase (`admin_configurations.sql`, `collaboration.sql`)
 - `src/contexts/` — `ConfigContext` (admin feature flags) and `ToastContext`
 - `src/utils/` — Supabase client init, logger, usage/quota helpers
 - `types/` (repo root) — Shared TypeScript types (`Property`, `PropertyFile`, `PropertyFolder`, `MapType`, ...)
@@ -69,8 +70,15 @@ Pages compose single-responsibility hooks rather than using a global store:
 | `useUserProperties` | Property list with file counts for list/sidebar/switcher views |
 | `useSearchState` / `useModalState` | Search input and modal/address state on the map page |
 | `useMobileViewport` | Responsive/touch styling |
+| `useTagViews` | Module-level store of the person's views (tags), which are switched off (localStorage), the current user id, and every view mutation; `isVisible`/`pinColor` are what the map, list and sidebar filter and color by |
 
 Every mutation in `usePropertyFileActions` invalidates the prefetch cache for that property so re-opening it never shows stale files.
+
+### Views and Sharing
+
+A view (`tags` table) is a named, colored label one person owns; properties carry any number (`property_tags`, read as `tag_ids` on `Property`). Views are layers: each is on or off per device, a property shows when any of its views is on, untagged properties have their own switch, and a pin takes the color of its first switched-on view. A view is shared by email (`tag_members`, viewer or editor); members see every property carrying it. On a property, every folder and file has `visibility`: private to its uploader (even from the property's owner) until marked shared. Uploads and new folders inherit the folder they land in; at the root, the owner's are private and a collaborator's are shared (`defaultVisibility` on `usePropertyFileActions`). Sharing a folder goes through `set_folder_visibility` so ancestors open and contents cascade in one transaction.
+
+Reads no longer filter by `user_id`: row-level security (`database/collaboration.sql`) decides what a person sees, and services rely on it. Only a property's owner puts it in a view. Pure rules live in `utils/tagViews.ts`; the interface is `ViewsSheet` (manage, share), `ViewChips` (phone switches under the map search and the Properties title), the sidebar's Views section, "⋯ → Views…" in the property sheet (a `keepOpen` checkmark menu), and "Share with Team" / "Make Private" in file and folder menus on shared properties. See `docs/collaboration.md`.
 
 Navigation is in the URL. The map and Properties pages call `sheetHistory.open/changeFolder/close` on user actions and let its effect drive state when the browser navigates; `PropertyDetailsModal` does the same for the viewed file (`?file=`). Never open or close the sheet with raw state setters from a user action; go through the hook so history stays right.
 
@@ -128,10 +136,10 @@ Tokens live in `src/styles/globals.css` (Tailwind v4 `@theme`): the iOS grouped 
 Keep the number of simultaneous choices small and grouped:
 
 - One filled primary button per screen. At most three visible controls per bar.
-- Map: search, a Map / Satellite segmented control, and a location button. No zoom buttons (pinch, scroll, double-tap). Satellite is Google's `hybrid` so labels stay visible; do not reintroduce a third mode.
-- Property card: title, address, one button (Open / Add property). Renaming happens inside the sheet.
-- Property sheet nav bar: close, title, and one "⋯" that opens a grouped menu (Switch Property… , Show as List/Grid | Rename…, Copy Address). The "+" offers Upload Files… (and Import from Google Drive… when configured) | New Folder….
-- File menu groups: Download | Rename…, Move to Folder…, Duplicate | Delete. Folder menu: Rename… | Delete.
+- Map: search, a Map / Satellite segmented control, and a location button. No zoom buttons (pinch, scroll, double-tap). Satellite is Google's `hybrid` so labels stay visible; do not reintroduce a third mode. View switches are filter chips under the search field on a phone (the first chip opens the Views sheet) and a checkbox list in the desktop sidebar; they are toggles, not commands.
+- Property card: title, address, one button (Open / Add Property). "Add Property" saves the pin at once (`savePin` in `map.tsx`): if the map is narrowed to a single view the property joins it, and if there are views to choose from the sheet opens its Views picker once (`promptViews`). Naming a pin saves it too. Renaming happens inside the sheet.
+- Property sheet nav bar: close, title, and one "⋯" that opens a grouped menu (Switch Property… , Show as List/Grid | Views…, Rename…, Copy Address | Delete Property). The "+" offers Upload Files… (and Import from Google Drive… when configured) | New Folder…; it is hidden from view-only members. Delete Property confirms with an action sheet and removes the stored files, their rows, and the pin.
+- File menu groups: Download | Rename…, Move to Folder…, Duplicate | Share with Team / Make Private (shared properties only) | Delete. Folder menu: Rename… | Share with Team / Make Private | Delete.
 - Properties are photo cards (Street View, satellite fallback) with the name set into a scrim and one file-count pill. Tapping a card only opens the property; no per-card menus. One glass search capsule above the grid.
 - Account is an avatar hero (tap the name to edit it inline) over a wash of the user's color, then grouped lists: Storage, About you, Sign Out. Profile questions are asked one at a time in an anchored menu with a checkmark on the current value, and save on selection.
 - Do not add controls that have no effect (a previous "Remember me" checkbox was wired to nothing).

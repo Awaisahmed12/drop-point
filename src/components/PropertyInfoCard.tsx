@@ -9,6 +9,8 @@ interface PropertyInfoCardProps {
   /** Fires on pointerdown of the close button, before the click, so the map
    *  can ignore the click that Google Maps will receive under the card. */
   onCloseStart?: () => void;
+  /** The pin is being saved; the button waits. */
+  busy?: boolean;
 }
 
 const parseAddress = (fullAddress: string) => {
@@ -21,7 +23,7 @@ const parseAddress = (fullAddress: string) => {
  * The card that rises when a pin is chosen: what it is, where it is, and one
  * button. Renaming and everything else live inside the property sheet.
  */
-export const PropertyInfoCard = ({ address, addressLoading, property, onSelect, onClose, onCloseStart }: PropertyInfoCardProps) => {
+export const PropertyInfoCard = ({ address, addressLoading, property, onSelect, onClose, onCloseStart, busy = false }: PropertyInfoCardProps) => {
   const { street, rest } = parseAddress(address);
   const title = property.label || street || address;
   const subtitle = property.label ? [street, rest].filter(Boolean).join(', ') : rest;
@@ -67,10 +69,10 @@ export const PropertyInfoCard = ({ address, addressLoading, property, onSelect, 
         <button
           type="button"
           className="ios-button ios-button-primary"
-          disabled={addressLoading || !address}
+          disabled={addressLoading || !address || busy}
           onClick={onSelect}
         >
-          {isNew ? 'Add Property' : 'Open'}
+          {busy ? 'Saving…' : isNew ? 'Add Property' : 'Open'}
         </button>
       </div>
     </div>

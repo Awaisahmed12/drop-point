@@ -24,6 +24,8 @@ Enable solo real estate professionals to organize property documents by location
 - Folders-first sorting and a clear hierarchy with breadcrumbs.
 - Grid and list views with persistent user preference.
 - Search within a property for file or folder names.
+- Views: label properties (an LLC, a status, a property type), switch views on and off on the map and list, color pins by view.
+- Sharing: share a view with people by email as viewers or editors; per-folder and per-file Shared / Private on shared properties.
 - Responsive UI for desktop and mobile.
 
 ### Authentication and security
@@ -34,7 +36,6 @@ Enable solo real estate professionals to organize property documents by location
 
 ### Out of scope for MVP
 
-- Team sharing and collaboration.
 - Billing and subscriptions.
 - AI-assisted tagging or OCR.
 - Offline-first data sync.

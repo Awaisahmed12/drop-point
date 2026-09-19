@@ -3,10 +3,14 @@ import React, { useEffect } from 'react';
 export interface ActionSheetItem {
   label: string;
   icon?: React.ReactNode;
+  /** Small glyph before the label (a color dot, say). */
+  leading?: React.ReactNode;
   onSelect: () => void | Promise<void>;
   tone?: 'default' | 'danger';
   /** Renders with a checkmark; use for the current choice in a picker. */
   selected?: boolean;
+  /** The menu stays open after this item runs; for multi-select toggles. */
+  keepOpen?: boolean;
 }
 
 interface ActionSheetProps {
@@ -59,7 +63,7 @@ export const ActionSheet: React.FC<ActionSheetProps> = ({ open, onClose, title, 
   if (!open) return null;
 
   const run = (item: ActionSheetItem) => {
-    onClose();
+    if (!item.keepOpen) onClose();
     void item.onSelect();
   };
 
@@ -82,12 +86,14 @@ export const ActionSheet: React.FC<ActionSheetProps> = ({ open, onClose, title, 
                 <button
                   key={item.label}
                   type="button"
-                  role="menuitem"
+                  role={item.keepOpen ? 'menuitemcheckbox' : 'menuitem'}
                   className={`flex items-center gap-3 w-full text-left px-4 h-10 text-subhead pointer-coarse:h-11 pointer-coarse:text-body ios-row-press ${
                     item.tone === 'danger' ? 'text-danger' : 'text-ink'
                   }`}
                   onClick={() => run(item)}
+                  aria-checked={item.keepOpen ? Boolean(item.selected) : undefined}
                 >
+                  {item.leading && <span className="flex-shrink-0 flex items-center">{item.leading}</span>}
                   <span className={`flex-1 whitespace-nowrap ${item.selected ? 'font-semibold' : ''}`}>{item.label}</span>
                   {item.selected && (
                     <svg className="w-4 h-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

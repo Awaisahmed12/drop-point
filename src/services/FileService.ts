@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../utils/supabaseClient';
-import type { PropertyFile } from '../../types';
+import type { PropertyFile, Visibility } from '../../types';
 import { sanitizeFileName } from '../../utils/fileManagement';
 
 /**
@@ -49,7 +49,8 @@ export class FileService {
     fileType: string,
     fileSize: number,
     folderId: string | null = null,
-    modifiedAt?: string
+    modifiedAt?: string,
+    visibility: Visibility = 'private'
   ): Promise<PropertyFile> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -67,7 +68,8 @@ export class FileService {
         file_type: fileType,
         file_size: fileSize,
         folder_id: folderId,
-        modified_at: modifiedAt || new Date().toISOString()
+        modified_at: modifiedAt || new Date().toISOString(),
+        visibility,
       }])
       .select()
       .single();
@@ -103,12 +105,12 @@ export class FileService {
       // Continue with database deletion even if storage deletion fails
     }
 
-    // Delete from database
+    // Delete from database. Row-level security lets the uploader and the
+    // property's owner through; nobody else sees the row.
     const { error: dbError } = await supabase
       .from('property_files')
       .delete()
-      .eq('id', file.id)
-      .eq('user_id', user.id);
+      .eq('id', file.id);
 
     if (dbError) {
       logger.error('[FileService] Error deleting file from database:', dbError);
@@ -117,7 +119,8 @@ export class FileService {
   }
 
   /**
-   * Fetch files for a property
+   * Fetch the files of a property that this person may see: their own
+   * uploads plus everything marked shared (row-level security).
    */
   async getPropertyFiles(propertyId: string): Promise<PropertyFile[]> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -129,7 +132,6 @@ export class FileService {
       .from('property_files')
       .select('*')
       .eq('property_id', propertyId)
-      .eq('user_id', user.id)
       .order('uploaded_at', { ascending: false });
 
     if (error) {
@@ -178,7 +180,6 @@ export class FileService {
         file_url: newPath
       })
       .eq('id', file.id)
-      .eq('user_id', user.id)
       .select()
       .single();
 
@@ -196,12 +197,14 @@ export class FileService {
 
   /**
    * Move a file to a different folder
-   * If newFileName is provided, the file will be renamed during the move
+   * If newFileName is provided, the file will be renamed during the move.
+   * `visibility` lets the file take on the target folder's setting.
    */
   async moveFile(
     file: PropertyFile,
     targetFolderId: string | null,
-    newFileName?: string
+    newFileName?: string,
+    visibility?: Visibility
   ): Promise<PropertyFile> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -246,10 +249,10 @@ export class FileService {
       .update({
         folder_id: targetFolderId,
         file_name: finalFileName,
-        file_url: finalPath
+        file_url: finalPath,
+        ...(visibility ? { visibility } : {}),
       })
       .eq('id', file.id)
-      .eq('user_id', user.id)
       .select()
       .single();
 
@@ -317,6 +320,7 @@ export class FileService {
         file_size: file.file_size,
         uploaded_at: now,
         modified_at: now,
+        visibility: file.visibility ?? 'private',
       }])
       .select()
       .single();
@@ -333,6 +337,25 @@ export class FileService {
       throw new Error('File duplication failed: No data returned');
     }
 
+    return data;
+  }
+
+  /** Share a file with everyone who can see the property, or make it private again. */
+  async setVisibility(file: PropertyFile, visibility: Visibility): Promise<PropertyFile> {
+    const { data, error } = await supabase
+      .from('property_files')
+      .update({ visibility })
+      .eq('id', file.id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('[FileService] Error changing file visibility:', error);
+      throw error;
+    }
+    if (!data) {
+      throw new Error('File visibility change failed: No data returned');
+    }
     return data;
   }
 
