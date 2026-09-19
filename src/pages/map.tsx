@@ -23,7 +23,8 @@ import { useModalState } from '../hooks/useModalState';
 import { useSheetHistory } from '../hooks/useSheetHistory';
 import { usePropertyFileActions } from '../hooks/usePropertyFileActions';
 import { useTagViews } from '../hooks/useTagViews';
-import { prefetchPropertyData, getPropertyDataSync, setPropertyDataCache, warmHeroImage } from '../hooks/usePropertyPrefetch';
+import { prefetchPropertyData, getPropertyDataSync, setPropertyDataCache, warmHeroImage, invalidatePropertyCache } from '../hooks/usePropertyPrefetch';
+import { defaultViewsForNewProperty } from '../../utils/tagViews';
 import { useToast } from '../contexts/ToastContext';
 import { propertyService } from '../services';
 import { supabase } from '../utils/supabaseClient';
@@ -113,6 +114,9 @@ function MapPage() {
   const { showToast } = useToast();
   const views = useTagViews();
   const [viewsOpen, setViewsOpen] = useState(false);
+  const [savingPin, setSavingPin] = useState(false);
+  // A pin that was just saved with several views to choose from: the sheet asks once.
+  const [viewsPromptId, setViewsPromptId] = useState<string | null>(null);
 
   const {
     mapCenter, setMapCenter, map, setMap, zoom, setZoom, mapType, setMapType,
@@ -332,6 +336,45 @@ function MapPage() {
     setSnappedLatLng(snapped);
   }, [setSelectedProperty, setAddress, setSnappedLatLng]);
 
+  /**
+   * Save a dropped pin as a property. If the map is narrowed to one view
+   * the property joins it; if there are views to choose from, the sheet
+   * asks. Returns null after telling the person it failed.
+   */
+  const savePin = useCallback(async (pin: Property): Promise<Property | null> => {
+    try {
+      const created = await propertyService.createProperty({
+        address: pin.address,
+        lat: pin.lat,
+        lng: pin.lng,
+        label: pin.label,
+        notes: pin.notes,
+      });
+      if (!created.id) throw new Error('Property could not be saved.');
+
+      const defaults = defaultViewsForNewProperty(views.tags, views.hidden, views.userId);
+      if (defaults === null) {
+        setViewsPromptId(created.id);
+      } else if (defaults.length > 0) {
+        try {
+          created.tag_ids = await views.setPropertyViews(created.id, defaults);
+          const name = views.tags.find(t => t.id === defaults[0])?.name;
+          if (name) showToast(`Added to “${name}”`, 'success');
+        } catch (error) {
+          logger.error('[PROPERTY] Saved, but could not add it to the view:', error);
+          showToast('Saved, but couldn’t add it to the view.', 'warning');
+        }
+      }
+
+      setUserProperties(prev => [created, ...prev.filter(p => p.id !== created.id)]);
+      return created;
+    } catch (error) {
+      logger.error('[PROPERTY] Error saving property:', error);
+      showToast('Failed to save property. Please try again.');
+      return null;
+    }
+  }, [views, setUserProperties, showToast]);
+
   /** Persist a not-yet-saved pin before its first upload or folder. */
   const ensurePropertyId = useCallback(async (): Promise<string | null> => {
     if (!savedProperty) {
@@ -339,24 +382,11 @@ function MapPage() {
       return null;
     }
     if (savedProperty.id) return savedProperty.id;
-    try {
-      const created = await propertyService.createProperty({
-        address: savedProperty.address,
-        lat: savedProperty.lat,
-        lng: savedProperty.lng,
-        label: savedProperty.label,
-        notes: savedProperty.notes,
-      });
-      if (!created.id) throw new Error('Property could not be saved.');
-      setSavedProperty(created);
-      void loadUserProperties();
-      return created.id;
-    } catch (error) {
-      logger.error('[PROPERTY] Error auto-saving property:', error);
-      showToast('Failed to save property. Please try again.');
-      return null;
-    }
-  }, [savedProperty, setSavedProperty, loadUserProperties, showToast]);
+    const created = await savePin(savedProperty);
+    if (!created) return null;
+    setSavedProperty(created);
+    return created.id;
+  }, [savedProperty, savePin, setSavedProperty, showToast]);
 
   // On someone else's property, what you add is for the team by default.
   const collaborating = Boolean(savedProperty?.user_id && views.userId && savedProperty.user_id !== views.userId);
@@ -515,36 +545,59 @@ function MapPage() {
     setTimeout(() => { suppressMapClickRef.current = false; }, 1200);
   }, []);
 
-  const handleInfoCardSelect = useCallback(() => {
+  /** "Add Property" saves the pin right away; "Open" opens a saved one. */
+  const handleInfoCardSelect = useCallback(async () => {
     if (!selectedProperty) return;
-    if (!selectedProperty.id) {
-      setSavedProperty({ ...selectedProperty, address });
+    let property = selectedProperty;
+    if (!property.id) {
+      setSavingPin(true);
+      try {
+        const created = await savePin({ ...selectedProperty, address });
+        if (!created) return;
+        property = created;
+      } finally {
+        setSavingPin(false);
+      }
       setFolders([]);
       setPropertyFiles([]);
       setFoldersLoading(false);
       setFilesLoading(false);
       setSelectedFolder('master');
-    } else {
-      setSavedProperty(selectedProperty);
-      sheetHistory.open(selectedProperty.id);
     }
+    setSavedProperty(property);
+    if (property.id) sheetHistory.open(property.id);
     setShowDetailsModal(true);
     dismissInfoCard();
   }, [
-    selectedProperty, address, dismissInfoCard, setSavedProperty, setFolders, setPropertyFiles,
+    selectedProperty, address, savePin, dismissInfoCard, setSavedProperty, setFolders, setPropertyFiles,
     setFoldersLoading, setFilesLoading, setSelectedFolder, setShowDetailsModal, sheetHistory,
   ]);
 
-  /** Rename from inside the sheet. An unsaved pin just carries the label until it's persisted. */
+  /** Rename from inside the sheet. Naming an unsaved pin saves it. */
   const handlePropertyRename = useCallback(async (property: Property, label: string | null) => {
     if (!property.id) {
-      setSavedProperty(prev => (prev ? { ...prev, label } : prev));
+      const created = await savePin({ ...property, label });
+      if (!created) throw new Error('Property could not be saved.');
+      setSavedProperty(created);
+      if (created.id) sheetHistory.open(created.id);
       return;
     }
     const updated = await propertyService.updateProperty(property.id, { label });
     setSavedProperty(updated);
     setUserProperties(prev => prev.map(p => (p.id === updated.id ? updated : p)));
-  }, [setSavedProperty, setUserProperties]);
+  }, [savePin, sheetHistory, setSavedProperty, setUserProperties]);
+
+  /** Delete the open property and everything on it, then leave the sheet. */
+  const handlePropertyDelete = useCallback(async (property: Property) => {
+    if (!property.id) return;
+    await propertyService.deleteProperty(property.id);
+    invalidatePropertyCache(property.id);
+    setUserProperties(prev => prev.filter(p => p.id !== property.id));
+    sheetHistory.close();
+    setSavedProperty(null);
+    setSelectedProperty(null);
+    showToast('Property deleted', 'success');
+  }, [sheetHistory, setUserProperties, setSavedProperty, setSelectedProperty, showToast]);
 
   /** Put the open property in exactly these views; pins and lists follow. */
   const handlePropertyViewsChange = useCallback(async (property: Property, tagIds: string[]) => {
@@ -690,7 +743,8 @@ function MapPage() {
               armMapClickSuppression();
               dismissInfoCard();
             }}
-            onSelect={handleInfoCardSelect}
+            onSelect={() => void handleInfoCardSelect()}
+            busy={savingPin}
           />
         )}
 
@@ -729,6 +783,9 @@ function MapPage() {
             onDismiss={fileActions.dismissPendingUpload}
             onPropertyRename={handlePropertyRename}
             onPropertyViewsChange={handlePropertyViewsChange}
+            onPropertyDelete={handlePropertyDelete}
+            promptViews={viewsPromptId !== null && viewsPromptId === savedProperty?.id}
+            onViewsPromptShown={() => setViewsPromptId(null)}
             onFileVisibilityChange={fileActions.setFileVisibility}
             onFolderVisibilityChange={fileActions.setFolderVisibility}
             onPropertySwitch={(property, files, switchedFolders) => {

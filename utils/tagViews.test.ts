@@ -8,6 +8,7 @@ import {
   parseHiddenViews,
   normalizeTagName,
   normalizeEmail,
+  defaultViewsForNewProperty,
 } from './tagViews';
 import { DEFAULT_PIN_COLOR, UNTAGGED_VIEW_ID } from '../constants';
 import type { Tag } from '../types';
@@ -68,6 +69,28 @@ describe('sharing predicates', () => {
   it('a property is shared when it carries a shared view', () => {
     expect(isPropertyShared({ tag_ids: ['llc'] }, [llc, theirs], 'me')).toBe(false);
     expect(isPropertyShared({ tag_ids: ['llc', 'theirs'] }, [llc, theirs], 'me')).toBe(true);
+  });
+});
+
+describe('defaultViewsForNewProperty', () => {
+  it('joins the one view the map is narrowed to', () => {
+    const hidden = new Set(['sold', UNTAGGED_VIEW_ID]);
+    expect(defaultViewsForNewProperty([llc, sold], hidden, 'me')).toEqual(['llc']);
+  });
+
+  it('asks when more than one layer is on', () => {
+    expect(defaultViewsForNewProperty([llc, sold], new Set(), 'me')).toBeNull();
+    expect(defaultViewsForNewProperty([llc, sold], new Set(['sold']), 'me')).toBeNull();
+  });
+
+  it('asks rather than joining a view the person can only look at', () => {
+    const hidden = new Set(['llc', UNTAGGED_VIEW_ID]);
+    expect(defaultViewsForNewProperty([llc, theirs], hidden, 'me')).toBeNull();
+  });
+
+  it('has nothing to offer when there are no views to put it in', () => {
+    expect(defaultViewsForNewProperty([], new Set(), 'me')).toEqual([]);
+    expect(defaultViewsForNewProperty([theirs], new Set(), 'me')).toEqual([]);
   });
 });
 

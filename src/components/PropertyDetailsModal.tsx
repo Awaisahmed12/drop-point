@@ -133,6 +133,11 @@ interface PropertyDetailsModalProps {
   onPropertyRename?: (property: Property, label: string | null) => Promise<void>;
   /** Put the property in exactly these views. Only its owner may. */
   onPropertyViewsChange?: (property: Property, tagIds: string[]) => Promise<void>;
+  /** Delete the property and everything on it. Only its owner may. */
+  onPropertyDelete?: (property: Property) => Promise<void>;
+  /** A just-saved pin with views to choose from: open the Views picker as the sheet opens. */
+  promptViews?: boolean;
+  onViewsPromptShown?: () => void;
   /** Share a file with everyone on the property, or make it private. */
   onFileVisibilityChange?: (file: PropertyFile, visibility: Visibility) => Promise<void>;
   /** Share a folder and its contents, or make them private. */
@@ -163,6 +168,9 @@ export const PropertyDetailsModal = ({
   onMapMove,
   onPropertyRename,
   onPropertyViewsChange,
+  onPropertyDelete,
+  promptViews = false,
+  onViewsPromptShown,
   onFileVisibilityChange,
   onFolderVisibilityChange,
 }: PropertyDetailsModalProps) => {
@@ -170,6 +178,14 @@ export const PropertyDetailsModal = ({
   const views = useTagViews();
   const [viewsPickerOpen, setViewsPickerOpen] = useState(false);
   const [newViewOpen, setNewViewOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  // A new pin lands in the sheet; if there are views it could join, ask now.
+  useEffect(() => {
+    if (!isOpen || !promptViews || !property?.id) return;
+    setViewsPickerOpen(true);
+    onViewsPromptShown?.();
+  }, [isOpen, promptViews, property?.id, onViewsPromptShown]);
 
   // State for UI interactions
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -1219,7 +1235,23 @@ export const PropertyDetailsModal = ({
             .catch(() => showToast('Couldn’t copy the address.')),
       },
     ],
+    ...(onPropertyDelete && isOwner && property.id
+      ? [[{ label: 'Delete Property', tone: 'danger' as const, onSelect: () => setConfirmDeleteOpen(true) }]]
+      : []),
   ];
+
+  const deleteProperty = async () => {
+    if (!onPropertyDelete) return;
+    try {
+      await onPropertyDelete(property);
+    } catch (error) {
+      logger.error('Delete property failed:', error);
+      showToast('Couldn’t delete this property. Please try again.');
+    }
+  };
+  const deleteSummary = files.length === 0
+    ? 'Its pin is removed.'
+    : `Its ${files.length} ${files.length === 1 ? 'file is' : 'files are'} deleted too.`;
 
   // Calendar-style multi-select: each view toggles and the menu stays open.
   const viewsPickerGroups: ActionSheetItem[][] = [
@@ -2487,6 +2519,13 @@ export const PropertyDetailsModal = ({
         groups={viewsPickerGroups}
         presentation="popover"
         anchorRef={moreButtonRef}
+      />
+      <ActionSheet
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        presentation="sheet"
+        title={`Delete “${displayName}”? ${deleteSummary} This can’t be undone.`}
+        groups={[[{ label: 'Delete Property', tone: 'danger', onSelect: deleteProperty }]]}
       />
       <InputAlert
         open={newViewOpen}

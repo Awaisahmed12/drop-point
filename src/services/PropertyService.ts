@@ -154,12 +154,40 @@ export class PropertyService {
   }
 
   /**
-   * Delete a property
+   * Delete a property and everything on it: the stored files, then the
+   * file and folder rows, then the property. Only the owner may.
    */
   async deleteProperty(propertyId: string): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('User not authenticated');
+    }
+
+    // Storage first, so a failure leaves rows that still point at real
+    // objects rather than objects nothing points at.
+    const bucket = supabase.storage.from('property-files');
+    const { data: objects, error: listError } = await bucket.list(propertyId, { limit: 1000 });
+    if (listError) {
+      logger.error('[PropertyService] Error listing files to delete:', listError);
+      throw listError;
+    }
+    if (objects && objects.length > 0) {
+      const { error: removeError } = await bucket.remove(objects.map(o => `${propertyId}/${o.name}`));
+      if (removeError) {
+        logger.error('[PropertyService] Error deleting stored files:', removeError);
+        throw removeError;
+      }
+    }
+
+    const { error: filesError } = await supabase.from('property_files').delete().eq('property_id', propertyId);
+    if (filesError) {
+      logger.error('[PropertyService] Error deleting file rows:', filesError);
+      throw filesError;
+    }
+    const { error: foldersError } = await supabase.from('property_folders').delete().eq('property_id', propertyId);
+    if (foldersError) {
+      logger.error('[PropertyService] Error deleting folder rows:', foldersError);
+      throw foldersError;
     }
 
     const { error } = await supabase

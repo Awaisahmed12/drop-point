@@ -62,6 +62,32 @@ export function isPropertyShared(property: Pick<Property, 'tag_ids'>, tags: Tag[
   return tagsForProperty(property, tags).some(t => isTagShared(t, userId));
 }
 
+/** Views this person may put a property in: their own, and ones they edit. */
+export function assignableTags(tags: Tag[], userId: string | null): Tag[] {
+  return tags.filter(t =>
+    t.owner_id === userId || (t.members ?? []).some(m => m.user_id === userId && m.role === 'editor'),
+  );
+}
+
+/**
+ * Which views a newly saved pin should join. When the map is narrowed to a
+ * single view (that view on, every other layer off, including "no view"),
+ * the pin joins it. Otherwise: `null` means ask the person, because there
+ * are views to choose from; `[]` means there is nothing to choose.
+ */
+export function defaultViewsForNewProperty(
+  tags: Tag[],
+  hidden: ReadonlySet<string>,
+  userId: string | null,
+): string[] | null {
+  const assignable = assignableTags(tags, userId);
+  if (assignable.length === 0) return [];
+  const onTags = tags.filter(t => !hidden.has(t.id));
+  const untaggedOn = !hidden.has(UNTAGGED_VIEW_ID);
+  if (onTags.length === 1 && !untaggedOn && assignable.some(t => t.id === onTags[0].id)) return [onTags[0].id];
+  return null;
+}
+
 /** Read the persisted hidden set; tolerant of a missing or corrupt value. */
 export function parseHiddenViews(raw: string | null): Set<string> {
   if (!raw) return new Set();

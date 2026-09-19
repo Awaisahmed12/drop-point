@@ -13,7 +13,7 @@ import { useUserProperties } from '../hooks/useUserProperties';
 import { useSheetHistory } from '../hooks/useSheetHistory';
 import { usePropertyFileActions } from '../hooks/usePropertyFileActions';
 import { useTagViews } from '../hooks/useTagViews';
-import { getPropertyDataSync, setPropertyDataCache, prefetchPropertyData } from '../hooks/usePropertyPrefetch';
+import { getPropertyDataSync, setPropertyDataCache, prefetchPropertyData, invalidatePropertyCache } from '../hooks/usePropertyPrefetch';
 import { propertyService } from '../services';
 import { useToast } from '../contexts/ToastContext';
 
@@ -125,6 +125,16 @@ function ListPage() {
     await refreshProperties();
   }, [refreshProperties]);
 
+  const deleteProperty = useCallback(async (property: Property) => {
+    if (!property.id) return;
+    await propertyService.deleteProperty(property.id);
+    invalidatePropertyCache(property.id);
+    sheetHistory.close();
+    setSavedProperty(null);
+    await refreshProperties();
+    showToast('Property deleted', 'success');
+  }, [sheetHistory, refreshProperties, showToast]);
+
   const changePropertyViews = useCallback(async (property: Property, tagIds: string[]) => {
     if (!property.id) return;
     const stored = await views.setPropertyViews(property.id, tagIds);
@@ -174,6 +184,7 @@ function ListPage() {
         onDismiss={fileActions.dismissPendingUpload}
         onPropertyRename={renameProperty}
         onPropertyViewsChange={changePropertyViews}
+        onPropertyDelete={deleteProperty}
         onFileVisibilityChange={fileActions.setFileVisibility}
         onFolderVisibilityChange={fileActions.setFolderVisibility}
         onPropertySwitch={(property, newFiles, newFolders) => {

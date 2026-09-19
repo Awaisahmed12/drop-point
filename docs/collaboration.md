@@ -24,6 +24,7 @@ The app runs without the migration; views simply stay empty.
 |---|---|
 | View (`tags`) | A named, colored label one person owns: "Company Investments LLC", "Under Contract", "Gas Stations". A property can carry many. |
 | Switch | Every view is on or off per device, like a calendar's checkbox. A property shows when any of its views is on; properties with no view have their own switch. Pins take the color of the first switched-on view they carry. |
+| New pins | "Add Property" saves the pin right away (so does naming it). If the map is narrowed to one view ("Show Only This View", or every other switch off), the new property joins that view. Otherwise, when there are views to choose from, the sheet opens the Views picker once; dismiss it to leave the property in no view. |
 | Sharing a view | Add people by email as viewers or editors. They see every property carrying the view. Invites are bound to the account the first time that email signs in (`claim_tag_invites`). |
 | Shared folder / file | Visible to everyone who can see the property. Uploads inherit the folder they land in; at the root, the owner's uploads are private and a collaborator's are shared. Sharing a folder opens the folders above it (so it can be reached) and everything inside it; making it private closes everything inside it (`set_folder_visibility`, one transaction). |
 | Private folder / file | Only its uploader sees it, on any property, including the property's owner. This is how "my own files plus the shared files" works. |
