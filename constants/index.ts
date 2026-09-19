@@ -43,6 +43,27 @@ export const DEFAULT_MAP_TYPE: MapType = 'hybrid';
 // Coordinate comparison threshold
 export const COORDINATE_THRESHOLD = 0.00001;
 
+// Views (tags). Pins take the color of the first view they carry that is
+// switched on; a property with no view keeps the accent blue.
+export const DEFAULT_PIN_COLOR = '#0a7aff';
+export const TAG_COLORS: ReadonlyArray<{ name: string; value: string }> = [
+  { name: 'Blue', value: '#0a7aff' },
+  { name: 'Green', value: '#34c759' },
+  { name: 'Orange', value: '#ff9500' },
+  { name: 'Red', value: '#ff3b30' },
+  { name: 'Pink', value: '#ff2d55' },
+  { name: 'Purple', value: '#af52de' },
+  { name: 'Indigo', value: '#5856d6' },
+  { name: 'Teal', value: '#00c7be' },
+  { name: 'Brown', value: '#a2845e' },
+  { name: 'Graphite', value: '#8e8e93' },
+];
+// Which views are switched off, persisted per device (like calendar checkboxes).
+export const HIDDEN_VIEWS_KEY = 'droppoint-hidden-views';
+// The id used for the built-in "no view" layer in the hidden set.
+export const UNTAGGED_VIEW_ID = '__untagged__';
+export const TAG_NAME_MAX_LENGTH = 40;
+
 // File upload constants
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 export const MAX_FILE_SIZE_MB = 50;

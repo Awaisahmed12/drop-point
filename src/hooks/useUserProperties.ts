@@ -26,14 +26,16 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
         return;
       }
 
-      // Fetch properties with file counts using a more efficient query
+      // Own properties plus any shared through a view (row-level security),
+      // with the ids of their views and a count of the files this person
+      // may see on each.
       const { data: propertiesData, error: propertiesError } = await supabase
         .from('properties')
         .select(`
-          id, address, lat, lng, label, notes, created_at, updated_at,
-          property_files!left(id)
+          id, user_id, address, lat, lng, label, notes, created_at, updated_at,
+          property_files!left(id),
+          property_tags(tag_id)
         `)
-        .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
       if (propertiesError) {
@@ -41,12 +43,15 @@ export const useUserProperties = (): UseUserPropertiesReturn => {
       }
 
       // Transform to PropertyWithFileCount format
-      const propertiesWithCount: PropertyWithFileCount[] = (propertiesData || []).map(property => ({
-        ...property,
-        file_count: property.property_files?.length || 0,
-        last_accessed: property.updated_at,
-        user_id: user.id
-      }));
+      const propertiesWithCount: PropertyWithFileCount[] = (propertiesData || []).map(property => {
+        const { property_files, property_tags, ...rest } = property;
+        return {
+          ...rest,
+          tag_ids: (property_tags ?? []).map(t => t.tag_id),
+          file_count: property_files?.length || 0,
+          last_accessed: property.updated_at,
+        };
+      });
 
       setProperties(propertiesWithCount);
       

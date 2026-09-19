@@ -18,35 +18,47 @@ const mocks = vi.hoisted(() => {
       async () => ({ path: 'p' }),
     ),
     createFileRecord: vi.fn<(
-      propertyId: string, name: string, path: string, type: string, size: number, folderId: string | null, modifiedAt?: string,
+      propertyId: string, name: string, path: string, type: string, size: number, folderId: string | null, modifiedAt?: string, visibility?: string,
     ) => Promise<unknown>>(async () => ({})),
     getPropertyFiles: vi.fn<(propertyId: string) => Promise<File_[]>>(async () => []),
     renameFile: vi.fn(async (file: File_, name: string) => ({ ...file, file_name: name })),
     deleteFile: vi.fn<(file: File_) => Promise<void>>(async () => {}),
-    moveFile: vi.fn<(file: File_, folderId: string | null, newName?: string) => Promise<File_>>(
-      async (file, folderId) => ({ ...file, folder_id: folderId }),
+    moveFile: vi.fn<(file: File_, folderId: string | null, newName?: string, visibility?: string) => Promise<File_>>(
+      async (file, folderId, _newName, visibility) => ({ ...file, folder_id: folderId, ...(visibility ? { visibility } : {}) }),
     ),
     copyFile: vi.fn(async (file: File_, name: string) => ({ ...file, id: 'copy', file_name: name })),
+    setVisibility: vi.fn(async (file: File_, visibility: string) => ({ ...file, visibility })),
   };
   const folderService = {
-    createFolder: vi.fn(async (propertyId: string, name: string, parentId: string | null) => ({
+    createFolder: vi.fn(async (propertyId: string, name: string, parentId: string | null, visibility?: string) => ({
       id: 'new-folder', property_id: propertyId, user_id: 'u1', name, parent_id: parentId,
-      created_at: '', updated_at: '', deleted_at: null,
+      created_at: '', updated_at: '', deleted_at: null, visibility: visibility ?? 'private',
     })),
     renameFolder: vi.fn(async (folder: Folder_, name: string) => ({ ...folder, name })),
     deleteFolder: vi.fn<(folderId: string) => Promise<void>>(async () => {}),
+    setVisibility: vi.fn<(folderId: string, visibility: string) => Promise<void>>(async () => {}),
+  };
+  const propertyService = {
+    getPropertyData: vi.fn<(propertyId: string) => Promise<{ files: File_[]; folders: Folder_[] }>>(
+      async () => ({ files: [], folders: [] }),
+    ),
   };
   return {
     fileService,
     folderService,
+    propertyService,
     showToast: vi.fn(),
     invalidatePropertyCache: vi.fn(),
     getUserUsageBytes: vi.fn<(userId: string) => Promise<number>>(async () => 0),
   };
 });
-const { fileService, folderService, showToast, invalidatePropertyCache, getUserUsageBytes } = mocks;
+const { fileService, folderService, propertyService, showToast, invalidatePropertyCache, getUserUsageBytes } = mocks;
 
-vi.mock('../services', () => ({ fileService: mocks.fileService, folderService: mocks.folderService }));
+vi.mock('../services', () => ({
+  fileService: mocks.fileService,
+  folderService: mocks.folderService,
+  propertyService: mocks.propertyService,
+}));
 vi.mock('../utils/supabaseClient', () => ({
   supabase: { auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'u1' } } })) } },
 }));
@@ -73,6 +85,7 @@ interface HarnessOptions {
   folders?: PropertyFolder[];
   selectedFolder?: string;
   ensurePropertyId?: () => Promise<string | null>;
+  defaultVisibility?: 'private' | 'shared';
 }
 
 function useHarness(options: HarnessOptions) {
@@ -86,6 +99,7 @@ function useHarness(options: HarnessOptions) {
     setFolders,
     selectedFolder: options.selectedFolder ?? 'master',
     ensurePropertyId: options.ensurePropertyId,
+    defaultVisibility: options.defaultVisibility,
   });
   return { actions, files, folders };
 }
@@ -155,6 +169,40 @@ describe('usePropertyFileActions', () => {
     expect(fileService.createFileRecord.mock.calls[0][5]).toBe('d1');
   });
 
+  it('uploads take the sharing of the folder they land in', async () => {
+    const shared = folder({ id: 'team', name: 'Team', visibility: 'shared' });
+    const { result } = renderHook(() => useHarness({ selectedFolder: 'team', folders: [shared] }));
+
+    await act(async () => {
+      await result.current.actions.uploadFiles([new File(['a'], 'a.txt')]);
+    });
+    await flush();
+
+    expect(fileService.createFileRecord.mock.calls[0][7]).toBe('shared');
+  });
+
+  it('root uploads and folders are private for an owner, shared when collaborating', async () => {
+    const owner = renderHook(() => useHarness({}));
+    await act(async () => {
+      await owner.result.current.actions.uploadFiles([new File(['a'], 'a.txt')]);
+      await owner.result.current.actions.createFolder('Mine');
+    });
+    await flush();
+    expect(fileService.createFileRecord.mock.calls[0][7]).toBe('private');
+    expect(folderService.createFolder).toHaveBeenLastCalledWith('prop-1', 'Mine', null, 'private');
+
+    vi.clearAllMocks();
+    getUserUsageBytes.mockResolvedValue(0);
+    const guest = renderHook(() => useHarness({ defaultVisibility: 'shared' }));
+    await act(async () => {
+      await guest.result.current.actions.uploadFiles([new File(['a'], 'b.txt')]);
+      await guest.result.current.actions.createFolder('Team');
+    });
+    await flush();
+    expect(fileService.createFileRecord.mock.calls[0][7]).toBe('shared');
+    expect(folderService.createFolder).toHaveBeenLastCalledWith('prop-1', 'Team', null, 'shared');
+  });
+
   it('rejects a rename that collides with a sibling file', async () => {
     const files = [file({ id: 'f1', file_name: 'a.pdf' }), file({ id: 'f2', file_name: 'b.pdf' })];
     const { result } = renderHook(() => useHarness({ files }));
@@ -190,8 +238,19 @@ describe('usePropertyFileActions', () => {
       await result.current.actions.createFolder('Inspections');
     });
 
-    expect(folderService.createFolder).toHaveBeenCalledWith('prop-1', 'Inspections', 'd1');
+    expect(folderService.createFolder).toHaveBeenCalledWith('prop-1', 'Inspections', 'd1', 'private');
     expect(result.current.folders.map(f => f.name)).toEqual(['Docs', 'Inspections']);
+  });
+
+  it('a folder made inside a shared folder is shared too', async () => {
+    const shared = folder({ id: 'team', name: 'Team', visibility: 'shared' });
+    const { result } = renderHook(() => useHarness({ folders: [shared], selectedFolder: 'team' }));
+
+    await act(async () => {
+      await result.current.actions.createFolder('Photos');
+    });
+
+    expect(folderService.createFolder).toHaveBeenCalledWith('prop-1', 'Photos', 'team', 'shared');
   });
 
   it('refuses to delete a folder that still has contents', async () => {
@@ -230,7 +289,53 @@ describe('usePropertyFileActions', () => {
       await result.current.actions.moveFile(files[0], 'd1');
     });
 
-    expect(fileService.moveFile).toHaveBeenCalledWith(files[0], 'd1', 'a (1).pdf');
+    expect(fileService.moveFile).toHaveBeenCalledWith(files[0], 'd1', 'a (1).pdf', 'private');
+  });
+
+  it('a file moved into a shared folder becomes shared; moved to the root it keeps its own', async () => {
+    const shared = folder({ id: 'team', name: 'Team', visibility: 'shared' });
+    const files = [file({ id: 'f1', file_name: 'a.pdf', folder_id: null }), file({ id: 'f2', file_name: 'b.pdf', folder_id: 'team', visibility: 'shared' })];
+    const { result } = renderHook(() => useHarness({ files, folders: [shared] }));
+
+    await act(async () => {
+      await result.current.actions.moveFile(files[0], 'team');
+    });
+    expect(fileService.moveFile).toHaveBeenLastCalledWith(files[0], 'team', undefined, 'shared');
+
+    await act(async () => {
+      await result.current.actions.moveFile(files[1], null);
+    });
+    expect(fileService.moveFile).toHaveBeenLastCalledWith(files[1], null, undefined, undefined);
+  });
+
+  it('shares a file and updates local state', async () => {
+    const files = [file({ id: 'f1' })];
+    const { result } = renderHook(() => useHarness({ files }));
+
+    await act(async () => {
+      await result.current.actions.setFileVisibility(files[0], 'shared');
+    });
+
+    expect(fileService.setVisibility).toHaveBeenCalledWith(files[0], 'shared');
+    expect(result.current.files[0].visibility).toBe('shared');
+    expect(invalidatePropertyCache).toHaveBeenCalledWith('prop-1');
+  });
+
+  it('sharing a folder re-reads files and folders because the database cascades', async () => {
+    const docs = folder({ id: 'd1' });
+    propertyService.getPropertyData.mockResolvedValue({
+      folders: [{ ...docs, visibility: 'shared' }],
+      files: [file({ id: 'f1', folder_id: 'd1', visibility: 'shared' })],
+    });
+    const { result } = renderHook(() => useHarness({ folders: [docs], files: [file({ id: 'f1', folder_id: 'd1' })] }));
+
+    await act(async () => {
+      await result.current.actions.setFolderVisibility(docs, 'shared');
+    });
+
+    expect(folderService.setVisibility).toHaveBeenCalledWith('d1', 'shared');
+    expect(result.current.folders[0].visibility).toBe('shared');
+    expect(result.current.files[0].visibility).toBe('shared');
   });
 
   it('duplicates a file with a "- Copy" name and prepends it', async () => {

@@ -168,12 +168,13 @@ export async function prefetchPropertyData(propertyId: string, location?: { lat:
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // No user filter: row-level security hands back this person's own rows
+    // plus anything shared on the property.
     const [folderResult, filesResult] = await Promise.all([
       supabase
         .from('property_folders')
         .select('*')
         .eq('property_id', propertyId)
-        .eq('user_id', user.id)
         .is('deleted_at', null)
         .order('created_at', { ascending: true }),
       supabase

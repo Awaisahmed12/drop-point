@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Get user from Authorization header
   const authHeader = req.headers.authorization;
   const token = authHeader?.replace('Bearer ', '');
-  
+
   let userId: string | null = null;
   if (token) {
     try {
@@ -47,19 +47,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Fetch user's saved properties if authenticated, with priority ranking
-    let userProperties: Array<{ 
-      id: string; 
-      address: string; 
-      label: string | null; 
+    // Fetch the person's saved properties if authenticated, with priority
+    // ranking. The query runs as that person (anon key + their token) so
+    // row-level security includes properties shared with them through a
+    // view, exactly as the map does.
+    let userProperties: Array<{
+      id: string;
+      address: string;
+      label: string | null;
       updated_at: string;
       created_at: string;
     }> = [];
-    if (userId) {
-      const { data: properties, error: propertiesError } = await supabaseServer
+    if (userId && token) {
+      const asUser = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: properties, error: propertiesError } = await asUser
         .from('properties')
         .select('id, address, label, updated_at, created_at')
-        .eq('user_id', userId)
         .order('updated_at', { ascending: false }); // Most recently updated first
       
       if (propertiesError) {

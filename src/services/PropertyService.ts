@@ -4,13 +4,25 @@ import { fileService } from './FileService';
 import { folderService } from './FolderService';
 import type { Property, PropertyFile, PropertyFolder } from '../../types';
 
+/** The columns every property read asks for: the row plus the ids of its views. */
+export const PROPERTY_SELECT = '*, property_tags(tag_id)';
+
+type PropertyRow = Record<string, unknown> & { property_tags?: Array<{ tag_id: string }> | null };
+
+/** Flatten the joined view rows into `tag_ids`. */
+export function normalizeProperty<T extends PropertyRow>(row: T): Omit<T, 'property_tags'> & { tag_ids: string[] } {
+  const { property_tags, ...rest } = row;
+  return { ...rest, tag_ids: (property_tags ?? []).map(t => t.tag_id) };
+}
+
 /**
  * Service layer for property-related operations
  * Abstracts Supabase calls to enable testing and reduce coupling
  */
 export class PropertyService {
   /**
-   * Get all properties for the current user
+   * Every property the person can see: their own, plus any carrying a view
+   * that was shared with them. Row-level security draws that line.
    */
   async getUserProperties(): Promise<Property[]> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -20,8 +32,7 @@ export class PropertyService {
 
     const { data, error } = await supabase
       .from('properties')
-      .select('*')
-      .eq('user_id', user.id)
+      .select(PROPERTY_SELECT)
       .order('updated_at', { ascending: false });
 
     if (error) {
@@ -29,7 +40,7 @@ export class PropertyService {
       throw error;
     }
 
-    return data || [];
+    return (data || []).map(normalizeProperty) as Property[];
   }
 
   /**
@@ -43,9 +54,8 @@ export class PropertyService {
 
     const { data, error } = await supabase
       .from('properties')
-      .select('*')
+      .select(PROPERTY_SELECT)
       .eq('id', propertyId)
-      .eq('user_id', user.id)
       .single();
 
     if (error) {
@@ -57,7 +67,7 @@ export class PropertyService {
       throw error;
     }
 
-    return data;
+    return data ? (normalizeProperty(data) as Property) : null;
   }
 
   /**
@@ -99,7 +109,7 @@ export class PropertyService {
       throw new Error('Property creation failed: No data returned');
     }
 
-    return data;
+    return { ...data, tag_ids: [] };
   }
 
   /**
@@ -128,7 +138,7 @@ export class PropertyService {
       })
       .eq('id', propertyId)
       .eq('user_id', user.id)
-      .select()
+      .select(PROPERTY_SELECT)
       .single();
 
     if (error) {
@@ -140,7 +150,7 @@ export class PropertyService {
       throw new Error('Property update failed: No data returned');
     }
 
-    return data;
+    return normalizeProperty(data) as Property;
   }
 
   /**

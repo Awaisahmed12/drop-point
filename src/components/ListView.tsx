@@ -4,13 +4,18 @@ import Link from 'next/link';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { prefetchPropertyData } from '../hooks/usePropertyPrefetch';
+import { useTagViews } from '../hooks/useTagViews';
+import { tagsForProperty } from '../../utils/tagViews';
 import type { PropertyWithFileCount } from '../../types';
 
 interface ListViewProps {
+  /** Every property the person can see; switched-off views are applied here. */
   properties: PropertyWithFileCount[];
   loading: boolean;
   error: string | null;
   onPropertySelect: (property: PropertyWithFileCount) => void;
+  /** Rendered between the title and the search field (the phone's view chips). */
+  toolbar?: React.ReactNode;
 }
 
 const parseAddress = (fullAddress: string) => {
@@ -40,12 +45,15 @@ const fileCountLabel = (n: number) => `${n} ${n === 1 ? 'file' : 'files'}`;
  * language as the property sheet's hero. Tapping a card opens it. Cards are
  * content, so they use standard materials, not glass.
  */
-export const ListView = ({ properties, loading, error, onPropertySelect }: ListViewProps) => {
+export const ListView = ({ properties, loading, error, onPropertySelect, toolbar }: ListViewProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const views = useTagViews();
 
   const query = searchQuery.toLowerCase().trim();
-  const sortedProperties = properties
+  const shown = properties.filter(views.isVisible);
+  const hiddenCount = properties.length - shown.length;
+  const sortedProperties = shown
     .filter(p => !query || p.address.toLowerCase().includes(query) || (p.label?.toLowerCase() ?? '').includes(query))
     .sort((a, b) => {
       const aDate = new Date(a.last_accessed || a.created_at || a.updated_at || '1970-01-01');
@@ -87,8 +95,11 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
         </div>
       );
     }
-    if (sortedProperties.length === 0) {
+    if (sortedProperties.length === 0 && searchQuery) {
       return <p className="text-subhead text-ink-2 text-center py-24">No properties match “{searchQuery}”.</p>;
+    }
+    if (sortedProperties.length === 0) {
+      return <p className="text-subhead text-ink-2 text-center py-24">Every property is in a view that’s switched off.</p>;
     }
     return null;
   };
@@ -101,10 +112,12 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
         <h1 className="ios-large-title">Properties</h1>
         <p className="text-subhead text-ink-2 mt-0.5">
           {searchQuery
-            ? `${sortedProperties.length} of ${properties.length}`
-            : `${properties.length} ${properties.length === 1 ? 'property' : 'properties'}`}
+            ? `${sortedProperties.length} of ${shown.length}`
+            : `${shown.length} ${shown.length === 1 ? 'property' : 'properties'}${hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''}`}
         </p>
       </div>
+
+      {toolbar}
 
       {/* Floating glass search: stays put while cards scroll beneath it. */}
       <div className="sticky z-20 mb-4 sm:mb-6 sm:max-w-sm" style={{ top: 'calc(var(--safe-top) + 8px)' }}>
@@ -134,6 +147,8 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
             const { street, rest } = parseAddress(property.address);
             const title = property.label || street || property.address;
             const subtitle = [property.label ? street : null, rest].filter(Boolean).join(', ');
+            const propertyTags = tagsForProperty(property, views.tags);
+            const shared = views.isShared(property);
             return (
               <button
                 type="button"
@@ -156,9 +171,27 @@ export const ListView = ({ properties, loading, error, onPropertySelect }: ListV
                 <span className="absolute top-3 left-3 rounded-full px-3 py-1 text-footnote font-semibold bg-black/45 text-white">
                   {fileCountLabel(property.file_count)}
                 </span>
+                {shared && (
+                  <span className="absolute top-3 right-3 rounded-full px-2.5 py-1 text-footnote font-semibold bg-black/45 text-white flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="9" cy="7" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0113 0" /><circle cx="17" cy="9" r="2.5" /><path d="M15 15.5a5 5 0 016.5 4.5" />
+                    </svg>
+                    Shared
+                  </span>
+                )}
                 <div className="absolute inset-x-0 bottom-0 px-4 pb-4 text-white">
                   <div className="text-title-2 font-bold leading-tight" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{title}</div>
                   {subtitle && <div className="text-subhead text-white/85 truncate mt-0.5">{subtitle}</div>}
+                  {propertyTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2" aria-label={`Views: ${propertyTags.map(t => t.name).join(', ')}`}>
+                      {propertyTags.map(t => (
+                        <span key={t.id} className="inline-flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-caption font-semibold bg-white/20 text-white">
+                          <span className="w-2 h-2 rounded-full" style={{ background: t.color, boxShadow: '0 0 0 1px rgba(255,255,255,0.6)' }} aria-hidden="true" />
+                          {t.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </button>
             );

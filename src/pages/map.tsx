@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import React, { useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import Head from 'next/head';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import { useRouter } from 'next/router';
@@ -10,6 +10,8 @@ import { PropertyInfoCard } from '../components/PropertyInfoCard';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { WebSidebar } from '../components/WebSidebar';
 import { CurrentLocationIndicator } from '../components/CurrentLocationIndicator';
+import { ViewChips } from '../components/ViewChips';
+import { ViewsSheet } from '../components/ViewsSheet';
 import { withAuth } from '../components/withAuth';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useMobileViewport } from '../hooks/useMobileViewport';
@@ -20,6 +22,7 @@ import { useSearchState } from '../hooks/useSearchState';
 import { useModalState } from '../hooks/useModalState';
 import { useSheetHistory } from '../hooks/useSheetHistory';
 import { usePropertyFileActions } from '../hooks/usePropertyFileActions';
+import { useTagViews } from '../hooks/useTagViews';
 import { prefetchPropertyData, getPropertyDataSync, setPropertyDataCache, warmHeroImage } from '../hooks/usePropertyPrefetch';
 import { useToast } from '../contexts/ToastContext';
 import { propertyService } from '../services';
@@ -37,22 +40,27 @@ import {
   CURRENT_LOCATION_ZOOM,
   CURRENT_LOCATION_ZOOM_DEEP,
   COORDINATE_THRESHOLD,
+  DEFAULT_PIN_COLOR,
 } from '../../constants';
 
 type LatLng = { lat: number; lng: number };
 
-const createPropertyPinIcon = (selected: boolean = false) => ({
-  url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-    <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <ellipse cx="16" cy="37" rx="6" ry="3" fill="rgba(0,0,0,0.2)"/>
-      <path d="M16 2C9.925 2 5 6.925 5 13C5 21.5 16 36 16 36S27 21.5 27 13C27 6.925 22.075 2 16 2Z"
-            fill="${selected ? '#1d4ed8' : '#2563eb'}" stroke="white" stroke-width="2"/>
-      <path d="M11 12L16 8L21 12V21H19V15H13V21H11V12Z" fill="white"/>
-    </svg>
-  `)}`,
-  scaledSize: new google.maps.Size(32, 40),
-  anchor: new google.maps.Point(16, 38),
-});
+/** A pin in a view's color; the selected pin is the same pin, a size larger. */
+const createPropertyPinIcon = (selected: boolean = false, color: string = DEFAULT_PIN_COLOR) => {
+  const scale = selected ? 1.2 : 1;
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+      <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="16" cy="37" rx="6" ry="3" fill="rgba(0,0,0,0.2)"/>
+        <path d="M16 2C9.925 2 5 6.925 5 13C5 21.5 16 36 16 36S27 21.5 27 13C27 6.925 22.075 2 16 2Z"
+              fill="${color}" stroke="white" stroke-width="2"/>
+        <path d="M11 12L16 8L21 12V21H19V15H13V21H11V12Z" fill="white"/>
+      </svg>
+    `)}`,
+    scaledSize: new google.maps.Size(32 * scale, 40 * scale),
+    anchor: new google.maps.Point(16 * scale, 38 * scale),
+  };
+};
 
 const isNear = (a: LatLng, b: LatLng) =>
   Math.abs(a.lat - b.lat) < COORDINATE_THRESHOLD && Math.abs(a.lng - b.lng) < COORDINATE_THRESHOLD;
@@ -103,6 +111,8 @@ function MapPage() {
   const router = useRouter();
   const { getMobileStyles, mobileClasses } = useMobileViewport();
   const { showToast } = useToast();
+  const views = useTagViews();
+  const [viewsOpen, setViewsOpen] = useState(false);
 
   const {
     mapCenter, setMapCenter, map, setMap, zoom, setZoom, mapType, setMapType,
@@ -348,6 +358,8 @@ function MapPage() {
     }
   }, [savedProperty, setSavedProperty, loadUserProperties, showToast]);
 
+  // On someone else's property, what you add is for the team by default.
+  const collaborating = Boolean(savedProperty?.user_id && views.userId && savedProperty.user_id !== views.userId);
   const fileActions = usePropertyFileActions({
     property: savedProperty,
     files: propertyFiles,
@@ -356,6 +368,7 @@ function MapPage() {
     setFolders,
     selectedFolder,
     ensurePropertyId,
+    defaultVisibility: collaborating ? 'shared' : 'private',
   });
 
   // ---------------------------------------------------------------------------
@@ -533,7 +546,16 @@ function MapPage() {
     setUserProperties(prev => prev.map(p => (p.id === updated.id ? updated : p)));
   }, [setSavedProperty, setUserProperties]);
 
+  /** Put the open property in exactly these views; pins and lists follow. */
+  const handlePropertyViewsChange = useCallback(async (property: Property, tagIds: string[]) => {
+    if (!property.id) return;
+    const stored = await views.setPropertyViews(property.id, tagIds);
+    setSavedProperty(prev => (prev && prev.id === property.id ? { ...prev, tag_ids: stored } : prev));
+    setUserProperties(prev => prev.map(p => (p.id === property.id ? { ...p, tag_ids: stored } : p)));
+  }, [views, setSavedProperty, setUserProperties]);
+
   const showInfoCard = Boolean(selectedProperty && address);
+  const overlaysHidden = showDropdown || showInfoCard || showDetailsModal;
 
   return (
     <div className="flex w-screen h-screen overflow-hidden">
@@ -602,11 +624,11 @@ function MapPage() {
                 ],
               }}
             >
-              {propertiesLoaded && userProperties.map(property => (
+              {propertiesLoaded && userProperties.filter(views.isVisible).map(property => (
                 <Marker
                   key={property.id || `temp-${property.lat}-${property.lng}`}
                   position={{ lat: property.lat, lng: property.lng }}
-                  icon={createPropertyPinIcon(selectedProperty?.id === property.id)}
+                  icon={createPropertyPinIcon(selectedProperty?.id === property.id, views.pinColor(property))}
                   onClick={() => selectProperty(property)}
                   onMouseOver={() => property.id && prefetchPropertyData(property.id, property)}
                   title={property.address}
@@ -638,14 +660,23 @@ function MapPage() {
               onPredictionsChange={setPredictions}
               onShowDropdownChange={setShowDropdown}
             />
+            {/* Phone: the view switches sit under the search field, like a maps app's category chips. */}
+            {!overlaysHidden && (
+              <ViewChips
+                onManage={() => setViewsOpen(true)}
+                className="sm:hidden absolute inset-x-0 z-30"
+                style={{ top: 'calc(var(--safe-top) + 64px)' }}
+              />
+            )}
             <MapControls
               mapType={mapType}
               onMapTypeChange={setMapType}
               onCurrentLocationClick={handleCurrentLocationClick}
-              hidden={showDropdown || showInfoCard || showDetailsModal}
+              hidden={overlaysHidden}
             />
           </>
         )}
+        <ViewsSheet open={viewsOpen} onClose={() => setViewsOpen(false)} />
 
         <MobileBottomNav onList={() => router.push('/list')} onMapTabReclick={handleMapTabReclick} />
 
@@ -697,6 +728,9 @@ function MapPage() {
             pendingUploads={fileActions.pendingUploads}
             onDismiss={fileActions.dismissPendingUpload}
             onPropertyRename={handlePropertyRename}
+            onPropertyViewsChange={handlePropertyViewsChange}
+            onFileVisibilityChange={fileActions.setFileVisibility}
+            onFolderVisibilityChange={fileActions.setFolderVisibility}
             onPropertySwitch={(property, files, switchedFolders) => {
               if (property.id) sheetHistory.open(property.id);
               setSavedProperty(property);

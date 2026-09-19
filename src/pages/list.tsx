@@ -5,22 +5,27 @@ import { ListView } from '../components/ListView';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { WebSidebar } from '../components/WebSidebar';
 import { PropertyDetailsModal } from '../components/PropertyDetailsModal';
+import { ViewChips } from '../components/ViewChips';
+import { ViewsSheet } from '../components/ViewsSheet';
 import type { Property, PropertyFile, PropertyFolder, PropertyWithFileCount } from '../../types';
 import { withAuth } from '../components/withAuth';
 import { useUserProperties } from '../hooks/useUserProperties';
 import { useSheetHistory } from '../hooks/useSheetHistory';
 import { usePropertyFileActions } from '../hooks/usePropertyFileActions';
+import { useTagViews } from '../hooks/useTagViews';
 import { getPropertyDataSync, setPropertyDataCache, prefetchPropertyData } from '../hooks/usePropertyPrefetch';
 import { propertyService } from '../services';
 import { useToast } from '../contexts/ToastContext';
 
 const toProperty = (p: Property | PropertyWithFileCount): Property => ({
   id: p.id,
+  user_id: p.user_id,
   address: p.address,
   lat: p.lat,
   lng: p.lng,
   label: p.label ?? null,
   notes: p.notes ?? null,
+  tag_ids: p.tag_ids ?? [],
 });
 
 function ListPage() {
@@ -30,9 +35,13 @@ function ListPage() {
   const [files, setFiles] = useState<PropertyFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<string>('master');
+  const [viewsOpen, setViewsOpen] = useState(false);
   const { showToast } = useToast();
+  const views = useTagViews();
   const { properties, loading: propertiesLoading, error: propertiesError, refreshProperties } = useUserProperties();
 
+  // On someone else's property, what you add is for the team by default.
+  const collaborating = Boolean(savedProperty?.user_id && views.userId && savedProperty.user_id !== views.userId);
   const fileActions = usePropertyFileActions({
     property: savedProperty,
     files,
@@ -40,6 +49,7 @@ function ListPage() {
     folders,
     setFolders,
     selectedFolder,
+    defaultVisibility: collaborating ? 'shared' : 'private',
   });
 
   // Warm the most recent properties (files, hero photo, first thumbnails) so
@@ -115,6 +125,13 @@ function ListPage() {
     await refreshProperties();
   }, [refreshProperties]);
 
+  const changePropertyViews = useCallback(async (property: Property, tagIds: string[]) => {
+    if (!property.id) return;
+    const stored = await views.setPropertyViews(property.id, tagIds);
+    setSavedProperty(prev => (prev && prev.id === property.id ? { ...prev, tag_ids: stored } : prev));
+    await refreshProperties();
+  }, [views, refreshProperties]);
+
   return (
     <div className="flex min-h-dvh bg-ground">
       <Head>
@@ -131,8 +148,10 @@ function ListPage() {
           loading={propertiesLoading}
           error={propertiesError}
           onPropertySelect={selectProperty}
+          toolbar={<ViewChips onManage={() => setViewsOpen(true)} className="sm:hidden -mx-3 mb-3" />}
         />
       </div>
+      <ViewsSheet open={viewsOpen} onClose={() => setViewsOpen(false)} />
       <PropertyDetailsModal
         isOpen={showDetailsModal}
         property={savedProperty}
@@ -154,6 +173,9 @@ function ListPage() {
         pendingUploads={fileActions.pendingUploads}
         onDismiss={fileActions.dismissPendingUpload}
         onPropertyRename={renameProperty}
+        onPropertyViewsChange={changePropertyViews}
+        onFileVisibilityChange={fileActions.setFileVisibility}
+        onFolderVisibilityChange={fileActions.setFolderVisibility}
         onPropertySwitch={(property, newFiles, newFolders) => {
           if (property.id) sheetHistory.open(property.id);
           setSavedProperty(toProperty(property));

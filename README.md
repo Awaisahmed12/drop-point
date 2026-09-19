@@ -39,4 +39,5 @@ NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=                  # optional, defaults to the 
 - Product requirements: `docs/product-requirements.md`
 - Security checklist: `docs/security-checklist.md`
 - Admin setup: `docs/admin-setup.md`
+- Collaboration, sharing and views: `docs/collaboration.md` (run `database/collaboration.sql` once)
 - Engineering quality and refactoring: `docs/engineering/quality-and-refactoring.md`
