@@ -6,13 +6,11 @@ import { useRouter } from 'next/router';
 import { MoveModal } from './MoveModal';
 import { FileIcon } from './FileIcon';
 import { FileThumbnail } from './FileThumbnail';
-import { PropertySwitcher } from './PropertySwitcher';
 import { FileMenu } from './FileMenu';
 import { FolderMenu } from './FolderMenu';
 import { RenameInput } from './RenameInput';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import { useResponsiveValue } from '../hooks/useResponsiveValue';
-import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
 import { useToast } from '../contexts/ToastContext';
 import { useInternalDrag } from '../hooks/useInternalDrag';
@@ -20,9 +18,9 @@ import { useSheetDrag } from '../hooks/useSheetDrag';
 import { useTagViews } from '../hooks/useTagViews';
 import { tryWithToast } from '../utils/tryWithToast';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection, Visibility } from '../../types';
-import type { PropertyWithFileCount } from '../../types';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
 import { tagsForProperty } from '../../utils/tagViews';
+import { REMINDER_PRESETS, addDays, describeDue, formatReminderDate, isDueSoon, todayIso } from '../../utils/reminders';
 import { getFileSignedUrl } from '../utils/supabaseClient';
 import { heroImageUrls } from '../hooks/usePropertyPrefetch';
 import { importFromGoogleDrive, preloadGoogleDrive, googleDriveAvailable } from '../utils/googleDrive';
@@ -31,6 +29,12 @@ import { ActionSheet, type ActionSheetItem } from './ActionSheet';
 import { InputAlert } from './InputAlert';
 
 /** Marks a folder or file the whole team can see. */
+const ReminderGlyph = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+  </svg>
+);
+
 const SharedGlyph = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <circle cx="9" cy="7" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0113 0" /><circle cx="17" cy="9" r="2.5" /><path d="M15 15.5a5 5 0 016.5 4.5" />
@@ -118,7 +122,6 @@ interface PropertyDetailsModalProps {
   onFileDelete: (file: PropertyFile) => void;
   onFileRename: (item: PropertyFile | PropertyFolder, newName: string) => Promise<void> | void;
   onFileMove?: (file: PropertyFile, targetFolderId: string | null) => Promise<void>;
-  onFileCopy?: (file: PropertyFile) => Promise<void>;
   onFolderCreate: (name: string) => Promise<void> | void;
   onFolderDelete: (folder: PropertyFolder) => void;
   
@@ -127,8 +130,6 @@ interface PropertyDetailsModalProps {
   onDismiss: (uploadId: string) => void;
   
   // Property switching
-  onPropertySwitch?: (property: PropertyWithFileCount, files: PropertyFile[], folders: PropertyFolder[]) => void;
-  onMapMove?: (lat: number, lng: number) => void;
   /** Rename the open property (null clears the custom name). */
   onPropertyRename?: (property: Property, label: string | null) => Promise<void>;
   /** Put the property in exactly these views. Only its owner may. */
@@ -142,6 +143,8 @@ interface PropertyDetailsModalProps {
   onFileVisibilityChange?: (file: PropertyFile, visibility: Visibility) => Promise<void>;
   /** Share a folder and its contents, or make them private. */
   onFolderVisibilityChange?: (folder: PropertyFolder, visibility: Visibility) => Promise<void>;
+  /** Set (or clear with null) the day to be reminded about a file. */
+  onFileReminderChange?: (file: PropertyFile, remindAt: string | null) => Promise<void>;
 }
 
 export const PropertyDetailsModal = ({ 
@@ -159,13 +162,10 @@ export const PropertyDetailsModal = ({
   onFileDelete,
   onFileRename,
   onFileMove,
-  onFileCopy,
   onFolderCreate,
   onFolderDelete,
   pendingUploads,
   onDismiss,
-  onPropertySwitch,
-  onMapMove,
   onPropertyRename,
   onPropertyViewsChange,
   onPropertyDelete,
@@ -173,6 +173,7 @@ export const PropertyDetailsModal = ({
   onViewsPromptShown,
   onFileVisibilityChange,
   onFolderVisibilityChange,
+  onFileReminderChange,
 }: PropertyDetailsModalProps) => {
   const { showToast } = useToast();
   const views = useTagViews();
@@ -272,7 +273,9 @@ export const PropertyDetailsModal = ({
 
   const [fabOpen, setFabOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [switcherOpen, setSwitcherOpen] = useState(false);
+  // "Set Reminder…": the file being asked about, then the preset sheet or the date alert.
+  const [reminderTarget, setReminderTarget] = useState<PropertyFile | null>(null);
+  const [reminderDateOpen, setReminderDateOpen] = useState(false);
   const [renamingProperty, setRenamingProperty] = useState(false);
   const [propertyLabelDraft, setPropertyLabelDraft] = useState('');
   const renameCancelledRef = useRef(false);
@@ -438,26 +441,9 @@ export const PropertyDetailsModal = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, imagePreview, files, loadImagePreview, leaveFileViewer]);
   
-  // View mode state with localStorage persistence
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('droppoint-view-mode');
-      return (saved === 'grid' || saved === 'list') ? saved : 'grid';
-    }
-    return 'grid';
-  });
-
-  // Save view mode preference
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('droppoint-view-mode', viewMode);
-    }
-  }, [viewMode]);
-
-  // Blanket fix: Close all menus when view mode changes
-  useEffect(() => {
-    closeMenus();
-  }, [viewMode, closeMenus]);
+  // One layout: the thumbnail grid. The list rendering stays below for
+  // desktop-table work later, but nothing switches to it.
+  const viewMode = 'grid' as 'list' | 'grid';
 
   // Blanket fix: Close all menus when modal closes or opens
   useEffect(() => {
@@ -473,27 +459,6 @@ export const PropertyDetailsModal = ({
   // Configuration hook
   const { streetViewEnabled, propertyImageEnabled } = useConfig();
 
-  // Property switching hook
-  const { switchToProperty } = usePropertySwitcher({
-    onMapMove,
-    onPropertyDataLoad: (property, files, folders) => {
-      // Clear search when switching properties
-      setSearchQuery('');
-      onPropertySwitch?.(property, files, folders);
-    },
-    onError: (error) => {
-      logger.error('Property switch error:', error);
-      showToast('Could not switch property. Please try again.');
-    },
-  });
-
-  // Convert current property to PropertyWithFileCount format
-  const currentPropertyWithFileCount: PropertyWithFileCount | null = property ? {
-    ...property,
-    file_count: files.length,
-    created_at: undefined, // PropertyWithFileCount doesn't have created_at
-    last_accessed: new Date().toISOString() // Current time as last accessed
-  } : null;
 
   // Global address parsing and formatting utility
   const parseAddress = (fullAddress: string) => {
@@ -1138,7 +1103,14 @@ export const PropertyDetailsModal = ({
     breadcrumbPath.unshift(current);
   }
 
-  const toggleViewMode = () => setViewMode(viewMode === 'list' ? 'grid' : 'list');
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    try {
+      await onFileUpload(e.target.files);
+    } catch (error) {
+      logger.error('File upload error:', error);
+    }
+  };
 
   const closeSheet = () => {
     onClose();
@@ -1205,6 +1177,19 @@ export const PropertyDetailsModal = ({
     }
   };
 
+  // Whoever may rename or delete an item may put a reminder on it.
+  const canEditItem = (item: PropertyFile | PropertyFolder) => isOwner || item.user_id === views.userId;
+  const today = todayIso();
+
+  const setReminder = async (remindAt: string | null) => {
+    const file = reminderTarget;
+    setReminderTarget(null);
+    setReminderDateOpen(false);
+    if (!file || !onFileReminderChange) return;
+    await onFileReminderChange(file, remindAt);
+    showToast(remindAt ? `Reminder set for ${formatReminderDate(remindAt, today)}` : 'Reminder removed', 'success');
+  };
+
   const toggleItemShared = (item: PropertyFile | PropertyFolder) => {
     const next: Visibility = item.visibility === 'shared' ? 'private' : 'shared';
     if ('file_name' in item) void onFileVisibilityChange?.(item, next);
@@ -1213,10 +1198,6 @@ export const PropertyDetailsModal = ({
 
   // Everything that isn't browsing files lives behind one "more" control.
   const moreGroups: ActionSheetItem[][] = [
-    [
-      { label: 'Switch Property…', onSelect: () => setSwitcherOpen(true) },
-      { label: viewMode === 'list' ? 'Show as Grid' : 'Show as List', onSelect: toggleViewMode },
-    ],
     [
       ...(onPropertyViewsChange && isOwner && property.id
         ? [{ label: 'Views…', onSelect: () => setViewsPickerOpen(true) }]
@@ -1606,13 +1587,27 @@ export const PropertyDetailsModal = ({
                 {/* Empty State */}
                 {sortedItems.length === 0 && !searchQuery && (
                   <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
-                    {selectedFolder === 'master' ? (
+                    {selectedFolder === 'master' && canEdit ? (
+                      // The first document is the onboarding's last step: one
+                      // filled button, and it opens the same "+" menu.
+                      <>
+                        <button
+                          type="button"
+                          className="ios-button ios-button-primary"
+                          onClick={() => setFabOpen(true)}
+                          aria-haspopup="menu"
+                        >
+                          Add Your First Document
+                        </button>
+                        <p className="text-footnote text-ink-2 mt-3 max-w-xs">Photos, PDFs, leases, inspections — anything for this property.</p>
+                      </>
+                    ) : selectedFolder === 'master' ? (
                       <>
                         <svg className="w-12 h-12 text-ink-3 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                         </svg>
                         <p className="text-subhead font-medium text-ink-2">No files yet</p>
-                        <p className="text-footnote text-ink-2 mt-1">Upload files or create folders to get started</p>
+                        <p className="text-footnote text-ink-2 mt-1">Nothing has been shared here yet</p>
                       </>
                     ) : (
                       <>
@@ -1860,7 +1855,7 @@ export const PropertyDetailsModal = ({
                                     setMoveFileTarget(file);
                                     setShowMoveModal(true);
                                   } : undefined}
-                                  onDuplicate={onFileCopy}
+                                  onSetReminder={onFileReminderChange && canEditItem(file) ? setReminderTarget : undefined}
                                   onDelete={onFileDelete}
                                   onToggleShared={onFileVisibilityChange && canShareItem(file) ? toggleItemShared : undefined}
                                   menuPosition={menuPosition[file.id] || {}}
@@ -2045,7 +2040,7 @@ export const PropertyDetailsModal = ({
                                     setMoveFileTarget(file);
                                     setShowMoveModal(true);
                                   } : undefined}
-                                  onDuplicate={onFileCopy}
+                                  onSetReminder={onFileReminderChange && canEditItem(file) ? setReminderTarget : undefined}
                                   onDelete={onFileDelete}
                                   onToggleShared={onFileVisibilityChange && canShareItem(file) ? toggleItemShared : undefined}
                                   menuPosition={menuPosition[file.id] || {}}
@@ -2054,6 +2049,14 @@ export const PropertyDetailsModal = ({
                                 />
                                 {propertyShared && file.visibility === 'shared' && (
                                   <span className="absolute bottom-1 left-1 w-5 h-5 rounded-full bg-surface-2 text-ink-2 flex items-center justify-center" title="Shared with everyone on this property"><SharedGlyph className="w-3 h-3" /></span>
+                                )}
+                                {file.remind_at && (
+                                  <span
+                                    className={`absolute bottom-1 right-1 w-5 h-5 rounded-full flex items-center justify-center ${isDueSoon(file.remind_at, today) ? 'bg-warning text-white' : 'bg-surface-2 text-ink-2'}`}
+                                    title={`Reminder ${describeDue(file.remind_at, today)}`}
+                                  >
+                                    <ReminderGlyph className="w-3 h-3" />
+                                  </span>
                                 )}
                               </div>
                               <div className="mt-2 text-center w-full">
@@ -2102,17 +2105,9 @@ export const PropertyDetailsModal = ({
           </div>
         </div>
 
-        {/* Hidden file input for upload */}
-        <input id="file-upload-input" type="file" className="hidden" onChange={async (e) => {
-          if (e.target.files) {
-            try {
-              await onFileUpload(e.target.files);
-            } catch (error) {
-              logger.error('File upload error:', error);
-              // You could add a toast notification here
-            }
-          }
-        }} multiple />
+        {/* Hidden file inputs for upload: the picker, and the camera on phones. */}
+        <input id="file-upload-input" type="file" className="hidden" onChange={handleFileInput} multiple />
+        <input id="camera-capture-input" type="file" className="hidden" accept="image/*" capture="environment" onChange={handleFileInput} />
 
         {/* Upload Progress Toasts - Apple-inspired design */}
         {pendingUploads.length > 0 && (
@@ -2354,6 +2349,8 @@ export const PropertyDetailsModal = ({
           title={selectedFolder === 'master' ? 'Add to this property' : `Add to “${folders.find(f => f.id === selectedFolder)?.name ?? 'folder'}”`}
           groups={[
             [
+              // In the field the document is usually a photo, so the camera comes first.
+              ...(isMobile ? [{ label: 'Take Photo', onSelect: () => document.getElementById('camera-capture-input')?.click() }] : []),
               { label: 'Upload Files…', onSelect: () => document.getElementById('file-upload-input')?.click() },
               ...(googleDriveAvailable ? [{ label: 'Import from Google Drive…', onSelect: importFromDrive }] : []),
             ],
@@ -2527,6 +2524,37 @@ export const PropertyDetailsModal = ({
         title={`Delete “${displayName}”? ${deleteSummary} This can’t be undone.`}
         groups={[[{ label: 'Delete Property', tone: 'danger', onSelect: deleteProperty }]]}
       />
+      {/* When to be reminded: three presets, a date, and Remove when one is set. */}
+      <ActionSheet
+        open={Boolean(reminderTarget) && !reminderDateOpen}
+        onClose={() => setReminderTarget(null)}
+        presentation="sheet"
+        title={reminderTarget?.remind_at
+          ? `Reminder for “${reminderTarget.file_name}” is ${describeDue(reminderTarget.remind_at, today)} (${formatReminderDate(reminderTarget.remind_at, today)}).`
+          : `Remind me about “${reminderTarget?.file_name ?? ''}”`}
+        groups={[
+          [
+            ...REMINDER_PRESETS.map(preset => ({ label: preset.label, onSelect: () => setReminder(addDays(today, preset.days)) })),
+            { label: 'Pick a Date…', onSelect: () => setReminderDateOpen(true) },
+          ],
+          ...(reminderTarget?.remind_at
+            ? [[{ label: 'Remove Reminder', tone: 'danger' as const, onSelect: () => setReminder(null) }]]
+            : []),
+        ]}
+      />
+      <InputAlert
+        open={reminderDateOpen}
+        title="Remind Me On"
+        message={reminderTarget ? `You’ll get an email about “${reminderTarget.file_name}”.` : undefined}
+        inputType="date"
+        initialValue={reminderTarget?.remind_at ?? addDays(today, 30)}
+        confirmLabel="Set"
+        onConfirm={async value => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Pick a date.';
+          await setReminder(value);
+        }}
+        onCancel={() => { setReminderDateOpen(false); setReminderTarget(null); }}
+      />
       <InputAlert
         open={newViewOpen}
         title="New View"
@@ -2548,14 +2576,6 @@ export const PropertyDetailsModal = ({
         }}
         onCancel={() => setNewViewOpen(false)}
       />
-      {currentPropertyWithFileCount && (
-        <PropertySwitcher
-          currentProperty={currentPropertyWithFileCount}
-          onPropertySelect={switchToProperty}
-          open={switcherOpen}
-          onClose={() => setSwitcherOpen(false)}
-        />
-      )}
 
       {/* Move Modal */}
       {showMoveModal && moveFileTarget && (

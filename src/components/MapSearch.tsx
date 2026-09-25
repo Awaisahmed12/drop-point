@@ -11,6 +11,12 @@ interface MapSearchProps {
   predictions: Prediction[];
   onPredictionsChange: (predictions: Prediction[]) => void;
   onShowDropdownChange?: (show: boolean) => void;
+  /** Replaces the default placeholder, e.g. while the user has no properties yet. */
+  placeholder?: string;
+  /** One line shown under the field; the first-launch nudge. */
+  hint?: string;
+  /** Focus the field on mount so the first thing a new user sees is the cursor. */
+  autoFocus?: boolean;
 }
 
 const isUserProperty = (prediction: Prediction): boolean =>
@@ -29,6 +35,9 @@ export const MapSearch = ({
   predictions,
   onPredictionsChange,
   onShowDropdownChange,
+  placeholder = 'Search for an address or property',
+  hint,
+  autoFocus = false,
 }: MapSearchProps) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -110,6 +119,12 @@ export const MapSearch = ({
       abortRef.current?.abort();
     };
   }, []);
+
+  // iOS only raises the keyboard for a focus inside a user gesture, so on a
+  // phone this places the cursor and the hint does the asking.
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
 
   const selectPrediction = useCallback((index: number) => {
     const prediction = predictions[index];
@@ -284,7 +299,7 @@ export const MapSearch = ({
             onFocus={handleFocus}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            placeholder="Search for an address or property"
+            placeholder={placeholder}
             // Placeholders disappear once the user types — explicit aria-label
             // gives screen readers a stable name.
             aria-label="Search address or saved property"
@@ -312,6 +327,9 @@ export const MapSearch = ({
         </div>
 
         {dropdownContent}
+        {hint && !showDropdown && (
+          <p className="mt-2 text-center text-footnote font-medium text-ink-2" aria-live="polite">{hint}</p>
+        )}
       </div>
     </div>
   );

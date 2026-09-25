@@ -17,7 +17,8 @@ interface ViewChipsProps {
  */
 export const ViewChips: React.FC<ViewChipsProps> = ({ onManage, className = '', style }) => {
   const { tags, hidden, loaded, toggleView } = useTagViews();
-  if (!loaded) return null;
+  // A lone "Views" button over the map is noise; the row appears with the first view.
+  if (!loaded || tags.length === 0) return null;
 
   const chip = (props: {
     key: string; label: string; on: boolean; color: string; onClick: () => void; ariaLabel?: string;

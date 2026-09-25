@@ -23,6 +23,7 @@ import { useModalState } from '../hooks/useModalState';
 import { useSheetHistory } from '../hooks/useSheetHistory';
 import { usePropertyFileActions } from '../hooks/usePropertyFileActions';
 import { useTagViews } from '../hooks/useTagViews';
+import { useUpcomingReminders } from '../hooks/useUpcomingReminders';
 import { prefetchPropertyData, getPropertyDataSync, setPropertyDataCache, warmHeroImage, invalidatePropertyCache } from '../hooks/usePropertyPrefetch';
 import { defaultViewsForNewProperty } from '../../utils/tagViews';
 import { useToast } from '../contexts/ToastContext';
@@ -47,7 +48,8 @@ import {
 type LatLng = { lat: number; lng: number };
 
 /** A pin in a view's color; the selected pin is the same pin, a size larger. */
-const createPropertyPinIcon = (selected: boolean = false, color: string = DEFAULT_PIN_COLOR) => {
+/** `dot` marks a pin whose property has a reminder coming up. */
+const createPropertyPinIcon = (selected: boolean = false, color: string = DEFAULT_PIN_COLOR, dot: boolean = false) => {
   const scale = selected ? 1.2 : 1;
   return {
     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
@@ -56,6 +58,7 @@ const createPropertyPinIcon = (selected: boolean = false, color: string = DEFAUL
         <path d="M16 2C9.925 2 5 6.925 5 13C5 21.5 16 36 16 36S27 21.5 27 13C27 6.925 22.075 2 16 2Z"
               fill="${color}" stroke="white" stroke-width="2"/>
         <path d="M11 12L16 8L21 12V21H19V15H13V21H11V12Z" fill="white"/>
+        ${dot ? '<circle cx="26" cy="6" r="5" fill="#ff9500" stroke="white" stroke-width="2"/>' : ''}
       </svg>
     `)}`,
     scaledSize: new google.maps.Size(32 * scale, 40 * scale),
@@ -113,6 +116,7 @@ function MapPage() {
   const { getMobileStyles, mobileClasses } = useMobileViewport();
   const { showToast } = useToast();
   const views = useTagViews();
+  const reminders = useUpcomingReminders();
   const [viewsOpen, setViewsOpen] = useState(false);
   const [savingPin, setSavingPin] = useState(false);
   // A pin that was just saved with several views to choose from: the sheet asks once.
@@ -609,6 +613,9 @@ function MapPage() {
 
   const showInfoCard = Boolean(selectedProperty && address);
   const overlaysHidden = showDropdown || showInfoCard || showDetailsModal;
+  // First launch: no properties yet, so the search field is the whole screen's
+  // job. It takes the cursor and says what to type; the chips stay out of the way.
+  const firstProperty = propertiesLoaded && userProperties.length === 0;
 
   return (
     <div className="flex w-screen h-screen overflow-hidden">
@@ -681,7 +688,7 @@ function MapPage() {
                 <Marker
                   key={property.id || `temp-${property.lat}-${property.lng}`}
                   position={{ lat: property.lat, lng: property.lng }}
-                  icon={createPropertyPinIcon(selectedProperty?.id === property.id, views.pinColor(property))}
+                  icon={createPropertyPinIcon(selectedProperty?.id === property.id, views.pinColor(property), Boolean(property.id && reminders.byProperty.has(property.id)))}
                   onClick={() => selectProperty(property)}
                   onMouseOver={() => property.id && prefetchPropertyData(property.id, property)}
                   title={property.address}
@@ -712,9 +719,12 @@ function MapPage() {
               predictions={predictions}
               onPredictionsChange={setPredictions}
               onShowDropdownChange={setShowDropdown}
+              placeholder={firstProperty ? 'Address of a property you manage' : undefined}
+              hint={firstProperty && !overlaysHidden ? 'Start with one property.' : undefined}
+              autoFocus={firstProperty}
             />
             {/* Phone: the view switches sit under the search field, like a maps app's category chips. */}
-            {!overlaysHidden && (
+            {!overlaysHidden && !firstProperty && (
               <ViewChips
                 onManage={() => setViewsOpen(true)}
                 className="sm:hidden absolute inset-x-0 z-30"
@@ -776,7 +786,6 @@ function MapPage() {
             onFileDelete={fileActions.deleteFile}
             onFileRename={fileActions.renameItem}
             onFileMove={fileActions.moveFile}
-            onFileCopy={fileActions.copyFile}
             onFolderCreate={fileActions.createFolder}
             onFolderDelete={fileActions.deleteFolder}
             pendingUploads={fileActions.pendingUploads}
@@ -788,20 +797,9 @@ function MapPage() {
             onViewsPromptShown={() => setViewsPromptId(null)}
             onFileVisibilityChange={fileActions.setFileVisibility}
             onFolderVisibilityChange={fileActions.setFolderVisibility}
-            onPropertySwitch={(property, files, switchedFolders) => {
-              if (property.id) sheetHistory.open(property.id);
-              setSavedProperty(property);
-              setPropertyFiles(files);
-              setFolders(switchedFolders);
-              setSelectedFolder('master');
-              setFoldersLoading(false);
-              setFilesLoading(false);
-              setAddress(property.address);
-              setSnappedLatLng({ lat: property.lat, lng: property.lng });
-            }}
-            onMapMove={(lat, lng) => {
-              setMapCenter({ lat, lng });
-              map?.panTo({ lat, lng });
+            onFileReminderChange={async (file, remindAt) => {
+              await fileActions.setFileReminder(file, remindAt);
+              await reminders.refresh();
             }}
           />
         </ErrorBoundary>

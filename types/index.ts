@@ -65,6 +65,14 @@ export type PropertyFile = {
   modified_at?: string;
   /** Private to the uploader unless 'shared'. Missing on rows from before the migration = private. */
   visibility?: Visibility;
+  /** Calendar day (`YYYY-MM-DD`) to be reminded about this document; null or missing = none. */
+  remind_at?: string | null;
+};
+
+/** One row of the Upcoming list: a document with a reminder, and where it lives. */
+export type UpcomingReminder = {
+  file: PropertyFile;
+  property_id: string;
 };
 
 // Prediction type for Google Places API

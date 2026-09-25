@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { ChevronRightIcon } from '@heroicons/react/24/outline';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { WebSidebar } from '../components/WebSidebar';
-import { ActionSheet } from '../components/ActionSheet';
 import { supabase } from '../utils/supabaseClient';
 import { namesFromUser } from '../utils/profile';
 import { getUserUsageBytes, formatBytes } from '../utils/usage';
@@ -13,14 +12,6 @@ import { withAuth } from '../components/withAuth';
 import { useToast } from '../contexts/ToastContext';
 import { resetTagViews } from '../hooks/useTagViews';
 import { logger } from '../utils/logger';
-
-// One question at a time, asked only when the user taps the row.
-const PROFILE_QUESTIONS = {
-  userType: { label: 'I’m a', options: ['Real Estate Agent', 'Property Manager', 'Investor', 'Homeowner', 'Developer', 'Admin', 'Other'] },
-  propertyCount: { label: 'I manage', options: ['1–5 properties', '6–20 properties', '21–100 properties', '100+ properties'] },
-  useCase: { label: 'I use it for', options: ['Document storage', 'Client management', 'Property tracking', 'Portfolio organization', 'Team collaboration', 'Personal use'] },
-} as const;
-type ProfileKey = keyof typeof PROFILE_QUESTIONS;
 
 function getAvatarColor(str: string): string {
   const palette = ['#0a7aff', '#5856d6', '#34c759', '#ff9500', '#ff2d55', '#af52de', '#00c7be', '#ff3b30'];
@@ -31,7 +22,9 @@ function getAvatarColor(str: string): string {
 
 /**
  * Account: an avatar hero on a wash of the user's color, then grouped lists.
- * One value per row, pickers as action sheets, sign out on its own at the end.
+ * Storage, then sign out on its own at the end. The profile questions that
+ * used to sit here are gone for the first version; `user_profiles` keeps
+ * the columns.
  */
 function AccountPage() {
   const { showToast } = useToast();
@@ -42,9 +35,7 @@ function AccountPage() {
   const [lastName, setLastName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameSaving, setNameSaving] = useState(false);
-  const [profile, setProfile] = useState<Record<ProfileKey, string>>({ userType: '', propertyCount: '', useCase: '' });
-  const [picker, setPicker] = useState<ProfileKey | null>(null);
-  const pickerAnchor = useRef<HTMLElement | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -57,12 +48,10 @@ function AccountPage() {
       try {
         const { data } = await supabase
           .from('user_profiles')
-          .select('user_type, property_count, use_case')
+          .select('user_type')
           .eq('user_id', user.id)
           .single();
-        if (data) {
-          setProfile({ userType: data.user_type || '', propertyCount: data.property_count || '', useCase: data.use_case || '' });
-        }
+        setIsAdmin(data?.user_type === 'Admin');
       } catch {}
       try {
         setUsageBytes(await getUserUsageBytes(user.id));
@@ -89,27 +78,6 @@ function AccountPage() {
     }
   };
 
-  const saveProfileAnswer = async (key: ProfileKey, value: string) => {
-    const next = { ...profile, [key]: profile[key] === value ? '' : value };
-    setProfile(next);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({
-          user_type: next.userType || null,
-          property_count: next.propertyCount || null,
-          use_case: next.useCase || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id);
-      if (error) throw error;
-    } catch {
-      showToast('Couldn’t save. Please try again.');
-    }
-  };
-
   const signOut = async () => {
     try {
       try { sessionStorage.clear(); } catch {}
@@ -126,14 +94,6 @@ function AccountPage() {
     ? displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : (email?.[0] ?? '?').toUpperCase();
   const avatarColor = getAvatarColor(displayName || email || '?');
-
-  const valueRow = (key: ProfileKey) => (
-    <button key={key} type="button" className="ios-row ios-row-press" aria-haspopup="menu" onClick={e => { pickerAnchor.current = e.currentTarget; setPicker(key); }}>
-      <span className="flex-1 text-body whitespace-nowrap">{PROFILE_QUESTIONS[key].label}</span>
-      <span className="text-body text-ink-2 truncate max-w-[55%]">{profile[key] || 'Choose'}</span>
-      <ChevronRightIcon className="ios-chevron w-4 h-4" strokeWidth={2.5} />
-    </button>
-  );
 
   return (
     <div className="flex min-h-dvh bg-ground">
@@ -226,16 +186,7 @@ function AccountPage() {
                 </div>
               </div>
 
-              {/* About you */}
-              <div>
-                <div className="ios-group-label">About you</div>
-                <div className="ios-group">
-                  {(Object.keys(PROFILE_QUESTIONS) as ProfileKey[]).map(valueRow)}
-                </div>
-                <p className="text-footnote text-ink-2 px-4 pt-2">Optional. Helps us build the right things for you.</p>
-              </div>
-
-              {profile.userType === 'Admin' && (
+              {isAdmin && (
                 <div className="ios-group">
                   <Link href="/admin" className="ios-row ios-row-press">
                     <span className="flex-1 text-body">Admin configuration</span>
@@ -254,23 +205,6 @@ function AccountPage() {
         </div>
         <MobileBottomNav />
       </div>
-
-      {picker && (
-        <ActionSheet
-          open
-          onClose={() => setPicker(null)}
-          presentation="popover"
-          anchorRef={pickerAnchor}
-          title={PROFILE_QUESTIONS[picker].label}
-          groups={[
-            PROFILE_QUESTIONS[picker].options.map(option => ({
-              label: option,
-              selected: profile[picker] === option,
-              onSelect: () => saveProfileAnswer(picker, option),
-            })),
-          ]}
-        />
-      )}
     </div>
   );
 }

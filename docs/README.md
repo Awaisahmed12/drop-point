@@ -7,5 +7,6 @@ This folder contains the canonical documentation for DropPoint. If you are looki
 - Security checklist: `docs/security-checklist.md`
 - Admin setup: `docs/admin-setup.md`
 - Collaboration, sharing and views: `docs/collaboration.md`
+- Reminders on documents and the daily email: `docs/reminders.md`
 - Engineering quality and refactoring: `docs/engineering/quality-and-refactoring.md`
 - Architecture decision (monolith vs. split backend): `docs/architecture-decision.md`

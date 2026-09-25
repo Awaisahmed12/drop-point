@@ -56,4 +56,4 @@ Who may do what:
 
 - Tagging individual files: the `file_tags` table and its policies exist; there is no interface for it yet.
 - Names of teammates: member rows show the email. Profiles are private to their owner, so a display name would need a small public-profile view.
-- Notifications when something is shared with you.
+- Notifications when something is shared with you. (Reminders on documents do email; see `docs/reminders.md`.)
