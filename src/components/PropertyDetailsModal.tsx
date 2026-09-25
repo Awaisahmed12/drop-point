@@ -1140,6 +1140,15 @@ export const PropertyDetailsModal = ({
 
   const toggleViewMode = () => setViewMode(viewMode === 'list' ? 'grid' : 'list');
 
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    try {
+      await onFileUpload(e.target.files);
+    } catch (error) {
+      logger.error('File upload error:', error);
+    }
+  };
+
   const closeSheet = () => {
     onClose();
     setCreatingFolder(false);
@@ -1606,13 +1615,27 @@ export const PropertyDetailsModal = ({
                 {/* Empty State */}
                 {sortedItems.length === 0 && !searchQuery && (
                   <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
-                    {selectedFolder === 'master' ? (
+                    {selectedFolder === 'master' && canEdit ? (
+                      // The first document is the onboarding's last step: one
+                      // filled button, and it opens the same "+" menu.
+                      <>
+                        <button
+                          type="button"
+                          className="ios-button ios-button-primary"
+                          onClick={() => setFabOpen(true)}
+                          aria-haspopup="menu"
+                        >
+                          Add Your First Document
+                        </button>
+                        <p className="text-footnote text-ink-2 mt-3 max-w-xs">Photos, PDFs, leases, inspections — anything for this property.</p>
+                      </>
+                    ) : selectedFolder === 'master' ? (
                       <>
                         <svg className="w-12 h-12 text-ink-3 mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                         </svg>
                         <p className="text-subhead font-medium text-ink-2">No files yet</p>
-                        <p className="text-footnote text-ink-2 mt-1">Upload files or create folders to get started</p>
+                        <p className="text-footnote text-ink-2 mt-1">Nothing has been shared here yet</p>
                       </>
                     ) : (
                       <>
@@ -2102,17 +2125,9 @@ export const PropertyDetailsModal = ({
           </div>
         </div>
 
-        {/* Hidden file input for upload */}
-        <input id="file-upload-input" type="file" className="hidden" onChange={async (e) => {
-          if (e.target.files) {
-            try {
-              await onFileUpload(e.target.files);
-            } catch (error) {
-              logger.error('File upload error:', error);
-              // You could add a toast notification here
-            }
-          }
-        }} multiple />
+        {/* Hidden file inputs for upload: the picker, and the camera on phones. */}
+        <input id="file-upload-input" type="file" className="hidden" onChange={handleFileInput} multiple />
+        <input id="camera-capture-input" type="file" className="hidden" accept="image/*" capture="environment" onChange={handleFileInput} />
 
         {/* Upload Progress Toasts - Apple-inspired design */}
         {pendingUploads.length > 0 && (
@@ -2354,6 +2369,8 @@ export const PropertyDetailsModal = ({
           title={selectedFolder === 'master' ? 'Add to this property' : `Add to “${folders.find(f => f.id === selectedFolder)?.name ?? 'folder'}”`}
           groups={[
             [
+              // In the field the document is usually a photo, so the camera comes first.
+              ...(isMobile ? [{ label: 'Take Photo', onSelect: () => document.getElementById('camera-capture-input')?.click() }] : []),
               { label: 'Upload Files…', onSelect: () => document.getElementById('file-upload-input')?.click() },
               ...(googleDriveAvailable ? [{ label: 'Import from Google Drive…', onSelect: importFromDrive }] : []),
             ],
