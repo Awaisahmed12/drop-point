@@ -609,6 +609,9 @@ function MapPage() {
 
   const showInfoCard = Boolean(selectedProperty && address);
   const overlaysHidden = showDropdown || showInfoCard || showDetailsModal;
+  // First launch: no properties yet, so the search field is the whole screen's
+  // job. It takes the cursor and says what to type; the chips stay out of the way.
+  const firstProperty = propertiesLoaded && userProperties.length === 0;
 
   return (
     <div className="flex w-screen h-screen overflow-hidden">
@@ -712,9 +715,12 @@ function MapPage() {
               predictions={predictions}
               onPredictionsChange={setPredictions}
               onShowDropdownChange={setShowDropdown}
+              placeholder={firstProperty ? 'Address of a property you manage' : undefined}
+              hint={firstProperty && !overlaysHidden ? 'Start with one property.' : undefined}
+              autoFocus={firstProperty}
             />
             {/* Phone: the view switches sit under the search field, like a maps app's category chips. */}
-            {!overlaysHidden && (
+            {!overlaysHidden && !firstProperty && (
               <ViewChips
                 onManage={() => setViewsOpen(true)}
                 className="sm:hidden absolute inset-x-0 z-30"
