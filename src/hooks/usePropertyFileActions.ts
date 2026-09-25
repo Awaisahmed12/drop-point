@@ -236,6 +236,18 @@ export function usePropertyFileActions({
     });
   }, [files, folders, property, folderIdForWrites, visibilityForWrites, resolvePropertyId, startSingleUpload, showToast]);
 
+  /** Set or clear (null) the day to be reminded about a file. Toasts on failure. */
+  const setFileReminder = useCallback(async (file: PropertyFile, remindAt: string | null) => {
+    try {
+      const updated = await fileService.setReminder(file, remindAt);
+      setFiles(prev => prev.map(f => (f.id === file.id ? updated : f)));
+      if (file.property_id) invalidatePropertyCache(file.property_id);
+    } catch (error) {
+      logger.error('[REMINDER] Failed to set reminder:', error);
+      showToast(remindAt ? 'Couldn’t set the reminder. Please try again.' : 'Couldn’t remove the reminder. Please try again.');
+    }
+  }, [setFiles, showToast]);
+
   /** Throws on failure so the caller can show a contextual message. */
   const renameItem = useCallback(async (item: PropertyFile | PropertyFolder, newName: string) => {
     const trimmed = newName.trim();
@@ -388,6 +400,7 @@ export function usePropertyFileActions({
     moveFile,
     copyFile,
     setFileVisibility,
+    setFileReminder,
     setFolderVisibility,
   };
 }

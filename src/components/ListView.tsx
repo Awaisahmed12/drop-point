@@ -6,7 +6,9 @@ import { GOOGLE_MAPS_API_KEY } from '../../constants';
 import { prefetchPropertyData } from '../hooks/usePropertyPrefetch';
 import { useTagViews } from '../hooks/useTagViews';
 import { tagsForProperty } from '../../utils/tagViews';
-import type { PropertyWithFileCount } from '../../types';
+import type { PropertyFile, PropertyWithFileCount } from '../../types';
+import { describeDue, daysUntil, todayIso } from '../../utils/reminders';
+import { FileIcon } from './FileIcon';
 
 interface ListViewProps {
   /** Every property the person can see; switched-off views are applied here. */
@@ -16,6 +18,10 @@ interface ListViewProps {
   onPropertySelect: (property: PropertyWithFileCount) => void;
   /** Rendered between the title and the search field (the phone's view chips). */
   toolbar?: React.ReactNode;
+  /** Documents with a reminder due soon, soonest first; the Upcoming list. */
+  upcoming?: PropertyFile[];
+  /** Open a property on one of its files (from the Upcoming list). */
+  onOpenFile?: (propertyId: string, fileId: string) => void;
 }
 
 const parseAddress = (fullAddress: string) => {
@@ -39,16 +45,23 @@ const swapToFallback = (e: React.SyntheticEvent<HTMLImageElement>, fallbackSrc: 
 
 const fileCountLabel = (n: number) => `${n} ${n === 1 ? 'file' : 'files'}`;
 
+const ChevronGlyph = () => (
+  <svg className="ios-chevron w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M9 6l6 6-6 6" />
+  </svg>
+);
+
 /**
  * The Properties screen: a large title, a floating glass search capsule, and
  * one photo card per property with its name set into the picture, the same
  * language as the property sheet's hero. Tapping a card opens it. Cards are
  * content, so they use standard materials, not glass.
  */
-export const ListView = ({ properties, loading, error, onPropertySelect, toolbar }: ListViewProps) => {
+export const ListView = ({ properties, loading, error, onPropertySelect, toolbar, upcoming = [], onOpenFile }: ListViewProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const views = useTagViews();
+  const dueSoon = new Set(upcoming.map(f => f.property_id));
 
   const query = searchQuery.toLowerCase().trim();
   const shown = properties.filter(views.isVisible);
@@ -119,6 +132,43 @@ export const ListView = ({ properties, loading, error, onPropertySelect, toolbar
 
       {toolbar}
 
+      {/* Upcoming: reminders due in the next 30 days, at most three, each one tap from its file. */}
+      {upcoming.length > 0 && onOpenFile && !searchQuery && (() => {
+        const today = todayIso();
+        const byId = new Map(properties.map(p => [p.id, p]));
+        const rows = upcoming.filter(f => byId.has(f.property_id)).slice(0, 3);
+        if (rows.length === 0) return null;
+        return (
+          <div className="mb-4 sm:mb-6 sm:max-w-sm">
+            <div className="ios-group-label">Upcoming</div>
+            <div className="ios-group">
+              {rows.map(file => {
+                const property = byId.get(file.property_id)!;
+                const where = property.label || parseAddress(property.address).street;
+                const overdue = daysUntil(file.remind_at!, today) < 0;
+                return (
+                  <button
+                    key={file.id}
+                    type="button"
+                    className="ios-row ios-row-press gap-3"
+                    onClick={() => onOpenFile(file.property_id, file.id)}
+                  >
+                    <span className="flex-shrink-0"><FileIcon type={file.file_name.split(".").pop() ?? ""} size={28} /></span>
+                    <span className="flex-1 min-w-0 text-left">
+                      <span className="block text-body truncate">{file.file_name}</span>
+                      <span className={`block text-footnote truncate ${overdue ? 'text-warning' : 'text-ink-2'}`}>
+                        {where} · {describeDue(file.remind_at!, today)}
+                      </span>
+                    </span>
+                    <ChevronGlyph />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Floating glass search: stays put while cards scroll beneath it. */}
       <div className="sticky z-20 mb-4 sm:mb-6 sm:max-w-sm" style={{ top: 'calc(var(--safe-top) + 8px)' }}>
         <div className="relative glass rounded-full">
@@ -168,8 +218,9 @@ export const ListView = ({ properties, loading, error, onPropertySelect, toolbar
                   onError={e => swapToFallback(e, staticMapUrl(property))}
                 />
                 <div className="hero-scrim absolute inset-x-0 bottom-0 h-[75%]" />
-                <span className="absolute top-3 left-3 rounded-full px-3 py-1 text-footnote font-semibold bg-black/45 text-white">
+                <span className="absolute top-3 left-3 rounded-full px-3 py-1 text-footnote font-semibold bg-black/45 text-white flex items-center gap-1.5">
                   {fileCountLabel(property.file_count)}
+                  {dueSoon.has(property.id ?? '') && <span className="w-2 h-2 rounded-full bg-warning" title="A reminder is coming up" />}
                 </span>
                 {shared && (
                   <span className="absolute top-3 right-3 rounded-full px-2.5 py-1 text-footnote font-semibold bg-black/45 text-white flex items-center gap-1">

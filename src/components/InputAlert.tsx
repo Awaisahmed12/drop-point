@@ -7,7 +7,7 @@ interface InputAlertProps {
   placeholder?: string;
   initialValue?: string;
   confirmLabel?: string;
-  inputType?: 'text' | 'email';
+  inputType?: 'text' | 'email' | 'date';
   /** Return an error message to keep the alert open, or nothing to close it. */
   onConfirm: (value: string) => Promise<string | void> | string | void;
   onCancel: () => void;
@@ -91,6 +91,7 @@ export const InputAlert: React.FC<InputAlertProps> = ({
             inputMode={inputType === 'email' ? 'email' : undefined}
             autoCapitalize={inputType === 'email' ? 'none' : undefined}
             autoComplete={inputType === 'email' ? 'email' : 'off'}
+            min={inputType === 'date' ? new Date().toISOString().slice(0, 10) : undefined}
             className="mt-3 w-full h-8 rounded-md border border-hairline bg-surface px-2 text-subhead text-ink focus:outline-none focus:border-accent"
             placeholder={placeholder}
             value={value}

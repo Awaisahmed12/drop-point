@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => {
     ),
     copyFile: vi.fn(async (file: File_, name: string) => ({ ...file, id: 'copy', file_name: name })),
     setVisibility: vi.fn(async (file: File_, visibility: string) => ({ ...file, visibility })),
+    setReminder: vi.fn(async (file: File_, remindAt: string | null) => ({ ...file, remind_at: remindAt })),
   };
   const folderService = {
     createFolder: vi.fn(async (propertyId: string, name: string, parentId: string | null, visibility?: string) => ({
@@ -176,6 +177,22 @@ describe('usePropertyFileActions', () => {
     });
     await flush();
     expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('sets and clears a reminder on a file and updates local state', async () => {
+    const { result } = renderHook(() => useHarness({ files: [file({})] }));
+
+    await act(async () => { await result.current.actions.setFileReminder(file({}), '2027-01-15'); });
+    expect(fileService.setReminder).toHaveBeenCalledWith(expect.objectContaining({ id: 'f1' }), '2027-01-15');
+    expect(result.current.files[0].remind_at).toBe('2027-01-15');
+    expect(invalidatePropertyCache).toHaveBeenCalledWith('prop-1');
+
+    await act(async () => { await result.current.actions.setFileReminder(result.current.files[0], null); });
+    expect(result.current.files[0].remind_at).toBeNull();
+
+    fileService.setReminder.mockRejectedValueOnce(new Error('rls'));
+    await act(async () => { await result.current.actions.setFileReminder(file({}), '2027-02-01'); });
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/couldn.t set the reminder/i));
   });
 
   it('persists an unsaved pin before the first upload, and aborts if that fails', async () => {

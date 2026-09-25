@@ -12,6 +12,8 @@ interface FileMenuProps {
   onRename: (file: PropertyFile) => void;
   onMove?: (file: PropertyFile) => void;
   onDuplicate?: (file: PropertyFile) => void;
+  /** Choose a day to be reminded about this file; offered to whoever may edit it. */
+  onSetReminder?: (file: PropertyFile) => void;
   onDelete: (file: PropertyFile) => void;
   /** Flip the file between private and shared with everyone on the property. Only offered on shared properties. */
   onToggleShared?: (file: PropertyFile) => void;
@@ -39,6 +41,7 @@ export const FileMenu: React.FC<FileMenuProps> = ({
   onRename,
   onMove,
   onDuplicate,
+  onSetReminder,
   onDelete,
   onToggleShared,
   presentation = 'popover',
@@ -85,6 +88,13 @@ export const FileMenu: React.FC<FileMenuProps> = ({
             label: 'Duplicate',
             onSelect: () => onDuplicate(file),
             icon: <Icon d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" extra={<rect x="9" y="9" width="11" height="11" rx="2" />} />,
+          }]
+        : []),
+      ...(onSetReminder
+        ? [{
+            label: file.remind_at ? 'Change Reminder…' : 'Set Reminder…',
+            onSelect: () => onSetReminder(file),
+            icon: <Icon d="M12 8v4l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
           }]
         : []),
     ],

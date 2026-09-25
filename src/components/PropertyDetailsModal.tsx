@@ -20,6 +20,7 @@ import { tryWithToast } from '../utils/tryWithToast';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection, Visibility } from '../../types';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
 import { tagsForProperty } from '../../utils/tagViews';
+import { REMINDER_PRESETS, addDays, describeDue, formatReminderDate, isDueSoon, todayIso } from '../../utils/reminders';
 import { getFileSignedUrl } from '../utils/supabaseClient';
 import { heroImageUrls } from '../hooks/usePropertyPrefetch';
 import { importFromGoogleDrive, preloadGoogleDrive, googleDriveAvailable } from '../utils/googleDrive';
@@ -28,6 +29,12 @@ import { ActionSheet, type ActionSheetItem } from './ActionSheet';
 import { InputAlert } from './InputAlert';
 
 /** Marks a folder or file the whole team can see. */
+const ReminderGlyph = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+  </svg>
+);
+
 const SharedGlyph = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <circle cx="9" cy="7" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0113 0" /><circle cx="17" cy="9" r="2.5" /><path d="M15 15.5a5 5 0 016.5 4.5" />
@@ -136,6 +143,8 @@ interface PropertyDetailsModalProps {
   onFileVisibilityChange?: (file: PropertyFile, visibility: Visibility) => Promise<void>;
   /** Share a folder and its contents, or make them private. */
   onFolderVisibilityChange?: (folder: PropertyFolder, visibility: Visibility) => Promise<void>;
+  /** Set (or clear with null) the day to be reminded about a file. */
+  onFileReminderChange?: (file: PropertyFile, remindAt: string | null) => Promise<void>;
 }
 
 export const PropertyDetailsModal = ({ 
@@ -164,6 +173,7 @@ export const PropertyDetailsModal = ({
   onViewsPromptShown,
   onFileVisibilityChange,
   onFolderVisibilityChange,
+  onFileReminderChange,
 }: PropertyDetailsModalProps) => {
   const { showToast } = useToast();
   const views = useTagViews();
@@ -263,6 +273,9 @@ export const PropertyDetailsModal = ({
 
   const [fabOpen, setFabOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  // "Set Reminder…": the file being asked about, then the preset sheet or the date alert.
+  const [reminderTarget, setReminderTarget] = useState<PropertyFile | null>(null);
+  const [reminderDateOpen, setReminderDateOpen] = useState(false);
   const [renamingProperty, setRenamingProperty] = useState(false);
   const [propertyLabelDraft, setPropertyLabelDraft] = useState('');
   const renameCancelledRef = useRef(false);
@@ -1164,6 +1177,19 @@ export const PropertyDetailsModal = ({
     }
   };
 
+  // Whoever may rename or delete an item may put a reminder on it.
+  const canEditItem = (item: PropertyFile | PropertyFolder) => isOwner || item.user_id === views.userId;
+  const today = todayIso();
+
+  const setReminder = async (remindAt: string | null) => {
+    const file = reminderTarget;
+    setReminderTarget(null);
+    setReminderDateOpen(false);
+    if (!file || !onFileReminderChange) return;
+    await onFileReminderChange(file, remindAt);
+    showToast(remindAt ? `Reminder set for ${formatReminderDate(remindAt, today)}` : 'Reminder removed', 'success');
+  };
+
   const toggleItemShared = (item: PropertyFile | PropertyFolder) => {
     const next: Visibility = item.visibility === 'shared' ? 'private' : 'shared';
     if ('file_name' in item) void onFileVisibilityChange?.(item, next);
@@ -1829,6 +1855,7 @@ export const PropertyDetailsModal = ({
                                     setMoveFileTarget(file);
                                     setShowMoveModal(true);
                                   } : undefined}
+                                  onSetReminder={onFileReminderChange && canEditItem(file) ? setReminderTarget : undefined}
                                   onDelete={onFileDelete}
                                   onToggleShared={onFileVisibilityChange && canShareItem(file) ? toggleItemShared : undefined}
                                   menuPosition={menuPosition[file.id] || {}}
@@ -2013,6 +2040,7 @@ export const PropertyDetailsModal = ({
                                     setMoveFileTarget(file);
                                     setShowMoveModal(true);
                                   } : undefined}
+                                  onSetReminder={onFileReminderChange && canEditItem(file) ? setReminderTarget : undefined}
                                   onDelete={onFileDelete}
                                   onToggleShared={onFileVisibilityChange && canShareItem(file) ? toggleItemShared : undefined}
                                   menuPosition={menuPosition[file.id] || {}}
@@ -2021,6 +2049,14 @@ export const PropertyDetailsModal = ({
                                 />
                                 {propertyShared && file.visibility === 'shared' && (
                                   <span className="absolute bottom-1 left-1 w-5 h-5 rounded-full bg-surface-2 text-ink-2 flex items-center justify-center" title="Shared with everyone on this property"><SharedGlyph className="w-3 h-3" /></span>
+                                )}
+                                {file.remind_at && (
+                                  <span
+                                    className={`absolute bottom-1 right-1 w-5 h-5 rounded-full flex items-center justify-center ${isDueSoon(file.remind_at, today) ? 'bg-warning text-white' : 'bg-surface-2 text-ink-2'}`}
+                                    title={`Reminder ${describeDue(file.remind_at, today)}`}
+                                  >
+                                    <ReminderGlyph className="w-3 h-3" />
+                                  </span>
                                 )}
                               </div>
                               <div className="mt-2 text-center w-full">
@@ -2487,6 +2523,37 @@ export const PropertyDetailsModal = ({
         presentation="sheet"
         title={`Delete “${displayName}”? ${deleteSummary} This can’t be undone.`}
         groups={[[{ label: 'Delete Property', tone: 'danger', onSelect: deleteProperty }]]}
+      />
+      {/* When to be reminded: three presets, a date, and Remove when one is set. */}
+      <ActionSheet
+        open={Boolean(reminderTarget) && !reminderDateOpen}
+        onClose={() => setReminderTarget(null)}
+        presentation="sheet"
+        title={reminderTarget?.remind_at
+          ? `Reminder for “${reminderTarget.file_name}” is ${describeDue(reminderTarget.remind_at, today)} (${formatReminderDate(reminderTarget.remind_at, today)}).`
+          : `Remind me about “${reminderTarget?.file_name ?? ''}”`}
+        groups={[
+          [
+            ...REMINDER_PRESETS.map(preset => ({ label: preset.label, onSelect: () => setReminder(addDays(today, preset.days)) })),
+            { label: 'Pick a Date…', onSelect: () => setReminderDateOpen(true) },
+          ],
+          ...(reminderTarget?.remind_at
+            ? [[{ label: 'Remove Reminder', tone: 'danger' as const, onSelect: () => setReminder(null) }]]
+            : []),
+        ]}
+      />
+      <InputAlert
+        open={reminderDateOpen}
+        title="Remind Me On"
+        message={reminderTarget ? `You’ll get an email about “${reminderTarget.file_name}”.` : undefined}
+        inputType="date"
+        initialValue={reminderTarget?.remind_at ?? addDays(today, 30)}
+        confirmLabel="Set"
+        onConfirm={async value => {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Pick a date.';
+          await setReminder(value);
+        }}
+        onCancel={() => { setReminderDateOpen(false); setReminderTarget(null); }}
       />
       <InputAlert
         open={newViewOpen}

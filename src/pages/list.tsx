@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import React, { useCallback, useEffect, useState } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { ListView } from '../components/ListView';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { WebSidebar } from '../components/WebSidebar';
@@ -10,6 +11,7 @@ import { ViewsSheet } from '../components/ViewsSheet';
 import type { Property, PropertyFile, PropertyFolder, PropertyWithFileCount } from '../../types';
 import { withAuth } from '../components/withAuth';
 import { useUserProperties } from '../hooks/useUserProperties';
+import { useUpcomingReminders } from '../hooks/useUpcomingReminders';
 import { useSheetHistory } from '../hooks/useSheetHistory';
 import { usePropertyFileActions } from '../hooks/usePropertyFileActions';
 import { useTagViews } from '../hooks/useTagViews';
@@ -39,6 +41,8 @@ function ListPage() {
   const { showToast } = useToast();
   const views = useTagViews();
   const { properties, loading: propertiesLoading, error: propertiesError, refreshProperties } = useUserProperties();
+  const reminders = useUpcomingReminders();
+  const router = useRouter();
 
   // On someone else's property, what you add is for the team by default.
   const collaborating = Boolean(savedProperty?.user_id && views.userId && savedProperty.user_id !== views.userId);
@@ -118,6 +122,11 @@ function ListPage() {
     if (property.id) sheetHistory.open(property.id);
   }, [openProperty, sheetHistory]);
 
+  // From the Upcoming list: the URL opens the property, and the sheet opens the file.
+  const openFile = useCallback((propertyId: string, fileId: string) => {
+    void router.push(`${router.pathname}?property=${propertyId}&file=${fileId}`, undefined, { shallow: true });
+  }, [router]);
+
   const renameProperty = useCallback(async (property: Property, label: string | null) => {
     if (!property.id) return;
     const updated = await propertyService.updateProperty(property.id, { label });
@@ -159,6 +168,8 @@ function ListPage() {
           error={propertiesError}
           onPropertySelect={selectProperty}
           toolbar={<ViewChips onManage={() => setViewsOpen(true)} className="sm:hidden -mx-3 mb-3" />}
+          upcoming={reminders.files}
+          onOpenFile={openFile}
         />
       </div>
       <ViewsSheet open={viewsOpen} onClose={() => setViewsOpen(false)} />
@@ -186,6 +197,10 @@ function ListPage() {
         onPropertyDelete={deleteProperty}
         onFileVisibilityChange={fileActions.setFileVisibility}
         onFolderVisibilityChange={fileActions.setFolderVisibility}
+        onFileReminderChange={async (file, remindAt) => {
+          await fileActions.setFileReminder(file, remindAt);
+          await reminders.refresh();
+        }}
       />
       <MobileBottomNav />
     </div>

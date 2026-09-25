@@ -359,6 +359,46 @@ export class FileService {
     return data;
   }
 
+  /** Set (or clear, with null) the day to be reminded about a file. */
+  async setReminder(file: PropertyFile, remindAt: string | null): Promise<PropertyFile> {
+    const { data, error } = await supabase
+      .from('property_files')
+      .update({ remind_at: remindAt })
+      .eq('id', file.id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('[FileService] Error setting file reminder:', error);
+      throw error;
+    }
+    if (!data) {
+      throw new Error('File reminder change failed: No data returned');
+    }
+    return data;
+  }
+
+  /**
+   * Every file this person may see whose reminder falls on or before
+   * `untilDate` (inclusive, `YYYY-MM-DD`), soonest first. Overdue ones
+   * come too: a reminder that passed unseen is still news.
+   */
+  async getUpcomingReminders(untilDate: string): Promise<PropertyFile[]> {
+    const { data, error } = await supabase
+      .from('property_files')
+      .select('*')
+      .not('remind_at', 'is', null)
+      .lte('remind_at', untilDate)
+      .order('remind_at', { ascending: true })
+      .limit(50);
+
+    if (error) {
+      logger.error('[FileService] Error fetching upcoming reminders:', error);
+      throw error;
+    }
+    return data || [];
+  }
+
   /**
    * Get files in a specific folder
    */
