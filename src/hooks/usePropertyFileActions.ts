@@ -3,7 +3,7 @@ import type { PendingUpload, Property, PropertyFile, PropertyFolder, Visibility 
 import { fileService, folderService, propertyService } from '../services';
 import { supabase } from '../utils/supabaseClient';
 import { getUserUsageBytes } from '../utils/usage';
-import { FREE_TIER_GB, FREE_TIER_MAX_BYTES } from '../../constants';
+import { FREE_TIER_GB, FREE_TIER_MAX_BYTES, MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from '../../constants';
 import { getDuplicateFileName, getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
 import { invalidatePropertyCache } from './usePropertyPrefetch';
 import { useToast } from '../contexts/ToastContext';
@@ -171,7 +171,19 @@ export function usePropertyFileActions({
   }, [setFiles, showToast]);
 
   const uploadFiles = useCallback(async (fileList: FileList | File[]) => {
-    const filesArray = Array.from(fileList);
+    // Storage rejects anything over the per-file limit; say so up front
+    // instead of letting the upload fail partway.
+    const selected = Array.from(fileList);
+    const filesArray = selected.filter(file => file.size <= MAX_FILE_SIZE_BYTES);
+    const tooLarge = selected.length - filesArray.length;
+    if (tooLarge > 0) {
+      showToast(
+        tooLarge === 1
+          ? `A file is larger than ${MAX_FILE_SIZE_MB} MB and was skipped.`
+          : `${tooLarge} files are larger than ${MAX_FILE_SIZE_MB} MB and were skipped.`,
+        'warning',
+      );
+    }
     if (filesArray.length === 0) return;
 
     const targetPropertyId = await resolvePropertyId();
@@ -216,7 +228,7 @@ export function usePropertyFileActions({
     newPendingUploads.forEach(pending => {
       void startSingleUpload(pending.id, pending.file, pending.name, targetPropertyId, folderId, visibility);
     });
-  }, [files, folderIdForWrites, visibilityForWrites, resolvePropertyId, startSingleUpload]);
+  }, [files, folderIdForWrites, visibilityForWrites, resolvePropertyId, startSingleUpload, showToast]);
 
   /** Throws on failure so the caller can show a contextual message. */
   const renameItem = useCallback(async (item: PropertyFile | PropertyFolder, newName: string) => {

@@ -144,6 +144,21 @@ describe('usePropertyFileActions', () => {
     expect(result.current.actions.pendingUploads).toEqual([]);
   });
 
+  it('skips files over the per-file size limit and uploads the rest', async () => {
+    fileService.getPropertyFiles.mockResolvedValue([]);
+    const { result } = renderHook(() => useHarness({}));
+    const big = new File(['x'], 'huge.mov');
+    Object.defineProperty(big, 'size', { value: 51 * 1024 * 1024 });
+
+    await act(async () => {
+      await result.current.actions.uploadFiles([big, new File(['a'], 'small.pdf')]);
+    });
+    await flush();
+
+    expect(fileService.uploadFile.mock.calls.map(call => call[2])).toEqual(['small.pdf']);
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/larger than 50 MB/), 'warning');
+  });
+
   it('persists an unsaved pin before the first upload, and aborts if that fails', async () => {
     const unsaved: Property = { ...property, id: null };
     const ensurePropertyId = vi.fn(async () => null);
