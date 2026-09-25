@@ -107,6 +107,8 @@ export function usePropertyFileActions({
     targetPropertyId: string,
     folderId: string | null,
     visibility: Visibility,
+    /** Set for the property's very first document: its success is the end of onboarding. */
+    firstDocumentFor?: string,
   ) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -159,6 +161,7 @@ export function usePropertyFileActions({
       if (lastError) throw lastError;
 
       setPendingUploads(prev => prev.map(p => (p.id === uploadId ? { ...p, status: 'success', progress: 100 } : p)));
+      if (firstDocumentFor) showToast(`Saved. It's here whenever you're at ${firstDocumentFor}.`, 'success');
 
       const refreshed = await fileService.getPropertyFiles(targetPropertyId);
       setFiles(refreshed);
@@ -224,11 +227,14 @@ export function usePropertyFileActions({
       };
     });
 
+    const firstDocument = files.length === 0 && folders.length === 0 && property
+      ? property.label || property.address
+      : undefined;
     setPendingUploads(prev => [...prev, ...newPendingUploads]);
-    newPendingUploads.forEach(pending => {
-      void startSingleUpload(pending.id, pending.file, pending.name, targetPropertyId, folderId, visibility);
+    newPendingUploads.forEach((pending, i) => {
+      void startSingleUpload(pending.id, pending.file, pending.name, targetPropertyId, folderId, visibility, i === 0 ? firstDocument : undefined);
     });
-  }, [files, folderIdForWrites, visibilityForWrites, resolvePropertyId, startSingleUpload, showToast]);
+  }, [files, folders, property, folderIdForWrites, visibilityForWrites, resolvePropertyId, startSingleUpload, showToast]);
 
   /** Throws on failure so the caller can show a contextual message. */
   const renameItem = useCallback(async (item: PropertyFile | PropertyFolder, newName: string) => {
