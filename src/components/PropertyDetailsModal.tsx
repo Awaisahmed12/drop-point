@@ -6,13 +6,11 @@ import { useRouter } from 'next/router';
 import { MoveModal } from './MoveModal';
 import { FileIcon } from './FileIcon';
 import { FileThumbnail } from './FileThumbnail';
-import { PropertySwitcher } from './PropertySwitcher';
 import { FileMenu } from './FileMenu';
 import { FolderMenu } from './FolderMenu';
 import { RenameInput } from './RenameInput';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import { useResponsiveValue } from '../hooks/useResponsiveValue';
-import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
 import { useToast } from '../contexts/ToastContext';
 import { useInternalDrag } from '../hooks/useInternalDrag';
@@ -20,7 +18,6 @@ import { useSheetDrag } from '../hooks/useSheetDrag';
 import { useTagViews } from '../hooks/useTagViews';
 import { tryWithToast } from '../utils/tryWithToast';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection, Visibility } from '../../types';
-import type { PropertyWithFileCount } from '../../types';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
 import { tagsForProperty } from '../../utils/tagViews';
 import { getFileSignedUrl } from '../utils/supabaseClient';
@@ -118,7 +115,6 @@ interface PropertyDetailsModalProps {
   onFileDelete: (file: PropertyFile) => void;
   onFileRename: (item: PropertyFile | PropertyFolder, newName: string) => Promise<void> | void;
   onFileMove?: (file: PropertyFile, targetFolderId: string | null) => Promise<void>;
-  onFileCopy?: (file: PropertyFile) => Promise<void>;
   onFolderCreate: (name: string) => Promise<void> | void;
   onFolderDelete: (folder: PropertyFolder) => void;
   
@@ -127,8 +123,6 @@ interface PropertyDetailsModalProps {
   onDismiss: (uploadId: string) => void;
   
   // Property switching
-  onPropertySwitch?: (property: PropertyWithFileCount, files: PropertyFile[], folders: PropertyFolder[]) => void;
-  onMapMove?: (lat: number, lng: number) => void;
   /** Rename the open property (null clears the custom name). */
   onPropertyRename?: (property: Property, label: string | null) => Promise<void>;
   /** Put the property in exactly these views. Only its owner may. */
@@ -159,13 +153,10 @@ export const PropertyDetailsModal = ({
   onFileDelete,
   onFileRename,
   onFileMove,
-  onFileCopy,
   onFolderCreate,
   onFolderDelete,
   pendingUploads,
   onDismiss,
-  onPropertySwitch,
-  onMapMove,
   onPropertyRename,
   onPropertyViewsChange,
   onPropertyDelete,
@@ -272,7 +263,6 @@ export const PropertyDetailsModal = ({
 
   const [fabOpen, setFabOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [renamingProperty, setRenamingProperty] = useState(false);
   const [propertyLabelDraft, setPropertyLabelDraft] = useState('');
   const renameCancelledRef = useRef(false);
@@ -438,26 +428,9 @@ export const PropertyDetailsModal = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, imagePreview, files, loadImagePreview, leaveFileViewer]);
   
-  // View mode state with localStorage persistence
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('droppoint-view-mode');
-      return (saved === 'grid' || saved === 'list') ? saved : 'grid';
-    }
-    return 'grid';
-  });
-
-  // Save view mode preference
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('droppoint-view-mode', viewMode);
-    }
-  }, [viewMode]);
-
-  // Blanket fix: Close all menus when view mode changes
-  useEffect(() => {
-    closeMenus();
-  }, [viewMode, closeMenus]);
+  // One layout: the thumbnail grid. The list rendering stays below for
+  // desktop-table work later, but nothing switches to it.
+  const viewMode = 'grid' as 'list' | 'grid';
 
   // Blanket fix: Close all menus when modal closes or opens
   useEffect(() => {
@@ -473,27 +446,6 @@ export const PropertyDetailsModal = ({
   // Configuration hook
   const { streetViewEnabled, propertyImageEnabled } = useConfig();
 
-  // Property switching hook
-  const { switchToProperty } = usePropertySwitcher({
-    onMapMove,
-    onPropertyDataLoad: (property, files, folders) => {
-      // Clear search when switching properties
-      setSearchQuery('');
-      onPropertySwitch?.(property, files, folders);
-    },
-    onError: (error) => {
-      logger.error('Property switch error:', error);
-      showToast('Could not switch property. Please try again.');
-    },
-  });
-
-  // Convert current property to PropertyWithFileCount format
-  const currentPropertyWithFileCount: PropertyWithFileCount | null = property ? {
-    ...property,
-    file_count: files.length,
-    created_at: undefined, // PropertyWithFileCount doesn't have created_at
-    last_accessed: new Date().toISOString() // Current time as last accessed
-  } : null;
 
   // Global address parsing and formatting utility
   const parseAddress = (fullAddress: string) => {
@@ -1138,8 +1090,6 @@ export const PropertyDetailsModal = ({
     breadcrumbPath.unshift(current);
   }
 
-  const toggleViewMode = () => setViewMode(viewMode === 'list' ? 'grid' : 'list');
-
   const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     try {
@@ -1222,10 +1172,6 @@ export const PropertyDetailsModal = ({
 
   // Everything that isn't browsing files lives behind one "more" control.
   const moreGroups: ActionSheetItem[][] = [
-    [
-      { label: 'Switch Property…', onSelect: () => setSwitcherOpen(true) },
-      { label: viewMode === 'list' ? 'Show as Grid' : 'Show as List', onSelect: toggleViewMode },
-    ],
     [
       ...(onPropertyViewsChange && isOwner && property.id
         ? [{ label: 'Views…', onSelect: () => setViewsPickerOpen(true) }]
@@ -1883,7 +1829,6 @@ export const PropertyDetailsModal = ({
                                     setMoveFileTarget(file);
                                     setShowMoveModal(true);
                                   } : undefined}
-                                  onDuplicate={onFileCopy}
                                   onDelete={onFileDelete}
                                   onToggleShared={onFileVisibilityChange && canShareItem(file) ? toggleItemShared : undefined}
                                   menuPosition={menuPosition[file.id] || {}}
@@ -2068,7 +2013,6 @@ export const PropertyDetailsModal = ({
                                     setMoveFileTarget(file);
                                     setShowMoveModal(true);
                                   } : undefined}
-                                  onDuplicate={onFileCopy}
                                   onDelete={onFileDelete}
                                   onToggleShared={onFileVisibilityChange && canShareItem(file) ? toggleItemShared : undefined}
                                   menuPosition={menuPosition[file.id] || {}}
@@ -2565,14 +2509,6 @@ export const PropertyDetailsModal = ({
         }}
         onCancel={() => setNewViewOpen(false)}
       />
-      {currentPropertyWithFileCount && (
-        <PropertySwitcher
-          currentProperty={currentPropertyWithFileCount}
-          onPropertySelect={switchToProperty}
-          open={switcherOpen}
-          onClose={() => setSwitcherOpen(false)}
-        />
-      )}
 
       {/* Move Modal */}
       {showMoveModal && moveFileTarget && (

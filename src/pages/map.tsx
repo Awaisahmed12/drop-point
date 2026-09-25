@@ -782,7 +782,6 @@ function MapPage() {
             onFileDelete={fileActions.deleteFile}
             onFileRename={fileActions.renameItem}
             onFileMove={fileActions.moveFile}
-            onFileCopy={fileActions.copyFile}
             onFolderCreate={fileActions.createFolder}
             onFolderDelete={fileActions.deleteFolder}
             pendingUploads={fileActions.pendingUploads}
@@ -794,21 +793,6 @@ function MapPage() {
             onViewsPromptShown={() => setViewsPromptId(null)}
             onFileVisibilityChange={fileActions.setFileVisibility}
             onFolderVisibilityChange={fileActions.setFolderVisibility}
-            onPropertySwitch={(property, files, switchedFolders) => {
-              if (property.id) sheetHistory.open(property.id);
-              setSavedProperty(property);
-              setPropertyFiles(files);
-              setFolders(switchedFolders);
-              setSelectedFolder('master');
-              setFoldersLoading(false);
-              setFilesLoading(false);
-              setAddress(property.address);
-              setSnappedLatLng({ lat: property.lat, lng: property.lng });
-            }}
-            onMapMove={(lat, lng) => {
-              setMapCenter({ lat, lng });
-              map?.panTo({ lat, lng });
-            }}
           />
         </ErrorBoundary>
       </div>

@@ -177,7 +177,6 @@ function ListPage() {
         onFileDelete={fileActions.deleteFile}
         onFileRename={fileActions.renameItem}
         onFileMove={fileActions.moveFile}
-        onFileCopy={fileActions.copyFile}
         onFolderCreate={fileActions.createFolder}
         onFolderDelete={fileActions.deleteFolder}
         pendingUploads={fileActions.pendingUploads}
@@ -187,13 +186,6 @@ function ListPage() {
         onPropertyDelete={deleteProperty}
         onFileVisibilityChange={fileActions.setFileVisibility}
         onFolderVisibilityChange={fileActions.setFolderVisibility}
-        onPropertySwitch={(property, newFiles, newFolders) => {
-          if (property.id) sheetHistory.open(property.id);
-          setSavedProperty(toProperty(property));
-          setFiles(newFiles);
-          setFolders(newFolders);
-          setSelectedFolder('master');
-        }}
       />
       <MobileBottomNav />
     </div>
