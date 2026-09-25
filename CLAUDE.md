@@ -35,6 +35,15 @@ NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=                 # Google Cloud OAuth web cli
 NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=                  # optional; defaults to the Maps key (enable the Google Picker API on it)
 ```
 
+Reminder emails (`/api/reminders/notify`, run daily by the cron in `vercel.json`) stay off until all of these are set in Vercel — see `docs/reminders.md`:
+
+```
+CRON_SECRET=                 # Vercel sends it as a Bearer token on cron calls
+SUPABASE_SERVICE_ROLE_KEY=   # server-side only
+RESEND_API_KEY=
+REMINDER_FROM_EMAIL=         # "DropPoint <reminders@yourdomain>"
+```
+
 The only production URL is **https://drop-point-xi.vercel.app** (Vercel project `drop-point`). The project does not own `droppoint.app`; that domain belongs to an unrelated site and must never appear in code, docs, or configuration. Never hardcode the site origin: read `NEXT_PUBLIC_SITE_URL` (client code via `getSiteUrl()`, which falls back to `window.location.origin`).
 
 ## Architecture
@@ -43,11 +52,11 @@ The only production URL is **https://drop-point-xi.vercel.app** (Vercel project 
 
 ### Key Directories
 
-- `src/pages/` — Next.js pages + API routes (`api/autocomplete`, `api/reverse-geocode`)
+- `src/pages/` — Next.js pages + API routes (`api/autocomplete`, `api/reverse-geocode`, `api/reminders/notify`)
 - `src/components/` — React components
 - `src/hooks/` — Component state and shared behavior
 - `src/services/` — `PropertyService`, `FileService`, `FolderService`, `TagService` — thin wrappers over the Supabase SDK
-- `database/` — SQL to run once in Supabase (`admin_configurations.sql`, `collaboration.sql`)
+- `database/` — SQL to run once in Supabase (`admin_configurations.sql`, `collaboration.sql`, `reminders.sql`)
 - `src/contexts/` — `ConfigContext` (admin feature flags) and `ToastContext`
 - `src/utils/` — Supabase client init, logger, usage/quota helpers
 - `types/` (repo root) — Shared TypeScript types (`Property`, `PropertyFile`, `PropertyFolder`, `MapType`, ...)
@@ -100,7 +109,7 @@ Sign-in leads with whichever social providers `NEXT_PUBLIC_AUTH_PROVIDERS` lists
 
 ### API Routes
 
-The two API routes (`/api/autocomplete`, `/api/reverse-geocode`) are thin proxies to the Google Maps APIs, keeping the API key server-side only.
+`/api/autocomplete` and `/api/reverse-geocode` are thin proxies to the Google Maps APIs, keeping the API key server-side only. `/api/reminders/notify` is the daily reminder email (service-role Supabase + Resend, gated by `CRON_SECRET`); see `docs/reminders.md`.
 
 ### File Storage
 
@@ -138,8 +147,8 @@ Keep the number of simultaneous choices small and grouped:
 - Map: search, a Map / Satellite segmented control, and a location button. No zoom buttons (pinch, scroll, double-tap). Satellite is Google's `hybrid` so labels stay visible; do not reintroduce a third mode. View switches are filter chips under the search field on a phone (the first chip opens the Views sheet; the row appears once the user has a view) and a checkbox list in the desktop sidebar; they are toggles, not commands. First launch (no properties): the search field takes focus, its placeholder asks for an address, and one line under it says "Start with one property."
 - Property card: title, address, one button (Open / Add Property). "Add Property" saves the pin at once (`savePin` in `map.tsx`): if the map is narrowed to a single view the property joins it, and if there are views to choose from the sheet opens its Views picker once (`promptViews`). Naming a pin saves it too. Renaming happens inside the sheet.
 - Property sheet nav bar: close, title, and one "⋯" that opens a grouped menu (Views…, Rename…, Copy Address | Delete Property). The "+" offers Take Photo (phones), Upload Files… (and Import from Google Drive… when configured) | New Folder…; it is hidden from view-only members. The content is always the thumbnail grid. An empty property shows one filled "Add Your First Document" button that opens the same "+" menu. Delete Property confirms with an action sheet and removes the stored files, their rows, and the pin.
-- File menu groups: Download | Rename…, Move to Folder… | Share with Team / Make Private (shared properties only) | Delete. Folder menu: Rename… | Share with Team / Make Private | Delete.
-- Properties are photo cards (Street View, satellite fallback) with the name set into a scrim and one file-count pill. Tapping a card only opens the property; no per-card menus. One glass search capsule above the grid.
+- File menu groups: Download | Rename…, Move to Folder…, Set Reminder… | Share with Team / Make Private (shared properties only) | Delete. Set Reminder… opens a confirmation-style sheet (In 30 Days / In 90 Days / In 1 Year / Pick a Date…, plus Remove once set); files with one carry a clock mark, orange when due within 30 days. Folder menu: Rename… | Share with Team / Make Private | Delete.
+- Properties are photo cards (Street View, satellite fallback) with the name set into a scrim and one file-count pill (an orange dot in it when a reminder is due). Tapping a card only opens the property; no per-card menus. One glass search capsule above the grid, and above that an Upcoming group of at most three reminders due within 30 days, each opening its file. Pins with something due carry the same dot.
 - Account is an avatar hero (tap the name to edit it inline) over a wash of the user's color, then grouped lists: Storage, Sign Out.
 - Do not add controls that have no effect (a previous "Remember me" checkbox was wired to nothing).
 
