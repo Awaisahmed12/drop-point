@@ -8,9 +8,11 @@ import { FileIcon } from './FileIcon';
 import { FileThumbnail } from './FileThumbnail';
 import { FileMenu } from './FileMenu';
 import { FolderMenu } from './FolderMenu';
+import { PropertySwitcher } from './PropertySwitcher';
 import { RenameInput } from './RenameInput';
 import { useMobileViewport } from '../hooks/useMobileViewport';
 import { useResponsiveValue } from '../hooks/useResponsiveValue';
+import { usePropertySwitcher } from '../hooks/usePropertySwitcher';
 import { useConfig } from '../contexts/ConfigContext';
 import { useToast } from '../contexts/ToastContext';
 import { useInternalDrag } from '../hooks/useInternalDrag';
@@ -19,6 +21,7 @@ import { useTagViews } from '../hooks/useTagViews';
 import { tryWithToast } from '../utils/tryWithToast';
 import type { Property, PropertyFile, PropertyFolder, PendingUpload, SortField, SortDirection, Visibility } from '../../types';
 import { formatDate, formatFileSize, splitFileNameAndExt, getFileNameWithoutExtension } from '../../utils/fileManagement';
+import type { PropertyWithFileCount } from '../../types';
 import { tagsForProperty } from '../../utils/tagViews';
 import { REMINDER_PRESETS, addDays, describeDue, formatReminderDate, isDueSoon, todayIso } from '../../utils/reminders';
 import { getFileSignedUrl } from '../utils/supabaseClient';
@@ -145,6 +148,9 @@ interface PropertyDetailsModalProps {
   onFolderVisibilityChange?: (folder: PropertyFolder, visibility: Visibility) => Promise<void>;
   /** Set (or clear with null) the day to be reminded about a file. */
   onFileReminderChange?: (file: PropertyFile, remindAt: string | null) => Promise<void>;
+  /** "Switch Property…": the page swaps the open property and its data. */
+  onPropertySwitch?: (property: PropertyWithFileCount, files: PropertyFile[], folders: PropertyFolder[]) => void;
+  onMapMove?: (lat: number, lng: number) => void;
 }
 
 export const PropertyDetailsModal = ({ 
@@ -174,6 +180,8 @@ export const PropertyDetailsModal = ({
   onFileVisibilityChange,
   onFolderVisibilityChange,
   onFileReminderChange,
+  onPropertySwitch,
+  onMapMove,
 }: PropertyDetailsModalProps) => {
   const { showToast } = useToast();
   const views = useTagViews();
@@ -273,6 +281,7 @@ export const PropertyDetailsModal = ({
 
   const [fabOpen, setFabOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   // "Set Reminder…": the file being asked about, then the preset sheet or the date alert.
   const [reminderTarget, setReminderTarget] = useState<PropertyFile | null>(null);
   const [reminderDateOpen, setReminderDateOpen] = useState(false);
@@ -459,6 +468,27 @@ export const PropertyDetailsModal = ({
   // Configuration hook
   const { streetViewEnabled, propertyImageEnabled } = useConfig();
 
+  // Property switching hook
+  const { switchToProperty } = usePropertySwitcher({
+    onMapMove,
+    onPropertyDataLoad: (property, files, folders) => {
+      // Clear search when switching properties
+      setSearchQuery('');
+      onPropertySwitch?.(property, files, folders);
+    },
+    onError: (error) => {
+      logger.error('Property switch error:', error);
+      showToast('Could not switch property. Please try again.');
+    },
+  });
+
+  // Convert current property to PropertyWithFileCount format
+  const currentPropertyWithFileCount: PropertyWithFileCount | null = property ? {
+    ...property,
+    file_count: files.length,
+    created_at: undefined, // PropertyWithFileCount doesn't have created_at
+    last_accessed: new Date().toISOString() // Current time as last accessed
+  } : null;
 
   // Global address parsing and formatting utility
   const parseAddress = (fullAddress: string) => {
@@ -1198,6 +1228,9 @@ export const PropertyDetailsModal = ({
 
   // Everything that isn't browsing files lives behind one "more" control.
   const moreGroups: ActionSheetItem[][] = [
+    // A picker sheet over the property sheet: the HIG discourages it, but on
+    // a phone it beats closing and hunting for the next pin.
+    ...(onPropertySwitch ? [[{ label: 'Switch Property…', onSelect: () => setSwitcherOpen(true) }]] : []),
     [
       ...(onPropertyViewsChange && isOwner && property.id
         ? [{ label: 'Views…', onSelect: () => setViewsPickerOpen(true) }]
@@ -2524,6 +2557,14 @@ export const PropertyDetailsModal = ({
         title={`Delete “${displayName}”? ${deleteSummary} This can’t be undone.`}
         groups={[[{ label: 'Delete Property', tone: 'danger', onSelect: deleteProperty }]]}
       />
+      {currentPropertyWithFileCount && (
+        <PropertySwitcher
+          currentProperty={currentPropertyWithFileCount}
+          onPropertySelect={switchToProperty}
+          open={switcherOpen}
+          onClose={() => setSwitcherOpen(false)}
+        />
+      )}
       {/* When to be reminded: three presets, a date, and Remove when one is set. */}
       <ActionSheet
         open={Boolean(reminderTarget) && !reminderDateOpen}

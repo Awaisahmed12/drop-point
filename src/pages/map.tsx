@@ -801,6 +801,21 @@ function MapPage() {
               await fileActions.setFileReminder(file, remindAt);
               await reminders.refresh();
             }}
+            onPropertySwitch={(property, files, switchedFolders) => {
+              if (property.id) sheetHistory.open(property.id);
+              setSavedProperty(property);
+              setPropertyFiles(files);
+              setFolders(switchedFolders);
+              setSelectedFolder('master');
+              setFoldersLoading(false);
+              setFilesLoading(false);
+              setAddress(property.address);
+              setSnappedLatLng({ lat: property.lat, lng: property.lng });
+            }}
+            onMapMove={(lat, lng) => {
+              setMapCenter({ lat, lng });
+              map?.panTo({ lat, lng });
+            }}
           />
         </ErrorBoundary>
       </div>

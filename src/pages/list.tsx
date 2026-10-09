@@ -201,6 +201,13 @@ function ListPage() {
           await fileActions.setFileReminder(file, remindAt);
           await reminders.refresh();
         }}
+        onPropertySwitch={(property, newFiles, newFolders) => {
+          if (property.id) sheetHistory.open(property.id);
+          setSavedProperty(toProperty(property));
+          setFiles(newFiles);
+          setFolders(newFolders);
+          setSelectedFolder('master');
+        }}
       />
       <MobileBottomNav />
     </div>
