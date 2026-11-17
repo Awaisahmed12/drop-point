@@ -33,6 +33,7 @@ Optional connectors (each stays hidden until its variable is set):
 NEXT_PUBLIC_AUTH_PROVIDERS=google,apple,facebook   # social sign-in buttons; each provider must also be enabled in Supabase Auth
 NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=                 # Google Cloud OAuth web client (JS origins = site URL); enables "Import from Google Drive"
 NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=                  # optional; defaults to the Maps key (enable the Google Picker API on it)
+GOOGLE_MAPS_SERVER_API_KEY=                         # optional; a second key, restricted to the Geocoding and Places APIs (no referrer), for the API routes. Without it they use the browser key, which must then allow server calls.
 ```
 
 Reminder emails (`/api/reminders/notify`, run daily by the cron in `vercel.json`) stay off until all of these are set in Vercel — see `docs/reminders.md`:
@@ -56,7 +57,7 @@ The only production URL is **https://drop-point-xi.vercel.app** (Vercel project 
 - `src/components/` — React components
 - `src/hooks/` — Component state and shared behavior
 - `src/services/` — `PropertyService`, `FileService`, `FolderService`, `TagService` — thin wrappers over the Supabase SDK
-- `database/` — SQL to run once in Supabase (`admin_configurations.sql`, `collaboration.sql`, `reminders.sql`)
+- `database/` — SQL to run once in Supabase (`admin_configurations.sql`, `collaboration.sql`, `reminders.sql`, `security.sql`)
 - `src/contexts/` — `ConfigContext` (admin feature flags) and `ToastContext`
 - `src/utils/` — Supabase client init, logger, usage/quota helpers
 - `types/` (repo root) — Shared TypeScript types (`Property`, `PropertyFile`, `PropertyFolder`, `MapType`, ...)
@@ -109,11 +110,15 @@ Sign-in leads with whichever social providers `NEXT_PUBLIC_AUTH_PROVIDERS` lists
 
 ### API Routes
 
-`/api/autocomplete` and `/api/reverse-geocode` are thin proxies to the Google Maps APIs, keeping the API key server-side only. `/api/reminders/notify` is the daily reminder email (service-role Supabase + Resend, gated by `CRON_SECRET`); see `docs/reminders.md`.
+`/api/autocomplete` and `/api/reverse-geocode` are thin proxies to the Google Maps APIs, keeping the API key server-side only. Both require a signed-in user (`requireUser` in `src/utils/apiGuard.ts` verifies the bearer token with Supabase), validate their inputs, and are rate-limited per user (`rateLimit`, in-memory per instance). Google's `error_message` never reaches the client. `/api/reminders/notify` is the daily reminder email (service-role Supabase + Resend, gated by `CRON_SECRET`, compared in constant time); see `docs/reminders.md`. Any new route that spends a quota or reads data goes through the same two guards.
 
 ### File Storage
 
-Files are stored in Supabase Storage. Access is via signed URLs with a 1-hour expiry (generated in `src/utils/supabaseClient.ts`). Anything written into a file-viewer tab must go through `escapeHtml` in `PropertyDetailsModal` because that tab shares the app's origin.
+Files are stored in Supabase Storage. Access is via signed URLs with a 1-hour expiry (generated in `src/utils/supabaseClient.ts`). Anything written into a file-viewer tab must go through `escapeHtml` in `PropertyDetailsModal` because that tab shares the app's origin. Uploads are limited twice: `ACCEPTED_FILE_TYPES` and `MAX_FILE_SIZE_BYTES` in the browser (`usePropertyFileActions`), and the bucket's `allowed_mime_types` / `file_size_limit` on the server (`database/security.sql`). `text/html` and `image/svg+xml` are never stored.
+
+### Security headers
+
+`next.config.ts` sends HSTS, `X-Frame-Options: DENY`, `nosniff`, a Referrer-Policy, a Permissions-Policy, and a Content-Security-Policy in **report-only** mode listing Supabase, Google Maps/Picker and Vercel as the only third parties. After a preview shows no CSP violations in the browser console, rename the header to `Content-Security-Policy` to enforce it. Add any new third-party host to the `csp` list there. `docs/security-checklist.md` tracks what is done in code and what lives in the Supabase and Vercel dashboards.
 
 ### Design System: a 2026 iPhone app that happens to be a web app
 
