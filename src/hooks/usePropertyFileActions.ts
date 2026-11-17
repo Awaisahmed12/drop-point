@@ -3,7 +3,7 @@ import type { PendingUpload, Property, PropertyFile, PropertyFolder, Visibility 
 import { fileService, folderService, propertyService } from '../services';
 import { supabase } from '../utils/supabaseClient';
 import { getUserUsageBytes } from '../utils/usage';
-import { FREE_TIER_GB, FREE_TIER_MAX_BYTES, MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from '../../constants';
+import { ACCEPTED_FILE_TYPES, FREE_TIER_GB, FREE_TIER_MAX_BYTES, MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from '../../constants';
 import { getDuplicateFileName, getUniqueFileName, sanitizeFileName } from '../../utils/fileManagement';
 import { invalidatePropertyCache } from './usePropertyPrefetch';
 import { useToast } from '../contexts/ToastContext';
@@ -33,6 +33,13 @@ interface UsePropertyFileActionsOptions {
 }
 
 const FOLDER_NAME_FORBIDDEN = /[<>:"/\\|?*]/g;
+
+const ACCEPTED_EXTENSIONS = new Set(ACCEPTED_FILE_TYPES.split(','));
+/** The storage bucket enforces the same list by MIME type; this is the earlier, friendlier refusal. */
+const isAcceptedFile = (file: File) => {
+  const dot = file.name.lastIndexOf('.');
+  return dot > 0 && ACCEPTED_EXTENSIONS.has(file.name.slice(dot).toLowerCase());
+};
 const sanitizeFolderName = (name: string) => name.replace(FOLDER_NAME_FORBIDDEN, '_').substring(0, 50).trim();
 
 /**
@@ -177,8 +184,18 @@ export function usePropertyFileActions({
     // Storage rejects anything over the per-file limit; say so up front
     // instead of letting the upload fail partway.
     const selected = Array.from(fileList);
-    const filesArray = selected.filter(file => file.size <= MAX_FILE_SIZE_BYTES);
-    const tooLarge = selected.length - filesArray.length;
+    const rightType = selected.filter(isAcceptedFile);
+    const wrongType = selected.length - rightType.length;
+    if (wrongType > 0) {
+      showToast(
+        wrongType === 1
+          ? `${selected.find(f => !isAcceptedFile(f))!.name} isn’t a file type DropPoint stores.`
+          : `${wrongType} files aren’t types DropPoint stores and were skipped.`,
+        'warning',
+      );
+    }
+    const filesArray = rightType.filter(file => file.size <= MAX_FILE_SIZE_BYTES);
+    const tooLarge = rightType.length - filesArray.length;
     if (tooLarge > 0) {
       showToast(
         tooLarge === 1
