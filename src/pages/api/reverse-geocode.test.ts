@@ -13,7 +13,7 @@ vi.mock('../../utils/apiGuard', () => ({
 
 import handler from './reverse-geocode';
 
-const run = async (query: Record<string, string>, method = 'GET') => {
+const run = async (query: Record<string, string | undefined>, method = 'GET') => {
   const res = {
     statusCode: 200,
     body: undefined as unknown,
@@ -63,7 +63,7 @@ describe('/api/reverse-geocode', () => {
 
   it('calls Google with the server key and the parsed coordinates, and never echoes its error text', async () => {
     mocks.requireUser.mockResolvedValue({ id: 'u1', token: 't' });
-    const fetchSpy = vi.fn(async () => ({
+    const fetchSpy = vi.fn<(input: URL | string) => Promise<{ ok: boolean; json: () => Promise<unknown> }>>(async () => ({
       ok: true,
       json: async () => ({ status: 'REQUEST_DENIED', error_message: 'API key restricted to referrer X' }),
     }));
