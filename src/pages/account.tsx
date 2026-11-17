@@ -84,7 +84,7 @@ function AccountPage() {
       resetTagViews();
       await supabase.auth.signOut();
     } finally {
-      window.location.href = '/';
+      window.location.assign(`${window.location.origin}/`);
     }
   };
 
