@@ -195,6 +195,19 @@ describe('usePropertyFileActions', () => {
     expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/couldn.t set the reminder/i));
   });
 
+  it('refuses file types the app does not store, before anything uploads', async () => {
+    fileService.getPropertyFiles.mockResolvedValue([]);
+    const { result } = renderHook(() => useHarness({}));
+
+    await act(async () => {
+      await result.current.actions.uploadFiles([new File(['x'], 'payload.exe'), new File(['y'], 'lease.pdf')]);
+    });
+    await flush();
+
+    expect(fileService.uploadFile.mock.calls.map(call => call[2])).toEqual(['lease.pdf']);
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/payload\.exe isn.t a file type/), 'warning');
+  });
+
   it('persists an unsaved pin before the first upload, and aborts if that fails', async () => {
     const unsaved: Property = { ...property, id: null };
     const ensurePropertyId = vi.fn(async () => null);

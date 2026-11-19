@@ -1,5 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { googleMapsServerKey, rateLimit, requireUser } from '../../utils/apiGuard';
+
+/** Longer than any address; stops a megabyte query string reaching Google. */
+const MAX_INPUT_LENGTH = 200;
 
 interface GoogleMapsResponse {
   predictions: google.maps.places.AutocompletePrediction[];
@@ -7,11 +11,7 @@ interface GoogleMapsResponse {
   error_message?: string;
 }
 
-// Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabaseServer = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -19,10 +19,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { input } = req.query;
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey = googleMapsServerKey();
 
-  if (typeof input !== 'string') {
-    return res.status(400).json({ error: 'Input parameter must be a string' });
+  if (typeof input !== 'string' || input.length > MAX_INPUT_LENGTH) {
+    return res.status(400).json({ error: `Input must be a string of at most ${MAX_INPUT_LENGTH} characters` });
   }
 
   if (!apiKey) {
@@ -30,21 +30,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Google Maps API key not configured' });
   }
 
-  // Get user from Authorization header
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.replace('Bearer ', '');
-
-  let userId: string | null = null;
-  if (token) {
-    try {
-      const { data: { user }, error } = await supabaseServer.auth.getUser(token);
-      if (!error && user) {
-        userId = user.id;
-      }
-    } catch (error) {
-      console.error('Error verifying token:', error);
-    }
-  }
+  // Signed-in users only, 120 keystrokes' worth of lookups a minute each:
+  // this route spends the Google quota.
+  const user = await requireUser(req, res);
+  if (!user) return;
+  if (!rateLimit(res, `autocomplete:${user.id}`, 120, 60_000)) return;
+  const { id: userId, token } = user;
 
   try {
     // Fetch the person's saved properties if authenticated, with priority
@@ -80,22 +71,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (input.trim()) {
       // Prepare Google Maps API request
-      const mapsUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${apiKey}&types=address`;
+      const mapsUrl = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
+      mapsUrl.searchParams.set('input', input);
+      mapsUrl.searchParams.set('key', apiKey);
+      mapsUrl.searchParams.set('types', 'address');
       const mapsResponse = await fetch(mapsUrl);
 
       if (!mapsResponse.ok) {
         console.error(`[AUTOCOMPLETE] Google Maps API HTTP error: ${mapsResponse.status}`);
-        return res.status(500).json({ error: `Google Maps API error: ${mapsResponse.status}` });
+        return res.status(502).json({ error: 'Address search failed' });
       }
 
       mapsData = await mapsResponse.json();
 
       if (mapsData.status && mapsData.status !== 'OK' && mapsData.status !== 'ZERO_RESULTS') {
         console.error(`[AUTOCOMPLETE] Google Maps API status error: ${mapsData.status}`, mapsData.error_message);
-        return res.status(500).json({ 
-          error: `Google Maps API error: ${mapsData.status}`,
-          message: mapsData.error_message 
-        });
+        // Google's error_message can describe the key's restrictions; it stays in the log.
+        return res.status(502).json({ error: `Address search failed: ${mapsData.status}` });
       }
     }
 

@@ -29,6 +29,7 @@ import { heroImageUrls } from '../hooks/usePropertyPrefetch';
 import { importFromGoogleDrive, preloadGoogleDrive, googleDriveAvailable } from '../utils/googleDrive';
 import { FolderIcon as HeroFolderIcon } from '@heroicons/react/24/solid';
 import { ActionSheet, type ActionSheetItem } from './ActionSheet';
+import { ACCEPTED_FILE_TYPES } from '../../constants';
 import { InputAlert } from './InputAlert';
 
 /** Marks a folder or file the whole team can see. */
@@ -2139,7 +2140,7 @@ export const PropertyDetailsModal = ({
         </div>
 
         {/* Hidden file inputs for upload: the picker, and the camera on phones. */}
-        <input id="file-upload-input" type="file" className="hidden" onChange={handleFileInput} multiple />
+        <input id="file-upload-input" type="file" className="hidden" accept={ACCEPTED_FILE_TYPES} onChange={handleFileInput} multiple />
         <input id="camera-capture-input" type="file" className="hidden" accept="image/*" capture="environment" onChange={handleFileInput} />
 
         {/* Upload Progress Toasts - Apple-inspired design */}

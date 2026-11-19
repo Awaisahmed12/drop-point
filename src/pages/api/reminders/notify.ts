@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { timingSafeEqual } from 'node:crypto';
 
 /**
  * The daily reminder email. Vercel's cron calls this once a day (see
@@ -52,7 +53,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (missing.length > 0) {
     return res.status(501).json({ error: `Reminder emails are not configured: set ${missing.join(', ')}` });
   }
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+  const expected = Buffer.from(`Bearer ${process.env.CRON_SECRET}`);
+  const given = Buffer.from(String(req.headers.authorization ?? ''));
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

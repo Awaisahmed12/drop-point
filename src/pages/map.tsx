@@ -74,7 +74,10 @@ async function reverseGeocode(lat: number, lng: number): Promise<{ address: stri
   const cached = getAddressFromCache(lat, lng);
   if (cached) return cached;
 
-  const res = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`, {
+    headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+  });
   if (!res.ok) throw new Error(`Reverse geocode failed: HTTP ${res.status}`);
   const data = await res.json();
   const first = data.results?.[0];
