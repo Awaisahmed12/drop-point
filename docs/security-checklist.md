@@ -17,6 +17,7 @@ This checklist is the canonical reference for pre-launch and ongoing security wo
 ### Secrets
 
 - Done — No secret is in the code or the git history (scanned for API keys, JWTs, private keys, tokens). `.env*` is ignored.
+- Done — CI builds with marker values for every server secret and fails if any (or an `sk_live_`/`re_`/`service_role` string) appears in `.next/static`, the files the browser downloads. Run it yourself: build, then `grep -r "sk_\|re_\|service_role" .next/static`.
 - Done — `NEXT_PUBLIC_*` variables are the only ones the browser sees: Supabase URL and anon key (public by design, RLS is the guard), the Google Maps browser key, the site URL, the auth-provider list and the OAuth client id. `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `CRON_SECRET` and `GOOGLE_MAPS_SERVER_API_KEY` are server-only.
 - Dashboard — Google Cloud → Credentials: restrict the **browser** Maps key to the site's HTTP referrers (`https://drop-point-xi.vercel.app/*` and the Vercel preview pattern) and to the Maps JavaScript, Places and Street View Static APIs. Create a **second key** for the server, restricted by API (Geocoding, Places) with no referrer, and set it as `GOOGLE_MAPS_SERVER_API_KEY` in Vercel. Until then the browser key must allow server calls, which means it cannot be referrer-restricted.
 - Dashboard — If the browser key was ever unrestricted, treat it as exposed: regenerate it in Google Cloud and update `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in Vercel.

@@ -38,7 +38,25 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
           NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ci-dummy-maps-key
+          # Marker values for every server-only secret. The next step fails
+          # if any of them, or a real-looking key, lands in the browser bundle.
+          SUPABASE_SERVICE_ROLE_KEY: CI_SECRET_MARKER_service_role
+          RESEND_API_KEY: CI_SECRET_MARKER_resend
+          CRON_SECRET: CI_SECRET_MARKER_cron
+          GOOGLE_MAPS_SERVER_API_KEY: CI_SECRET_MARKER_maps_server
+          REMINDER_FROM_EMAIL: CI_SECRET_MARKER_from
         run: npm run build
+
+      - name: No server secret in the browser bundle
+        # Only NEXT_PUBLIC_* values may reach .next/static. A secret named
+        # with that prefix by mistake, or inlined some other way, fails here.
+        run: |
+          if grep -rqE "CI_SECRET_MARKER_|sk_(live|test)_[A-Za-z0-9]{8,}|re_[A-Za-z0-9]{20,}|service_role" .next/static; then
+            echo "::error::A server-side secret is in the browser bundle:"
+            grep -rnoE "CI_SECRET_MARKER_[a-z_]+|sk_(live|test)_[A-Za-z0-9]{8,}|re_[A-Za-z0-9]{20,}|service_role" .next/static | head
+            exit 1
+          fi
+          echo "Browser bundle holds no server secret."
 
       - name: Unit tests
         run: npm run test:run
